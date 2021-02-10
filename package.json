@@ -18,5 +18,9 @@
   "homepage": "https://github.com/juncraul/Screeps-2021#readme",
   "devDependencies": {
     "gulp": "^4.0.2"
+  },
+  "dependencies": {
+    "@types/lodash": "^4.14.168",
+    "@types/screeps": "^3.2.1"
   }
 }
