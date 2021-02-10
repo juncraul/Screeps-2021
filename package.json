@@ -1,0 +1,19 @@
+{
+  "name": "screeps-2021",
+  "version": "1.0.0",
+  "description": "My Screeps Repo",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juncraul/Screeps-2021.git"
+  },
+  "author": "Raul Junc",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/juncraul/Screeps-2021/issues"
+  },
+  "homepage": "https://github.com/juncraul/Screeps-2021#readme"
+}
