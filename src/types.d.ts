@@ -1,16 +1,22 @@
-// example declaration file - remove these and add your own custom typings
 
 // memory extension samples
 interface CreepMemory {
   role: string;
   room: string;
   working: boolean;
+  task: any;
 }
 
 interface Memory {
   uuid: number;
   log: any;
   Keys: any; //TODO: Find a proper type for this
+}
+
+interface ITask{
+  activity: number;
+  creepType: number;
+  source: Source;
 }
 
 // `global` extension samples

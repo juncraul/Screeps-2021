@@ -1,10 +1,10 @@
 
-export default class Task{
-    activity: Activity;
-    creepType: CreepType;
+export default class Task implements ITask{
+    activity: number;
+    creepType: number;
     source: Source;
 
-    constructor(activity: Activity, creepType: CreepType, source: Source){
+    constructor(activity: number, creepType: number, source: Source){
         this.activity = activity;
         this.creepType = creepType;
         this.source = source;
@@ -12,7 +12,7 @@ export default class Task{
 }
 
 export enum Activity {
-    CreateCreep
+    Harvest
 }
 
 export enum CreepType {

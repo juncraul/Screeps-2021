@@ -8,6 +8,14 @@ export class Helper {
         return room.find(FIND_MY_SPAWNS);
     }
 
+    public static getRoomCreepsMine(room: Room): Creep[]{
+        return room.find(FIND_MY_CREEPS);
+    }
+
+    public static getRoomCreepsMineNoTask(room: Room): Creep[]{
+        return room.find(FIND_MY_CREEPS).filter(creep => creep.memory.task == null);
+    }
+
     public static getCashedMemory(key: string, defaultValue : any): any {
         let obj = Memory.Keys[key];
         if (obj == undefined) {
