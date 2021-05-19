@@ -16,7 +16,8 @@ interface Memory {
 interface ITask{
   activity: number;
   creepType: number;
-  source: Source;
+  targetPlace: RoomPosition;
+  taskDone: boolean;
 }
 
 // `global` extension samples

@@ -4,6 +4,7 @@ export class CreepBase {
     creep: Creep; 						// The creep that this wrapper class will control
     body: BodyPartDefinition[];    	 	// These properties are all wrapped from this.creep.* to this.*
     store: StoreDefinition;				// |
+    carryCurrent: number
     carryCapacity: number;				// |
     fatigue: number;					// |
     hits: number;						// |
@@ -28,6 +29,7 @@ export class CreepBase {
       this.creep = creep;
       this.body = creep.body;
       this.store = creep.store;
+      this.carryCurrent = creep.store.getUsedCapacity();
       this.carryCapacity = creep.carryCapacity;
       this.fatigue = creep.fatigue;
       this.hits = creep.hits;
@@ -51,22 +53,33 @@ export class CreepBase {
     workTheTask(){
         switch(this.task.activity){
             case Activity.Harvest:
-                let source: Source | null = Game.getObjectById(this.task.source.id);
+                let source: Source | null = Task.getSourceFromTarget(this.task.targetPlace);
                 if(source){
                     this.harvest(source);
                 }
-                break;
+                if(this.carryCapacity > 0 && this.carryCapacity == this.carryCurrent){
+                    this.task.taskDone = true;
+                }
+            break;
+            case Activity.Construct:
+                let constructionSite: ConstructionSite | null = Task.getConstructionSiteFromTarget(this.task.targetPlace);
+                if(constructionSite){
+                    this.build(constructionSite);
+                }
+                if(this.carryCurrent == 0){
+                    this.task.taskDone = true;
+                }
+            break;
         }
     }
 
-    // build(structure: ConstructionSite) {
-    //   let result = this.creep.build(structure);
-    //   if (result == ERR_NOT_IN_RANGE) {
-    //     this.goTo(structure.pos);
-    //   }
-    //   this.memory.targetId = structure.id;
-    //   return result;
-    // }
+     build(structure: ConstructionSite) {
+       let result = this.creep.build(structure);
+       if (result == ERR_NOT_IN_RANGE) {
+         this.goTo(structure.pos);
+       }
+       return result;
+     }
 
     // repair(structure: Structure) {
     //   let result = this.creep.repair(structure);

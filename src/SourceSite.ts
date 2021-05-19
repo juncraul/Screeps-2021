@@ -10,7 +10,7 @@ export default class SourceSite {
 
     constructor(source: Source, controller: StructureController){
         this.source = source;
-        this.maxWorkerCount = 1;
+        this.maxWorkerCount = 2;
         this.creeps = this.getCreepsAssignedToASource(source);
         this.room = source.room;
         this.controllerLevel = controller.level;
@@ -30,12 +30,16 @@ export default class SourceSite {
     private getCreepsAssignedToASource(source: Source): Creep[]{
         let creepsIds: string[] = Helper.getCashedMemory(`Source-${source.id}`, []);
         let creeps: Creep[] = [];
-        creepsIds.forEach(creepId =>{
-            let creep: Creep | null = Game.getObjectById(creepId);
+        for(let i: number = creepsIds.length; i >= 0; i--){
+            let creep: Creep | null = Game.getObjectById(creepsIds[i]);
             if(creep && creep.hits > 0){
                 creeps.push(creep);
+            }else{
+                //Clean up any dead creeps.
+                creepsIds.splice(i, 1);
             }
-        })
+        }
+        Helper.setCashedMemory(`Source-${source.id}`, creepsIds);
         return creeps;
     }
 
@@ -50,6 +54,6 @@ export default class SourceSite {
     }
 
     private createHarvesterWithCarry(source: Source): Task{
-        return new Task(Activity.Harvest, CreepType.HarvesterWithCarry, source);
+        return new Task(Activity.Harvest, CreepType.HarvesterWithCarry, source.pos);
     }
 }
