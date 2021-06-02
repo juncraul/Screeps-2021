@@ -1,4 +1,4 @@
-import Task, { Activity } from "Task";
+import CreepTask, { Activity } from "Tasks/CreepTask";
 
 export class CreepBase {
   creep: Creep; 						// The creep that this wrapper class will control
@@ -23,7 +23,7 @@ export class CreepBase {
   ticksToLive: number | undefined;	// |
   //lifetime: number;
   actionLog: { [actionName: string]: boolean }; // Tracks the actions that a creep has completed this tick
-  task: Task;
+  task: CreepTask;
 
   constructor(creep: Creep) {
     this.creep = creep;
@@ -50,23 +50,67 @@ export class CreepBase {
     this.task = creep.memory.task;
   }
 
+  addTask(task: CreepTask){
+    this.task = task;
+    this.creep.memory.task = task;
+  }
+
   workTheTask() {
     switch (this.task.activity) {
       case Activity.Harvest:
-        let source: Source | null = Task.getSourceFromTarget(this.task.targetPlace);
+        let source: Source | null = CreepTask.getSourceFromTarget(this.task.targetPlace);
         if (source) {
           this.harvest(source);
         }
         if (this.carryCapacity > 0 && this.carryCapacity == this.carryCurrent) {
+          this.creep.say("Har Done");
           this.task.taskDone = true;
         }
         break;
       case Activity.Construct:
-        let constructionSite: ConstructionSite | null = Task.getConstructionSiteFromTarget(this.task.targetPlace);
+        let constructionSite: ConstructionSite | null = CreepTask.getConstructionSiteFromTarget(this.task.targetPlace);
         if (constructionSite) {
           this.build(constructionSite);
         }
         if (this.carryCurrent == 0) {
+          this.creep.say("Con Done");
+          this.task.taskDone = true;
+        }
+        break;
+      case Activity.Deposit:
+        let structure: Structure | null = CreepTask.getStructureFromTarget(this.task.targetPlace);
+        if (structure) {
+          this.transfer(structure, RESOURCE_ENERGY);
+        }
+        if (this.carryCurrent == 0) {
+          this.creep.say("Dep Done");
+          this.task.taskDone = true;
+        }
+        break;
+      case Activity.Move:
+        this.goTo(this.task.targetPlace);
+        if (this.task.targetPlace == this.pos) {
+          this.creep.say("Move Done");
+          this.task.taskDone = true;
+        }
+        break;
+      case Activity.Collect:
+        let target: Structure | null = CreepTask.getStructureFromTarget(this.task.targetPlace);
+        if (target) {
+          this.withdraw(target, RESOURCE_ENERGY);
+        }
+        if (this.carryCurrent == 0) {
+          this.creep.say("Col Done");
+          this.task.taskDone = true;
+        }
+        break;
+      case Activity.Upgrade:
+        let controller: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
+        if (controller) {
+          this.upgradeController(controller);
+        }
+        if (this.carryCurrent == 0) {
+          this.creep.say("Upg Done");
           this.task.taskDone = true;
         }
         break;
@@ -103,28 +147,40 @@ export class CreepBase {
     return this.creep.moveTo(destination);
   };
 
-  //     transfer(target: Creep | Probe | Structure, resourceType: ResourceConstant, amount?: number) {
-  //       let result: ScreepsReturnCode;
-  //       if (target instanceof Probe) {
-  //         if (amount) {
-  //             result = this.creep.transfer(target.creep, resourceType, this.carry[resourceType]! < amount ? this.carry[resourceType]! : amount);
-  //         }
-  //         else {
-  //           result = this.creep.transfer(target.creep, resourceType);
-  //         }
-  //       } else {
-  //         if (amount) {
-  //           result = this.creep.transfer(target, resourceType, this.carry[resourceType]! < amount ? this.carry[resourceType]! : amount);
-  //         }
-  //         else {
-  //           result = this.creep.transfer(target, resourceType);
-  //         }
-  //       }
-  //       if (result == ERR_NOT_IN_RANGE) {
-  //         this.goTo(target.pos, { stroke: "#0000ff" });
-  //       }
-  //       return result;
-  //     }
+  isFree(): boolean{
+    return this.task == null || this.task.taskDone;
+  }
+
+  isFull(): boolean{
+    return this.store.getFreeCapacity() == 0;
+  }
+
+  say(whatToSay: string, toPublic?: boolean){
+    this.creep.say(whatToSay, toPublic);
+  }
+
+  transfer(target: Creep | CreepBase | Structure, resourceType: ResourceConstant, amount?: number) {
+    let result: ScreepsReturnCode;
+    if (target instanceof CreepBase) {
+      if (amount) {
+          result = this.creep.transfer(target.creep, resourceType, this.store[resourceType]! < amount ? this.store[resourceType]! : amount);
+      }
+      else {
+        result = this.creep.transfer(target.creep, resourceType);
+      }
+    } else {
+      if (amount) {
+        result = this.creep.transfer(target, resourceType, this.store[resourceType]! < amount ? this.store[resourceType]! : amount);
+      }
+      else {
+        result = this.creep.transfer(target, resourceType);
+      }
+    }
+    if (result == ERR_NOT_IN_RANGE) {
+      this.goTo(target.pos);
+    }
+    return result;
+  }
 
   //     transferAll(target: Creep | Probe | Structure) {
   //       let result: ScreepsReturnCode;
@@ -144,40 +200,40 @@ export class CreepBase {
   //       return result;
   //     }
 
-  //     withdraw(target: Tombstone | Structure, resourceType: ResourceConstant, amount?: number) {
-  //       let result;
-  //       if (amount) {
-  //         let freeSpace = this.carryCapacity - _.sum(this.carry);
-  //         result = this.creep.withdraw(target, resourceType, freeSpace < amount ? freeSpace : amount);
-  //       }
-  //       else {
-  //         result = this.creep.withdraw(target, resourceType);
-  //       }
-  //       if (result == ERR_NOT_IN_RANGE) {
-  //         this.goTo(target.pos, { stroke: "#00ffff" });
-  //       }
-  //       return result;
-  //     }
+  withdraw(target: Tombstone | Structure, resourceType: ResourceConstant, amount?: number) {
+    let result;
+    if (amount) {
+      let freeSpace = this.store.getFreeCapacity();
+      result = this.creep.withdraw(target, resourceType, freeSpace < amount ? freeSpace : amount);
+    }
+    else {
+      result = this.creep.withdraw(target, resourceType);
+    }
+    if (result == ERR_NOT_IN_RANGE) {
+      this.goTo(target.pos);
+    }
+    return result;
+  }
 
-  //     withdrawAll(target: Tombstone | Structure) {
-  //       let result: ScreepsReturnCode;
-  //       result = ERR_NOT_ENOUGH_RESOURCES;
-  //       if (target instanceof StructureLink) {
-  //         result = this.creep.withdraw(target, RESOURCE_ENERGY);
-  //       }
-  //       else if (target instanceof StructureLab) {
-  //         result = this.creep.withdraw(target, <ResourceConstant>target.mineralType);
-  //       }
-  //       else if (target instanceof Tombstone || target instanceof StructureContainer || target instanceof StructureStorage || target instanceof StructureTerminal) {
-  //         for (let resourceType in target.store) {
-  //           result = this.creep.withdraw(target, <ResourceConstant>resourceType);
-  //         }
-  //       }
-  //       if (result == ERR_NOT_IN_RANGE) {
-  //         this.goTo(target.pos, { stroke: "#00ffff" });
-  //       }
-  //       return result;
+  // withdrawAll(target: Tombstone | Structure) {
+  //   let result: ScreepsReturnCode;
+  //   result = ERR_NOT_ENOUGH_RESOURCES;
+  //   if (target instanceof StructureLink) {
+  //     result = this.creep.withdraw(target, RESOURCE_ENERGY);
+  //   }
+  //   else if (target instanceof StructureLab) {
+  //     result = this.creep.withdraw(target, <ResourceConstant>target.mineralType);
+  //   }
+  //   else if (target instanceof Tombstone || target instanceof StructureContainer || target instanceof StructureStorage || target instanceof StructureTerminal) {
+  //     for (let resourceType in target.store) {
+  //       result = this.creep.withdraw(target, <ResourceConstant>resourceType);
   //     }
+  //   }
+  //   if (result == ERR_NOT_IN_RANGE) {
+  //     this.goTo(target.pos, { stroke: "#00ffff" });
+  //   }
+  //   return result;
+  // }
 
   //     pickup(resource: Resource) {
   //       let result = this.creep.pickup(resource);
@@ -187,14 +243,13 @@ export class CreepBase {
   //       return result;
   //     }
 
-  //     upgradeController(controller: StructureController) {
-  //       let result = this.creep.upgradeController(controller);
-  //       if (result == ERR_NOT_IN_RANGE) {
-  //         this.goTo(controller.pos);
-  //       }
-  //       this.memory.targetId = controller.id;
-  //       return result;
-  //     }
+  upgradeController(controller: StructureController) {
+    let result = this.creep.upgradeController(controller);
+    if (result == ERR_NOT_IN_RANGE) {
+      this.goTo(controller.pos);
+    }
+    return result;
+  }
 
   //     reserve(controller: StructureController) {
   //       let result = this.creep.reserveController(controller);

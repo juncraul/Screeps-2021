@@ -1,5 +1,12 @@
 
 export class Helper {
+  public static getRoomController(room: Room): StructureController | null {
+    let structure = room.find(FIND_STRUCTURES, {filter: {structureType: STRUCTURE_CONTROLLER}})[0];
+    if(structure instanceof StructureController)
+      return structure;
+    return null
+  }
+
   public static getRoomSources(room: Room): Source[] {
     return room.find(FIND_SOURCES);
   }
