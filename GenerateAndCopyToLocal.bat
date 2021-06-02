@@ -1,0 +1,2 @@
+rollup -c
+CopyToLocal.bat

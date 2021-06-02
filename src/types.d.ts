@@ -13,7 +13,7 @@ interface Memory {
   Keys: any; //TODO: Find a proper type for this
 }
 
-interface ITask{
+interface ITask {
   activity: number;
   creepType: number;
   targetPlace: RoomPosition;
