@@ -13,7 +13,7 @@ export default class SourceSite extends BaseSite {
   containerConstructionSiteNextToSource: ConstructionSite | null;
 
   constructor(source: Source, controller: StructureController) {
-    super("SourceSite", source.id);
+    super("SourceSite", source.id, source.pos);
     this.source = source;
     this.room = source.room;
     this.maxWorkerCount = 1;

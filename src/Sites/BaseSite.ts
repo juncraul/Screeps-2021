@@ -4,10 +4,12 @@ import { CreepBase } from "../CreepBase";
 export default class SourceSite {
   memoryType: string;
   siteId: string;
+  sitePos: RoomPosition;
 
-  constructor(memoryType: string, siteId: string) {
+  constructor(memoryType: string, siteId: string, sitePos: RoomPosition) {
     this.memoryType = memoryType;
     this.siteId = siteId;
+    this.sitePos = sitePos;
   }
 
   getCreepsAssignedToThisSite(): CreepBase[] {

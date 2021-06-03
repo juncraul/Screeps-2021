@@ -12,20 +12,18 @@ export default class UpgradeSite extends BaseSite {
     controllerLevel: number;
     containerNextToUpgrade: StructureContainer | null;
     containerConstructionSiteNextToUpgrade: ConstructionSite | null;
-    sitePos: RoomPosition;
   
     constructor(controller: StructureController) {
-      super("Controller", controller.id)
+      super("Controller", controller.id, controller.pos)
       this.controller = controller;
       this.maxWorkerCount = this.calculateMaxWorkerCount();
       this.creeps = this.getCreepsAssignedToThisSite();
       this.room = controller.room;
       this.controllerLevel = controller.level;
-      let potentialContainer = controller.pos.findInRange(FIND_MY_STRUCTURES, 1, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
+      let potentialContainer = controller.pos.findInRange(FIND_STRUCTURES, 3, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
       let potentialContainerConstructionSite = controller.pos.findInRange(FIND_MY_CONSTRUCTION_SITES, 2, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
       this.containerNextToUpgrade = (potentialContainer instanceof StructureContainer) ? potentialContainer : null;
       this.containerConstructionSiteNextToUpgrade = (potentialContainerConstructionSite instanceof ConstructionSite) ? potentialContainerConstructionSite : null;
-      this.sitePos = controller.pos;
     }
   
     public handleUpgradeSite(): SpawnTask[] {
@@ -39,7 +37,7 @@ export default class UpgradeSite extends BaseSite {
       if (this.containerConstructionSiteNextToUpgrade) {
         for (let i: number = this.creeps.length - 1; i >= 0; i--){
           if(this.creeps[i].store.energy == 0 && this.creeps[i].isFree()){
-            let structureWithEnergy = this.sitePos.findClosestByRange(FIND_STRUCTURES, {filter: (str) => {return str.structureType == STRUCTURE_CONTAINER && str.store[RESOURCE_ENERGY] > 100}})
+            let structureWithEnergy = this.getStructureWithMoreThan100Energy();
             if(structureWithEnergy){
                 this.creeps[i].addTask(new CreepTask(Activity.Collect, structureWithEnergy.pos))
             }
@@ -51,7 +49,7 @@ export default class UpgradeSite extends BaseSite {
       if (this.containerNextToUpgrade){
         for (let i: number = this.creeps.length - 1; i >= 0; i--){
           if(this.creeps[i].store.energy == 0 && this.creeps[i].isFree()){
-            let structureWithEnergy = this.sitePos.findClosestByRange(FIND_STRUCTURES, {filter: (str) => {return str.structureType == STRUCTURE_CONTAINER && str.store[RESOURCE_ENERGY] > 100}})
+            let structureWithEnergy = this.getStructureWithMoreThan100Energy();
             if(structureWithEnergy){
                 this.creeps[i].addTask(new CreepTask(Activity.Collect, structureWithEnergy.pos))
             }
@@ -61,6 +59,10 @@ export default class UpgradeSite extends BaseSite {
         }
       }
       return tasksForThisUpgradeSite;
+    }
+
+    private getStructureWithMoreThan100Energy(): AnyStructure | null {
+      return this.sitePos.findClosestByRange(FIND_STRUCTURES, {filter: (str) => {return str.structureType == STRUCTURE_CONTAINER && str.store[RESOURCE_ENERGY] > 100}})
     }
 
     private calculateMaxWorkerCount(): number{

@@ -10,5 +10,6 @@ export default class SpawnTask  {
 
 export enum SpawnType {
   Harvester = 0,
-  Upgrader = 1
+  Upgrader = 1,
+  Carrier = 2
 }
