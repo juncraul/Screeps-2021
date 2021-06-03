@@ -1,10 +1,10 @@
 import { CreepBase } from "CreepBase";
 import CreepTask, { Activity } from "Tasks/CreepTask";
-import { Helper } from "Helper";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
+import BaseSite from "./BaseSite";
 
 
-export default class UpgradeSite {
+export default class UpgradeSite extends BaseSite {
     controller: StructureController;
     room: Room;
     creeps: CreepBase[];
@@ -12,13 +12,12 @@ export default class UpgradeSite {
     controllerLevel: number;
     containerNextToUpgrade: StructureContainer | null;
     containerConstructionSiteNextToUpgrade: ConstructionSite | null;
-    memoryType: string;
-    siteId: string;
     sitePos: RoomPosition;
   
     constructor(controller: StructureController) {
+      super("Controller", controller.id)
       this.controller = controller;
-      this.maxWorkerCount = 1;
+      this.maxWorkerCount = this.calculateMaxWorkerCount();
       this.creeps = this.getCreepsAssignedToThisSite();
       this.room = controller.room;
       this.controllerLevel = controller.level;
@@ -26,8 +25,6 @@ export default class UpgradeSite {
       let potentialContainerConstructionSite = controller.pos.findInRange(FIND_MY_CONSTRUCTION_SITES, 2, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
       this.containerNextToUpgrade = (potentialContainer instanceof StructureContainer) ? potentialContainer : null;
       this.containerConstructionSiteNextToUpgrade = (potentialContainerConstructionSite instanceof ConstructionSite) ? potentialContainerConstructionSite : null;
-      this.memoryType = "Controller";
-      this.siteId = controller.id;
       this.sitePos = controller.pos;
     }
   
@@ -42,7 +39,7 @@ export default class UpgradeSite {
       if (this.containerConstructionSiteNextToUpgrade) {
         for (let i: number = this.creeps.length - 1; i >= 0; i--){
           if(this.creeps[i].store.energy == 0 && this.creeps[i].isFree()){
-            let structureWithEnergy = this.sitePos.findClosestByRange(FIND_STRUCTURES, {filter: (str) => {str.structureType == STRUCTURE_CONTAINER && str.store[RESOURCE_ENERGY] > 100}})
+            let structureWithEnergy = this.sitePos.findClosestByRange(FIND_STRUCTURES, {filter: (str) => {return str.structureType == STRUCTURE_CONTAINER && str.store[RESOURCE_ENERGY] > 100}})
             if(structureWithEnergy){
                 this.creeps[i].addTask(new CreepTask(Activity.Collect, structureWithEnergy.pos))
             }
@@ -54,7 +51,7 @@ export default class UpgradeSite {
       if (this.containerNextToUpgrade){
         for (let i: number = this.creeps.length - 1; i >= 0; i--){
           if(this.creeps[i].store.energy == 0 && this.creeps[i].isFree()){
-            let structureWithEnergy = this.sitePos.findClosestByRange(FIND_STRUCTURES, {filter: (str) => {str.structureType == STRUCTURE_CONTAINER && str.store[RESOURCE_ENERGY] > 100}})
+            let structureWithEnergy = this.sitePos.findClosestByRange(FIND_STRUCTURES, {filter: (str) => {return str.structureType == STRUCTURE_CONTAINER && str.store[RESOURCE_ENERGY] > 100}})
             if(structureWithEnergy){
                 this.creeps[i].addTask(new CreepTask(Activity.Collect, structureWithEnergy.pos))
             }
@@ -65,21 +62,13 @@ export default class UpgradeSite {
       }
       return tasksForThisUpgradeSite;
     }
-  
-    private getCreepsAssignedToThisSite(): CreepBase[] {
-      let creepsIds: string[] = Helper.getCashedMemory(`${this.memoryType}-${this.siteId}`, []);
-      let creeps: CreepBase[] = [];
-      for (let i: number = creepsIds.length - 1; i >= 0; i--) {
-        let creep: Creep | null = Game.getObjectById(creepsIds[i]);
-        if (creep && creep.hits > 0) {
-          creeps.push(new CreepBase(creep));
-        } else {
-          //Clean up any dead creeps.
-          creepsIds.splice(i, 1);
-        }
+
+    private calculateMaxWorkerCount(): number{
+      if(this.containerNextToUpgrade){
+        return 1;
+      }else{
+        return 3;
       }
-      Helper.setCashedMemory(`${this.memoryType}-${this.siteId}`, creepsIds);
-      return creeps;
     }
   
     private createNewUpgraderCreeps(): SpawnTask | null {

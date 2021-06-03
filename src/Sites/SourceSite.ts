@@ -1,9 +1,9 @@
-import { Helper } from "Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import { CreepBase } from "../CreepBase";
+import BaseSite from "./BaseSite";
 
-export default class SourceSite {
+export default class SourceSite extends BaseSite {
   source: Source;
   room: Room;
   creeps: CreepBase[];
@@ -13,10 +13,11 @@ export default class SourceSite {
   containerConstructionSiteNextToSource: ConstructionSite | null;
 
   constructor(source: Source, controller: StructureController) {
+    super("SourceSite", source.id);
     this.source = source;
-    this.maxWorkerCount = 1;
-    this.creeps = this.getCreepsAssignedToASource(source);
     this.room = source.room;
+    this.maxWorkerCount = 1;
+    this.creeps = this.getCreepsAssignedToThisSite();
     this.controllerLevel = controller.level;
     let potentialContainer = source.pos.findInRange(FIND_STRUCTURES, 2, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
     let potentialContainerConstructionSite = source.pos.findInRange(FIND_MY_CONSTRUCTION_SITES, 1, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
@@ -52,22 +53,6 @@ export default class SourceSite {
       }
     }
     return tasksForThisSourceSite;
-  }
-
-  private getCreepsAssignedToASource(source: Source): CreepBase[] {
-    let creepsIds: string[] = Helper.getCashedMemory(`Source-${source.id}`, []);
-    let creeps: CreepBase[] = [];
-    for (let i: number = creepsIds.length - 1; i >= 0; i--) {
-      let creep: Creep | null = Game.getObjectById(creepsIds[i]);
-      if (creep && creep.hits > 0) {
-        creeps.push(new CreepBase(creep));
-      } else {
-        //Clean up any dead creeps.
-        creepsIds.splice(i, 1);
-      }
-    }
-    Helper.setCashedMemory(`Source-${source.id}`, creepsIds);
-    return creeps;
   }
 
   private createNewHarvesterCreeps(): SpawnTask | null {

@@ -103,6 +103,23 @@ export default class Overseer implements IOverseer {
         }
         if (spawn.spawnCreep([WORK, CARRY, MOVE], creepName) == OK) {
           theNewCreep = Game.creeps[creepName];
+        }else{
+          return;
+        }
+        let creepNames: [string];
+        switch(task.spawnType){
+          case SpawnType.Harvester:
+            creepNames = Helper.getCashedMemory(`SourceSite-${task.siteId}`, []);
+            creepNames.push(creepName)
+            Helper.setCashedMemory(`SourceSite-${task.siteId}`, creepNames);
+            break;
+          case SpawnType.Upgrader:
+            creepNames = Helper.getCashedMemory(`Controller-${task.siteId}`, []);
+            creepNames.push(creepName)
+            Helper.setCashedMemory(`Controller-${task.siteId}`, creepNames);
+            break;
+          default:
+            throw `Spawn type not implemented: ${task.spawnType}`
         }
       }
     })
