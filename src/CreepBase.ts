@@ -56,6 +56,8 @@ export class CreepBase {
   }
 
   workTheTask() {
+    if(!this.task)
+      return;
     switch (this.task.activity) {
       case Activity.Harvest:
         let source: Source | null = CreepTask.getSourceFromTarget(this.task.targetPlace);
@@ -99,7 +101,7 @@ export class CreepBase {
         if (target) {
           this.withdraw(target, RESOURCE_ENERGY);
         }
-        if (this.carryCurrent == 0) {
+        if (this.carryCurrent == this.carryCapacity) {
           this.creep.say("Col Done");
           this.task.taskDone = true;
         }
@@ -146,6 +148,10 @@ export class CreepBase {
   ) {
     return this.creep.moveTo(destination);
   };
+
+  isEmpty(): boolean{
+    return this.store.getUsedCapacity() == 0;
+  }
 
   isFree(): boolean{
     return this.task == null || this.task.taskDone;
