@@ -5,11 +5,13 @@ export default class SourceSite {
   memoryType: string;
   siteId: string;
   sitePos: RoomPosition;
+  creeps: CreepBase[];
 
   constructor(memoryType: string, siteId: string, sitePos: RoomPosition) {
     this.memoryType = memoryType;
     this.siteId = siteId;
     this.sitePos = sitePos;
+    this.creeps = this.getCreepsAssignedToThisSite();
   }
 
   getCreepsAssignedToThisSite(): CreepBase[] {
@@ -39,9 +41,13 @@ export default class SourceSite {
     }
     let ruins: Ruin[] = Game.rooms[this.sitePos.roomName].find(FIND_RUINS);
     for (let i: number = ruins.length - 1; i >= 0; i --){
-      if(ruins[i].store.getUsedCapacity() != 0)
+      if(ruins[i].store.getUsedCapacity(RESOURCE_ENERGY) != 0)
         containers.push(ruins[i]);
     }
     return containers;
+  }
+
+  getNumberOfDyingCreeps(): number{
+    return this.creeps.filter(function (creep) {return creep.ticksToLive && creep.ticksToLive < 50}).length;
   }
 }

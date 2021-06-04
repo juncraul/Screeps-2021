@@ -86,6 +86,12 @@ export class CreepBase {
         if (structure) {
           this.transfer(structure, RESOURCE_ENERGY);
         }
+        if(structure instanceof StructureSpawn || structure instanceof StructureExtension || structure instanceof StructureTower){
+          if(structure.store.getFreeCapacity(RESOURCE_ENERGY) == 0){
+            this.creep.say("Str Full");
+            this.task.taskDone = true;
+          }
+        }
         if (this.carryCurrent == 0) {
           this.creep.say("Dep Done");
           this.task.taskDone = true;

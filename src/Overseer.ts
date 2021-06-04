@@ -82,29 +82,8 @@ export default class Overseer implements IOverseer {
     let theNewCreep: Creep | null = null;
     spawns.forEach(spawn => {
       if (spawn.spawning == null) {
-        let creepName: string;
-        let bodyPartConstant: BodyPartConstant[] = [];
-        switch(task.spawnType){
-          case SpawnType.Harvester:
-            creepName = `Harvester-${Game.time}`;
-            bodyPartConstant = [WORK, CARRY, MOVE];
-            break;
-          case SpawnType.Upgrader:
-            creepName = `Upgrader-${Game.time}`;
-            bodyPartConstant = [WORK, CARRY, MOVE];
-            break;
-          case SpawnType.Carrier:
-            creepName = `Carrier-${Game.time}`;
-            bodyPartConstant = [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
-            break;
-          case SpawnType.Constructor:
-            creepName = `Constructor-${Game.time}`;
-            bodyPartConstant = [WORK, CARRY, MOVE];
-            break;
-          default:
-            throw `Spawn type not implemented: ${task.spawnType}`;
-        }
-        if (spawn.spawnCreep(bodyPartConstant, creepName) == OK) {
+        let creepName: string = `${task.name}-${Game.time}`;
+        if (spawn.spawnCreep(task.bodyPartConstant, creepName) == OK) {
           theNewCreep = Game.creeps[creepName];
         }else{
           return;

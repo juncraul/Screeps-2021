@@ -1,10 +1,14 @@
 export default class SpawnTask  {
   spawnType: SpawnType;
   siteId: string;
+  name: string;
+  bodyPartConstant: BodyPartConstant[];
 
-  constructor(spawnType: SpawnType, siteId: string) {
+  constructor(spawnType: SpawnType, siteId: string, name: string, bodyPartConstant: BodyPartConstant[]) {
     this.spawnType = spawnType;
     this.siteId = siteId;
+    this.name = name;
+    this.bodyPartConstant = bodyPartConstant;
   }
 
   public getSpawnTypeText(): string {

@@ -7,7 +7,6 @@ import BaseSite from "./BaseSite";
 export default class SourceSite extends BaseSite {
   source: Source;
   room: Room;
-  creeps: CreepBase[];
   maxWorkerCount: number;
   controllerLevel: number;
   containerNextToSource: StructureContainer | null;
@@ -18,7 +17,6 @@ export default class SourceSite extends BaseSite {
     this.source = source;
     this.room = source.room;
     this.maxWorkerCount = 1;
-    this.creeps = this.getCreepsAssignedToThisSite();
     this.controllerLevel = controller.level;
     let potentialContainer = source.pos.findInRange(FIND_STRUCTURES, 2, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
     let potentialContainerConstructionSite = source.pos.findInRange(FIND_MY_CONSTRUCTION_SITES, 1, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
@@ -63,16 +61,34 @@ export default class SourceSite extends BaseSite {
   }
 
   private createNewHarvesterCreeps(): SpawnTask | null {
-    switch (this.controllerLevel) {
-      case 1:
-      case 2:
-      case 3:
-        return this.createHarvesterWithCarry();
+    let bodyPartConstants: BodyPartConstant[] =[]
+    if(this.containerNextToSource){
+      let segments = Math.floor(this.room.energyCapacityAvailable / 150);//Work-100; Move-50
+      if(segments < 2){
+        console.log("Something wrong with room capacity")
+      } else if(segments == 2){//300 energy
+        bodyPartConstants = [WORK, WORK, MOVE, MOVE]
+      } else if(segments == 3){//450 energy
+        bodyPartConstants = [WORK, WORK, WORK, MOVE, MOVE, MOVE]
+      } else if(segments == 4){//600 energy
+        bodyPartConstants = [WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE]
+      } else if(segments >= 5){//800 energy - This is the ideal creep with 10 energy collected per tick, enough for source refresh.
+        bodyPartConstants = [WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE, MOVE]
+      }
+    }else{
+      let segments = Math.floor(this.room.energyCapacityAvailable / 200);//Work-100; Move-50; Carry-50
+      if(segments < 1){
+        console.log("Something wrong with room capacity")
+      } else if(segments == 1){//200 energy
+        bodyPartConstants = [WORK, MOVE, CARRY]
+      } else if(segments == 2){//400 energy
+        bodyPartConstants = [WORK, WORK, MOVE, MOVE, CARRY, CARRY]
+      } else if(segments == 3){//600 energy
+        bodyPartConstants = [WORK, WORK, WORK, MOVE, MOVE, MOVE, CARRY, CARRY, CARRY]
+      } else if(segments >= 4){//800 energy
+        bodyPartConstants = [WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE, CARRY, CARRY, CARRY, CARRY]
+      }
     }
-    return null
-  }
-
-  private createHarvesterWithCarry(): SpawnTask {
-    return new SpawnTask(SpawnType.Harvester, this.source.id);
+    return new SpawnTask(SpawnType.Harvester, this.source.id, "Harvester", bodyPartConstants);
   }
 }

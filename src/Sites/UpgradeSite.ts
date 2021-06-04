@@ -7,7 +7,6 @@ import BaseSite from "./BaseSite";
 export default class UpgradeSite extends BaseSite {
     controller: StructureController;
     room: Room;
-    creeps: CreepBase[];
     maxWorkerCount: number;
     controllerLevel: number;
     containerNextToUpgrade: StructureContainer | null;
@@ -17,7 +16,6 @@ export default class UpgradeSite extends BaseSite {
       super("Controller", controller.id, controller.pos)
       this.controller = controller;
       this.maxWorkerCount = this.calculateMaxWorkerCount();
-      this.creeps = this.getCreepsAssignedToThisSite();
       this.room = controller.room;
       this.controllerLevel = controller.level;
       let potentialContainer = controller.pos.findInRange(FIND_STRUCTURES, 3, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
@@ -84,7 +82,7 @@ export default class UpgradeSite extends BaseSite {
     }
   
     private createHarvesterWithCarry(): SpawnTask {
-      return new SpawnTask(SpawnType.Upgrader, this.siteId);
+      return new SpawnTask(SpawnType.Upgrader, this.siteId, "Upgrader", [WORK, CARRY, MOVE]);
     }
   }
   

@@ -25,7 +25,23 @@ export class Helper {
     return room.find(FIND_HOSTILE_SPAWNS);
   }
 
-  public static getRoomCreepsMine(room: Room, mine?: boolean): Creep[] {
+  public static getRoomExtensions(room: Room, mine?: boolean): StructureExtension[] {
+    let structures: Structure[];
+    let extensions: StructureExtension[] = [];
+    if(mine){
+      structures = room.find(FIND_MY_STRUCTURES, {filter: {structureType: STRUCTURE_EXTENSION}});
+    }else{
+      structures = room.find(FIND_STRUCTURES, {filter: {structureType: STRUCTURE_EXTENSION}});
+    }
+    structures.forEach(structure => {
+      if(structure instanceof StructureExtension){
+        extensions.push(structure)
+      }
+    })
+    return extensions;
+  }
+
+  public static getRoomCreeps(room: Room, mine?: boolean): Creep[] {
     if(mine){
       return room.find(FIND_MY_CREEPS);
     }

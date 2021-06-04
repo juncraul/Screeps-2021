@@ -7,7 +7,6 @@ import BaseSite from "./BaseSite";
 export default class ConstructionArea extends BaseSite {
     controller: StructureController;
     room: Room;
-    creeps: CreepBase[];
     maxWorkerCount: number;
     controllerLevel: number;
     containersToCollectFrom: (StructureContainer | Ruin)[];
@@ -15,7 +14,6 @@ export default class ConstructionArea extends BaseSite {
     constructor(controller: StructureController) {
       super("ConstructionArea", controller.room.name, controller.pos)
       this.controller = controller;
-      this.creeps = this.getCreepsAssignedToThisSite();
       this.room = controller.room;
       this.controllerLevel = controller.level;
       this.containersToCollectFrom = this.getContainersToCollectFrom();
@@ -63,7 +61,7 @@ export default class ConstructionArea extends BaseSite {
         return 0;
       let constructions = this.getConstructionsInRoom(this.room);
       let sumOfConstructionPoint = constructions.reduce(function(accumulator, item){return accumulator + item.progressTotal - item.progress}, 0)
-      return sumOfConstructionPoint / 2000 >= 3 ? 3 : sumOfConstructionPoint / 2000 + 1;
+      return sumOfConstructionPoint / 5000 >= 3 ? 3 : sumOfConstructionPoint / 5000 + 1;
     }
   
     private createNewConstructionCreeps(): SpawnTask | null {
@@ -77,7 +75,7 @@ export default class ConstructionArea extends BaseSite {
     }
   
     private createHarvesterWithCarry(): SpawnTask {
-      return new SpawnTask(SpawnType.Constructor, this.siteId);
+      return new SpawnTask(SpawnType.Constructor, this.siteId, "Constructor", [WORK, CARRY, MOVE]);
     }
   }
   
