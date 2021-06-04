@@ -67,9 +67,9 @@ export default class Overseer implements IOverseer {
 
   private handleRoomTasks(room: Room, newTasks: SpawnTask[]) {
     if(newTasks.length > 0){
-      room.visual.text("List of spawns", 10, 10, { align: 'left', opacity: 0.5, color: "#ff0000" });
+      room.visual.text("List of spawns", 30, 25, { align: 'left', opacity: 0.5, color: "#ff0000" });
       for(let i: number = 0; i < newTasks.length; i ++){
-        room.visual.text(newTasks[i].getSpawnTypeText(), 10, 11 + i, { align: 'left', opacity: 0.5, color: "#ff0000" });
+        room.visual.text(newTasks[i].getSpawnTypeText(), 30, 26 + i, { align: 'left', opacity: 0.5, color: "#ff0000" });
       }
     }
     if(newTasks.length > 0){//Will try to spawn only the first creep in the list.

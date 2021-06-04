@@ -93,7 +93,7 @@ export default class CarrySite extends BaseSite {
       let segments = Math.floor(this.room.energyCapacityAvailable / 100);//Carry-50; Move-50
       if(this.creeps.length == 0){//Note: In this situation, there is no way to fill extensions
         //Use energyAvailable to setup the segments with 3 as a cap. A.k.a. wait till Spawn has 300 energy.
-        segments = Math.floor(this.room.energyAvailable / 100) > 3 ? Math.floor(this.room.energyCapacityAvailable / 100) : 3;
+        segments = Math.floor(this.room.energyAvailable / 100) > 3 ? Math.floor(this.room.energyAvailable / 100) : 3;
       }
       if(segments < 3){
         console.log("Something wrong with room capacity")
@@ -106,7 +106,7 @@ export default class CarrySite extends BaseSite {
       } else if(segments >= 6){//600 energy
         bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
       }
-      return new SpawnTask(SpawnType.Harvester, this.siteId, "Carrier", bodyPartConstants);
+      return new SpawnTask(SpawnType.Carrier, this.siteId, "Carrier", bodyPartConstants);
     }
   }
   
