@@ -30,22 +30,23 @@ export default class ConstructionArea extends BaseSite {
           tasksForThisSite.push(task);
         }
       }
-      for( let i: number = this.containersToCollectFrom.length - 1; i >= 0; i --){
-        if(this.containersToCollectFrom[i].store.energy < 200)
-          continue;
-        for(let j: number = this.creeps.length - 1; j >= 0; j --){
-          if(this.creeps[j].isEmpty() && this.creeps[j].isFree()){
-            this.creeps[j].addTask(new CreepTask(Activity.Collect, this.containersToCollectFrom[i].pos))
-            continue;//This is so that not all creeps get sent to same container.
+      for(let i: number = 0; i < this.creeps.length; i ++){
+        if(this.creeps[i].isEmpty() && this.creeps[i].isFree()){
+          for( let j: number = 0; j < this.containersToCollectFrom.length; j ++){
+            if(this.containersToCollectFrom[j].store.energy < 200)
+              continue;
+            this.creeps[i].addTask(new CreepTask(Activity.Collect, this.containersToCollectFrom[j].pos))
+            continue;//This is so that not all creeps get sent to same container.  
           }
-          if(!this.creeps[j].isEmpty() && this.creeps[j].isFree()){
-            let constructionArea = this.getConstructionClosestByPoint(this.creeps[j].pos);
-            if(constructionArea){
-              this.creeps[j].addTask(new CreepTask(Activity.Construct, constructionArea.pos))
-            }
+        }
+        if(!this.creeps[i].isEmpty() && this.creeps[i].isFree()){
+          let constructionArea = this.getConstructionClosestByPoint(this.creeps[i].pos);
+          if(constructionArea){
+            this.creeps[i].addTask(new CreepTask(Activity.Construct, constructionArea.pos))
           }
         }
       }
+      
       return tasksForThisSite;
     }
 

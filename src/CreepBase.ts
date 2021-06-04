@@ -93,15 +93,15 @@ export class CreepBase {
         break;
       case Activity.Move:
         let roomPosition = CreepTask.getRoomPositionFromTarget(this.task.targetPlace)
-        this.goTo(this.task.targetPlace);
-        if (Helper.isSamePosition(this.pos, this.task.targetPlace)) {
+        this.goTo(roomPosition);
+        if (Helper.isSamePosition(this.pos, roomPosition)) {
           this.creep.say("Move Done");
           this.task.taskDone = true;
         }
         break;
       case Activity.Collect:
         let target: Structure | Ruin | null = CreepTask.getStructureFromTarget(this.task.targetPlace);
-        if (!target){
+        if (!target || target.structureType == STRUCTURE_ROAD || target.structureType == STRUCTURE_RAMPART){
           target = CreepTask.getRuinFromTarget(this.task.targetPlace);
         }
         if (target) {

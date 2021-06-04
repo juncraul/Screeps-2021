@@ -3,7 +3,7 @@ import SourceSite from "Sites/SourceSite";
 import UpgradeSite from "Sites/UpgradeSite";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import CarrySite from "Sites/CarrySite";
-import ConstructionArea from "Sites/ConstructionSite";
+import ConstructionArea from "Sites/ConstructionArea";
 
 export default class Overseer implements IOverseer {
 

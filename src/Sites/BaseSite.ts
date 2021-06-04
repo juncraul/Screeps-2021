@@ -39,6 +39,7 @@ export default class SourceSite {
     }
     let ruins: Ruin[] = Game.rooms[this.sitePos.roomName].find(FIND_RUINS);
     for (let i: number = ruins.length - 1; i >= 0; i --){
+      if(ruins[i].store.getUsedCapacity() != 0)
         containers.push(ruins[i]);
     }
     return containers;

@@ -36,23 +36,22 @@ export default class CarrySite extends BaseSite {
           tasksForThisUpgradeSite.push(task);
         }
       }
-      for( let i: number = this.containersToCollectFrom.length - 1; i >= 0; i --){
-        if(this.containersToCollectFrom[i].store.energy < 200)
-          continue;
-        for(let j: number = this.creeps.length - 1; j >= 0; j --){
-          if(this.creeps[j].isEmpty() && this.creeps[j].isFree()){
-            this.creeps[j].addTask(new CreepTask(Activity.Collect, this.containersToCollectFrom[i].pos))
-            continue;//This is so that not all creeps get sent to same container.
+      for(let i: number = 0; i < this.creeps.length; i ++){
+        if(this.creeps[i].isEmpty() && this.creeps[i].isFree()){
+          for( let j: number = 0; j < this.containersToCollectFrom.length; j ++){
+            if(this.containersToCollectFrom[j].store.energy < 200)
+              continue;
+            this.creeps[i].addTask(new CreepTask(Activity.Collect, this.containersToCollectFrom[j].pos))
           }
-          if(this.creeps[j].isFull() && this.creeps[j].isFree()){
-            this.spawns.forEach(spawn =>{
-              this.creeps[j].addTask(new CreepTask(Activity.Deposit, spawn.pos))
-            })
-          }
-          if(this.creeps[j].isFull() && this.creeps[j].isFree()){
-            if(this.containerNextToController){
-              this.creeps[j].addTask(new CreepTask(Activity.Deposit, this.containerNextToController.pos))
-            }
+        }
+        if(this.creeps[i].isFull() && this.creeps[i].isFree()){
+          this.spawns.forEach(spawn =>{
+            this.creeps[i].addTask(new CreepTask(Activity.Deposit, spawn.pos))
+          })
+        }
+        if(this.creeps[i].isFull() && this.creeps[i].isFree()){
+          if(this.containerNextToController){
+            this.creeps[i].addTask(new CreepTask(Activity.Deposit, this.containerNextToController.pos))
           }
         }
       }
