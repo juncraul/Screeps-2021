@@ -1,9 +1,9 @@
 import { Helper } from "Helper";
 import SourceSite from "Sites/SourceSite";
-import CreepTask, { Activity } from "Tasks/CreepTask";
 import UpgradeSite from "Sites/UpgradeSite";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import CarrySite from "Sites/CarrySite";
+import ConstructionArea from "Sites/ConstructionSite";
 
 export default class Overseer implements IOverseer {
 
@@ -22,6 +22,7 @@ export default class Overseer implements IOverseer {
     tasks = tasks.concat(this.handleHarvestSite(room));
     tasks = tasks.concat(this.handleUpgradeSite(room));
     tasks = tasks.concat(this.handleCarrySite(room));
+    tasks = tasks.concat(this.handleConstructionArea(room));
     return tasks;
   }
 
@@ -55,25 +56,29 @@ export default class Overseer implements IOverseer {
     return tasks;
   }
 
-  //private handleConstructions(room: Room): SpawnTask[] {
-  //  if (!room.controller)
-  //    return [];
-  //  let tasks: SpawnTask[] = [];
-  //  let constructionSites: ConstructionSite[] = Helper.getRoomConstructions(room);
-  //  constructionSites.forEach(constructionSite => {
-  //    tasks.push(new CreepTask(Activity.Construct, constructionSite.pos))
-  //  });
-  //  return tasks;
-  //}
+  private handleConstructionArea(room: Room): SpawnTask[] {
+    if (!room.controller)
+      return [];
+    let tasks: SpawnTask[] = [];
+      let constructionSite: ConstructionArea = new ConstructionArea(room.controller);
+      tasks = tasks.concat(constructionSite.handleConstructionArea());
+    return tasks;
+  }
 
   private handleRoomTasks(room: Room, newTasks: SpawnTask[]) {
-    newTasks.forEach(task => {
-        this.createNewCreep(room, task)
-    });
+    if(newTasks.length > 0){
+      room.visual.text("List of spawns", 10, 10, { align: 'left', opacity: 0.5, color: "#ff0000" });
+      for(let i: number = 0; i < newTasks.length; i ++){
+        room.visual.text(newTasks[i].getSpawnTypeText(), 10, 11 + i, { align: 'left', opacity: 0.5, color: "#ff0000" });
+      }
+    }
+    if(newTasks.length > 0){//Will try to spawn only the first creep in the list.
+      this.createNewCreep(room, newTasks[0])
+    }
   }
 
   private createNewCreep(room: Room, task: SpawnTask): Creep | null {
-    let spawns: StructureSpawn[] = Helper.getRoomSpawns(room);
+    let spawns: StructureSpawn[] = Helper.getRoomSpawns(room, true);
     let theNewCreep: Creep | null = null;
     spawns.forEach(spawn => {
       if (spawn.spawning == null) {
@@ -91,6 +96,10 @@ export default class Overseer implements IOverseer {
           case SpawnType.Carrier:
             creepName = `Carrier-${Game.time}`;
             bodyPartConstant = [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
+            break;
+          case SpawnType.Constructor:
+            creepName = `Constructor-${Game.time}`;
+            bodyPartConstant = [WORK, CARRY, MOVE];
             break;
           default:
             throw `Spawn type not implemented: ${task.spawnType}`;
@@ -116,6 +125,11 @@ export default class Overseer implements IOverseer {
             creepNames = Helper.getCashedMemory(`CarrySite-${task.siteId}`, []);
             creepNames.push(creepName)
             Helper.setCashedMemory(`CarrySite-${task.siteId}`, creepNames);
+            break;
+          case SpawnType.Constructor:
+            creepNames = Helper.getCashedMemory(`ConstructionArea-${task.siteId}`, []);
+            creepNames.push(creepName)
+            Helper.setCashedMemory(`ConstructionArea-${task.siteId}`, creepNames);
             break;
           default:
             throw `Spawn type not implemented: ${task.spawnType}`

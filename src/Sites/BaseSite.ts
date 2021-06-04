@@ -27,4 +27,20 @@ export default class SourceSite {
     Helper.setCashedMemory(`${this.memoryType}-${this.siteId}`, creepsNames);
     return creeps;
   }
+  
+  getContainersToCollectFrom(): (StructureContainer | Ruin)[]{
+    let containers: (StructureContainer | Ruin)[] = [];
+    let sources: Source[] = Game.rooms[this.sitePos.roomName].find(FIND_SOURCES);
+    for (let i: number = sources.length - 1; i >= 0; i --){
+      let potentialContainer = sources[i].pos.findInRange(FIND_STRUCTURES, 1, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
+      if(potentialContainer && potentialContainer instanceof StructureContainer){
+        containers.push(potentialContainer);
+      }
+    }
+    let ruins: Ruin[] = Game.rooms[this.sitePos.roomName].find(FIND_RUINS);
+    for (let i: number = ruins.length - 1; i >= 0; i --){
+        containers.push(ruins[i]);
+    }
+    return containers;
+  }
 }

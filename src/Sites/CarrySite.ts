@@ -1,4 +1,5 @@
 import { CreepBase } from "CreepBase";
+import { Helper } from "Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import BaseSite from "./BaseSite";
@@ -11,10 +12,11 @@ export default class CarrySite extends BaseSite {
     maxWorkerCount: number;
     controllerLevel: number;
     containerNextToController: StructureContainer | null;
-    containersToCollectFrom: StructureContainer[];
+    spawns: StructureSpawn[];
+    containersToCollectFrom: (StructureContainer | Ruin)[];
   
     constructor(controller: StructureController) {
-      super("CarrySite", controller.id, controller.pos)
+      super("CarrySite", controller.room.name, controller.pos)
       this.controller = controller;
       this.maxWorkerCount = 1;
       this.creeps = this.getCreepsAssignedToThisSite();
@@ -22,6 +24,7 @@ export default class CarrySite extends BaseSite {
       this.controllerLevel = controller.level;
       let potentialContainer = controller.pos.findInRange(FIND_STRUCTURES, 3, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
       this.containerNextToController = (potentialContainer instanceof StructureContainer) ? potentialContainer : null;
+      this.spawns = Helper.getRoomSpawns(controller.room, true);
       this.containersToCollectFrom = this.getContainersToCollectFrom();
     }
   
@@ -42,6 +45,11 @@ export default class CarrySite extends BaseSite {
             continue;//This is so that not all creeps get sent to same container.
           }
           if(this.creeps[j].isFull() && this.creeps[j].isFree()){
+            this.spawns.forEach(spawn =>{
+              this.creeps[j].addTask(new CreepTask(Activity.Deposit, spawn.pos))
+            })
+          }
+          if(this.creeps[j].isFull() && this.creeps[j].isFree()){
             if(this.containerNextToController){
               this.creeps[j].addTask(new CreepTask(Activity.Deposit, this.containerNextToController.pos))
             }
@@ -49,18 +57,6 @@ export default class CarrySite extends BaseSite {
         }
       }
       return tasksForThisUpgradeSite;
-    }
-
-    private getContainersToCollectFrom(): StructureContainer[]{
-      let containers: StructureContainer[] = [];
-      let sources: Source[] = this.room.find(FIND_SOURCES);
-      for (let i: number = sources.length - 1; i >= 0; i --){
-        let potentialContainer = sources[i].pos.findInRange(FIND_STRUCTURES, 1, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
-        if(potentialContainer && potentialContainer instanceof StructureContainer){
-          containers.push(potentialContainer);
-        }
-      }
-      return containers;
     }
   
     private createNewCarrierCreeps(): SpawnTask | null {

@@ -11,16 +11,25 @@ export class Helper {
     return room.find(FIND_SOURCES);
   }
 
-  public static getRoomConstructions(room: Room): ConstructionSite[] {
-    return room.find(FIND_MY_CONSTRUCTION_SITES);
+  public static getRoomConstructions(room: Room, mine?: boolean): ConstructionSite[] {
+    if(mine){
+      return room.find(FIND_MY_CONSTRUCTION_SITES);
+    }
+    return room.find(FIND_CONSTRUCTION_SITES);
   }
 
-  public static getRoomSpawns(room: Room): StructureSpawn[] {
-    return room.find(FIND_MY_SPAWNS);
+  public static getRoomSpawns(room: Room, mine?: boolean): StructureSpawn[] {
+    if(mine){
+      return room.find(FIND_MY_SPAWNS);
+    }
+    return room.find(FIND_HOSTILE_SPAWNS);
   }
 
-  public static getRoomCreepsMine(room: Room): Creep[] {
-    return room.find(FIND_MY_CREEPS);
+  public static getRoomCreepsMine(room: Room, mine?: boolean): Creep[] {
+    if(mine){
+      return room.find(FIND_MY_CREEPS);
+    }
+    return room.find(FIND_CREEPS);
   }
 
   public static getRoomCreepsMineNoTask(room: Room): Creep[] {
@@ -29,6 +38,10 @@ export class Helper {
 
   public static getAllMyCreeps(includingSpawning: boolean = false): Creep[] {
     return _.filter(Game.creeps, (creep) => creep.spawning == includingSpawning);
+  }
+
+  public static isSamePosition(roomPosition1: RoomPosition, roomPosition2: RoomPosition){
+    return roomPosition1.x == roomPosition2.x && roomPosition1.y == roomPosition2.y && roomPosition1.roomName == roomPosition2.roomName;
   }
 
   public static getCashedMemory(key: string, defaultValue: any): any {

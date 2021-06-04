@@ -55,7 +55,7 @@ export default class UpgradeSite extends BaseSite {
             }
           }
           if(this.creeps[i].isFull() && this.creeps[i].isFree())
-            this.creeps[i].addTask(new CreepTask(Activity.Upgrade, this.containerNextToUpgrade.pos))
+            this.creeps[i].addTask(new CreepTask(Activity.Upgrade, this.controller.pos))
         }
       }
       return tasksForThisUpgradeSite;

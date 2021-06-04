@@ -1,3 +1,4 @@
+import { Helper } from "Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 
 export class CreepBase {
@@ -48,6 +49,7 @@ export class CreepBase {
     //this.lifetime = this.getBodyparts(CLAIM) > 0 ? CREEP_CLAIM_LIFE_TIME : CREEP_LIFE_TIME;
     this.actionLog = {};
     this.task = creep.memory.task;
+    //this.task.targetPlace = new RoomPosition(this.task.targetPlace.x, this.task.targetPlace.y, this.task.targetPlace.roomName)//This to make it back to an object
   }
 
   addTask(task: CreepTask){
@@ -74,7 +76,7 @@ export class CreepBase {
         if (constructionSite) {
           this.build(constructionSite);
         }
-        if (this.carryCurrent == 0) {
+        if (this.carryCurrent == 0 || !constructionSite) {
           this.creep.say("Con Done");
           this.task.taskDone = true;
         }
@@ -90,14 +92,18 @@ export class CreepBase {
         }
         break;
       case Activity.Move:
+        let roomPosition = CreepTask.getRoomPositionFromTarget(this.task.targetPlace)
         this.goTo(this.task.targetPlace);
-        if (this.task.targetPlace == this.pos) {
+        if (Helper.isSamePosition(this.pos, this.task.targetPlace)) {
           this.creep.say("Move Done");
           this.task.taskDone = true;
         }
         break;
       case Activity.Collect:
-        let target: Structure | null = CreepTask.getStructureFromTarget(this.task.targetPlace);
+        let target: Structure | Ruin | null = CreepTask.getStructureFromTarget(this.task.targetPlace);
+        if (!target){
+          target = CreepTask.getRuinFromTarget(this.task.targetPlace);
+        }
         if (target) {
           this.withdraw(target, RESOURCE_ENERGY);
         }
@@ -206,7 +212,7 @@ export class CreepBase {
   //       return result;
   //     }
 
-  withdraw(target: Tombstone | Structure, resourceType: ResourceConstant, amount?: number) {
+  withdraw(target: Tombstone | Structure | Ruin, resourceType: ResourceConstant, amount?: number) {
     let result;
     if (amount) {
       let freeSpace = this.store.getFreeCapacity();

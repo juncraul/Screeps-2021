@@ -1,3 +1,4 @@
+import { Helper } from "Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import { CreepBase } from "../CreepBase";
@@ -34,7 +35,7 @@ export default class SourceSite extends BaseSite {
       }
     }
     if (this.containerConstructionSiteNextToSource) {
-      for (let i: number = this.creeps.length - 1; i >= 0; i--){
+      for (let i: number = 0; i < this.creeps.length; i++){
         if(this.creeps[i].store.energy == 0 && this.creeps[i].isFree())
           this.creeps[i].addTask(new CreepTask(Activity.Harvest, this.source.pos))
         if(this.creeps[i].isFull() && this.creeps[i].isFree())
@@ -42,11 +43,17 @@ export default class SourceSite extends BaseSite {
       }
     }
     if (this.containerNextToSource){
-      for (let i: number = this.creeps.length - 1; i >= 0; i--){
+      for (let i: number = 0; i < this.creeps.length; i++){
         if(this.creeps[i].store.energy == 0 && this.creeps[i].isFree()){
-          if(i == 0)//Move only the first creep on top of container.
-            this.creeps[i].addTask(new CreepTask(Activity.Move, this.containerNextToSource.pos))
-          this.creeps[i].addTask(new CreepTask(Activity.Harvest, this.source.pos))
+          if(i == 0){//Move only the first creep on top of container.
+            if(!Helper.isSamePosition(this.containerNextToSource.pos, this.creeps[i].pos)){
+              this.creeps[i].addTask(new CreepTask(Activity.Move, this.containerNextToSource.pos))
+            }else{
+              this.creeps[i].addTask(new CreepTask(Activity.Harvest, this.source.pos))
+            }
+          }else{
+            this.creeps[i].addTask(new CreepTask(Activity.Harvest, this.source.pos))
+          }
         }
         if(this.creeps[i].isFull() && this.creeps[i].isFree())
           this.creeps[i].addTask(new CreepTask(Activity.Deposit, this.containerNextToSource.pos))
