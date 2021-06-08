@@ -71,7 +71,7 @@ export default class ConstructionArea extends BaseSite {
         return 0;
       let constructions = this.getConstructionsInRoom(this.room);
       let sumOfConstructionPoint = constructions.reduce(function(accumulator, item){return accumulator + item.progressTotal - item.progress}, 0)
-      return Math.floor(sumOfConstructionPoint / 5000 >= 3 ? 3 : sumOfConstructionPoint / 5000 + 1);
+      return Math.floor(sumOfConstructionPoint / 5000 >= 3 ? 3 : Math.ceil(sumOfConstructionPoint / 5000));
     }
   
     private createNewConstructionCreeps(): SpawnTask | null {

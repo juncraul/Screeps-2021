@@ -96,8 +96,8 @@ export default class CarrySite extends BaseSite {
       this.spawns.forEach(spawn =>{
         structures.push(spawn);
       })
-      GetRoomObjects.getRoomCannons(this.room).forEach(cannon => {
-        structures.push(cannon.tower);
+      GetRoomObjects.getRoomTowers(this.room).forEach(tower => {
+        structures.push(tower);
       })
       return structures;
     }

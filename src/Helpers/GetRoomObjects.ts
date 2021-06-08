@@ -1,4 +1,3 @@
-import { Cannon } from "Cannon";
 
 export class GetRoomObjects {
 
@@ -73,15 +72,15 @@ export class GetRoomObjects {
     }
   }
 
-  public static getRoomCannons(room: Room): Cannon[] {
+  public static getRoomTowers(room: Room): StructureTower[] {
     let towers = room.find(FIND_MY_STRUCTURES, { filter: object => { return object.structureType == STRUCTURE_TOWER } });
-    let cannons = new Array<Cannon>();
+    let towerStructures: StructureTower[] = [];
     towers.forEach(function (tower) {
       if (tower instanceof StructureTower) {
-        cannons.push(new Cannon(tower));
+        towerStructures.push(tower);
       }
     });
-    return cannons;
+    return towerStructures;
   }
 
   public static getRoomStorage(room: Room): StructureStorage | null {

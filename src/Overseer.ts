@@ -6,6 +6,7 @@ import CarrySite from "Sites/CarrySite";
 import ConstructionArea from "Sites/ConstructionArea";
 import { Cannon } from "Cannon";
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
+import { BaseBuilder } from "BaseBuilder/BaseBuilder";
 
 export default class Overseer implements IOverseer {
 
@@ -13,12 +14,15 @@ export default class Overseer implements IOverseer {
   refresh(): void {
     let currentRoom: Room = Game.rooms["W6N1"];
     let tasks: SpawnTask[] = [];
-    let cannons: Cannon[] = GetRoomObjects.getRoomCannons(currentRoom);
+    let towers: StructureTower[] = GetRoomObjects.getRoomTowers(currentRoom);
 
     tasks = tasks.concat(this.overseeRoom(currentRoom));
 
     this.handleRoomTasks(currentRoom, tasks);
-    cannons.forEach(cannon => {cannon.cannonLogic()})
+    towers.forEach(tower => {
+      let cannon = new Cannon(tower);
+      cannon.cannonLogic()})
+    BaseBuilder.logicCreateConstructionSites();
   }
 
   private overseeRoom(room: Room): SpawnTask[] {

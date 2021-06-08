@@ -2,6 +2,7 @@ import { ErrorMapper } from "utils/ErrorMapper";
 import Overseer from "Overseer";
 import { CreepBase } from "CreepBase";
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
+import './Prototypes/RoomVisual'; // Prototypes used in Visualizer class
 
 // When compiling TS to JS and bundling with rollup, the line numbers and file names in error messages change
 // This utility uses source maps to get the line numbers and file names of the original, TS source code
