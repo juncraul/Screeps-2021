@@ -1,7 +1,7 @@
 import { ErrorMapper } from "utils/ErrorMapper";
 import Overseer from "Overseer";
 import { CreepBase } from "CreepBase";
-import { Helper } from "Helper";
+import { GetRoomObjects } from "Helpers/GetRoomObjects";
 
 // When compiling TS to JS and bundling with rollup, the line numbers and file names in error messages change
 // This utility uses source maps to get the line numbers and file names of the original, TS source code
@@ -17,7 +17,7 @@ export const loop = ErrorMapper.wrapLoop(() => {
   let overseer: Overseer = new Overseer;
   overseer.refresh();
 
-  Helper.getAllMyCreeps().forEach(creep => {
+  GetRoomObjects.getAllMyCreeps().forEach(creep => {
     let creepBase: CreepBase = new CreepBase(creep);
     creepBase.workTheTask();
   });

@@ -1,4 +1,4 @@
-import { Helper } from "Helper";
+import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import { CreepBase } from "../CreepBase";
@@ -26,7 +26,7 @@ export default class SourceSite extends BaseSite {
 
   public handleSourceSite(): SpawnTask[] {
     let tasksForThisSourceSite: SpawnTask[] = [];
-    if (this.creeps.length < this.maxWorkerCount) {
+    if (this.creeps.length < this.maxWorkerCount + this.getNumberOfDyingCreeps()) {
       let task: SpawnTask | null = this.createNewHarvesterCreeps();
       if (task) {
         tasksForThisSourceSite.push(task);
@@ -42,7 +42,7 @@ export default class SourceSite extends BaseSite {
     }
     if (this.containerNextToSource){
       for (let i: number = 0; i < this.creeps.length; i++){
-        if(this.creeps[i].store.energy == 0 && this.creeps[i].isFree()){
+        if(!this.creeps[i].isFull() && this.creeps[i].isFree()){
           if(i == 0){//Move only the first creep on top of container.
             if(!Helper.isSamePosition(this.containerNextToSource.pos, this.creeps[i].pos)){
               this.creeps[i].addTask(new CreepTask(Activity.Move, this.containerNextToSource.pos))
@@ -62,8 +62,10 @@ export default class SourceSite extends BaseSite {
 
   private createNewHarvesterCreeps(): SpawnTask | null {
     let bodyPartConstants: BodyPartConstant[] =[]
+    let buildCheapestCreep = this.creeps.length == 0;//We might get in a deadend where resources will never be more available.
     if(this.containerNextToSource){
       let segments = Math.floor(this.room.energyCapacityAvailable / 150);//Work-100; Move-50
+      segments = buildCheapestCreep ? this.room.energyAvailable / 150 : segments;
       if(segments < 2){
         console.log("Something wrong with room capacity")
       } else if(segments == 2){//300 energy
@@ -77,6 +79,7 @@ export default class SourceSite extends BaseSite {
       }
     }else{
       let segments = Math.floor(this.room.energyCapacityAvailable / 200);//Work-100; Move-50; Carry-50
+      segments = buildCheapestCreep ? this.room.energyAvailable / 200 : segments;
       if(segments < 1){
         console.log("Something wrong with room capacity")
       } else if(segments == 1){//200 energy

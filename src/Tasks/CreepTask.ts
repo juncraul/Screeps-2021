@@ -22,6 +22,10 @@ export default class CreepTask implements ICreepTask {
     return (new RoomPosition(target.x, target.y, target.roomName)).findInRange(FIND_STRUCTURES, 0)[0];
   }
 
+  public static getResourceFromTarget(target: RoomPosition): Resource | null {
+    return (new RoomPosition(target.x, target.y, target.roomName)).findInRange(FIND_DROPPED_RESOURCES, 0)[0];
+  }
+
   public static getRuinFromTarget(target: RoomPosition): Ruin | null {
     return (new RoomPosition(target.x, target.y, target.roomName)).findInRange(FIND_RUINS, 0)[0];
   }
@@ -44,5 +48,6 @@ export enum Activity {
     Deposit = 2,
     Move = 3,
     Collect = 4,
-    Upgrade = 5
+    Upgrade = 5,
+    Pickup = 6
 }

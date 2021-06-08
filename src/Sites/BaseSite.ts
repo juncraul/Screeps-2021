@@ -1,4 +1,4 @@
-import { Helper } from "Helper";
+import { Helper } from "Helpers/Helper";
 import { CreepBase } from "../CreepBase";
 
 export default class SourceSite {
@@ -47,7 +47,12 @@ export default class SourceSite {
     return containers;
   }
 
+  getDroppedResourcesToCollectFrom(resourceType: ResourceConstant): Resource[]{
+    let resources: Resource[] = Game.rooms[this.sitePos.roomName].find(FIND_DROPPED_RESOURCES, {filter: {resourceType: resourceType}});
+    return resources;
+  }
+
   getNumberOfDyingCreeps(): number{
-    return this.creeps.filter(function (creep) {return creep.ticksToLive && creep.ticksToLive < 50}).length;
+    return this.creeps.filter(function (creep) {return creep.ticksToLive && creep.ticksToLive < 100}).length;
   }
 }

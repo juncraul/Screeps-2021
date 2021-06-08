@@ -1,5 +1,6 @@
 import { CreepBase } from "CreepBase";
-import { Helper } from "Helper";
+import { GetRoomObjects } from "Helpers/GetRoomObjects";
+import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import BaseSite from "./BaseSite";
@@ -14,8 +15,9 @@ export default class CarrySite extends BaseSite {
     spawns: StructureSpawn[];
     extensions: StructureExtension[];
     depositToGeneralStore: (StructureContainer)[];
-    depositToLimitedStore: (StructureSpawn | StructureExtension)[];
+    depositToLimitedStore: (StructureSpawn | StructureExtension | StructureTower)[];
     containersToCollectFrom: (StructureContainer | Ruin)[];
+    droppedResourcesToCollectFrom: Resource[];
   
     constructor(controller: StructureController) {
       super("CarrySite", controller.room.name, controller.pos)
@@ -25,11 +27,12 @@ export default class CarrySite extends BaseSite {
       this.controllerLevel = controller.level;
       let potentialContainer = controller.pos.findInRange(FIND_STRUCTURES, 3, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
       this.containerNextToController = (potentialContainer instanceof StructureContainer) ? potentialContainer : null;
-      this.spawns = Helper.getRoomSpawns(controller.room, true);
-      this.extensions = Helper.getRoomExtensions(controller.room, true);
+      this.spawns = GetRoomObjects.getRoomSpawns(controller.room, true);
+      this.extensions = GetRoomObjects.getRoomExtensions(controller.room, true);
       this.depositToGeneralStore = this.getGeneralDeposits();
       this.depositToLimitedStore = this.getLimitedDeposits();
       this.containersToCollectFrom = this.getContainersToCollectFrom();
+      this.droppedResourcesToCollectFrom = this.getDroppedResourcesToCollectFrom(RESOURCE_ENERGY);
     }
   
     public handleCarrySite(): SpawnTask[] {
@@ -42,10 +45,18 @@ export default class CarrySite extends BaseSite {
       }
       for(let i: number = 0; i < this.creeps.length; i ++){
         if(this.creeps[i].isEmpty() && this.creeps[i].isFree()){
+          let foundSomewhereToCollectFrom = false;
           for( let j: number = 0; j < this.containersToCollectFrom.length; j ++){
             if(this.containersToCollectFrom[j].store.energy < 200)
               continue;
             this.creeps[i].addTask(new CreepTask(Activity.Collect, this.containersToCollectFrom[j].pos))
+            foundSomewhereToCollectFrom = true;
+          }
+          for( let j: number = 0; j < this.droppedResourcesToCollectFrom.length && !foundSomewhereToCollectFrom; j ++){
+            if(this.droppedResourcesToCollectFrom[j].amount < 200)
+              continue;
+            this.creeps[i].addTask(new CreepTask(Activity.Pickup, this.droppedResourcesToCollectFrom[j].pos))
+            foundSomewhereToCollectFrom = true;
           }
         }
         let foundSomewhereToDeposit = false;
@@ -77,13 +88,16 @@ export default class CarrySite extends BaseSite {
       return structures;
     }
 
-    private getLimitedDeposits():(StructureSpawn | StructureExtension)[]{
-      let structures: (StructureSpawn | StructureExtension)[] = [];
+    private getLimitedDeposits():(StructureSpawn | StructureExtension | StructureTower)[]{
+      let structures: (StructureSpawn | StructureExtension | StructureTower)[] = [];
       this.extensions.forEach(extension =>{
         structures.push(extension);
       })
       this.spawns.forEach(spawn =>{
         structures.push(spawn);
+      })
+      GetRoomObjects.getRoomCannons(this.room).forEach(cannon => {
+        structures.push(cannon.tower);
       })
       return structures;
     }
@@ -97,14 +111,18 @@ export default class CarrySite extends BaseSite {
       }
       if(segments < 3){
         console.log("Something wrong with room capacity")
-      } else if(segments == 3){//300 energy
+      } else if(segments == 3){//300 energy - 150 Store
         bodyPartConstants = [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE]
-      } else if(segments == 4){//400 energy
+      } else if(segments == 4){//400 energy - 200 Store
         bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE]
-      } else if(segments == 5){//500 energy
+      } else if(segments == 5){//500 energy - 250 Store
         bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE]
-      } else if(segments >= 6){//600 energy
+      } else if(segments == 6){//600 energy - 300 Store
         bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
+      } else if(segments == 7){//700 energy - 350 Store
+        bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
+      } else if(segments >= 8){//800 energy - 400 Store
+        bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
       }
       return new SpawnTask(SpawnType.Carrier, this.siteId, "Carrier", bodyPartConstants);
     }

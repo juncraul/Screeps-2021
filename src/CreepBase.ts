@@ -1,4 +1,4 @@
-import { Helper } from "Helper";
+import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 
 export class CreepBase {
@@ -106,12 +106,12 @@ export class CreepBase {
         }
         break;
       case Activity.Collect:
-        let target: Structure | Ruin | null = CreepTask.getStructureFromTarget(this.task.targetPlace);
-        if (!target || target.structureType == STRUCTURE_ROAD || target.structureType == STRUCTURE_RAMPART){
-          target = CreepTask.getRuinFromTarget(this.task.targetPlace);
+        let targetCollect: Structure | Ruin | null = CreepTask.getStructureFromTarget(this.task.targetPlace);
+        if (!targetCollect || targetCollect.structureType == STRUCTURE_ROAD || targetCollect.structureType == STRUCTURE_RAMPART){
+          targetCollect = CreepTask.getRuinFromTarget(this.task.targetPlace);
         }
-        if (target) {
-          this.withdraw(target, RESOURCE_ENERGY);
+        if (targetCollect) {
+          this.withdraw(targetCollect, RESOURCE_ENERGY);
         }
         if (this.carryCurrent == this.carryCapacity) {
           this.creep.say("Col Done");
@@ -125,6 +125,16 @@ export class CreepBase {
         }
         if (this.carryCurrent == 0) {
           this.creep.say("Upg Done");
+          this.task.taskDone = true;
+        }
+        break;
+      case Activity.Pickup:
+        let targetPickup: Resource | null = CreepTask.getResourceFromTarget(this.task.targetPlace);
+        if (targetPickup) {
+          this.pickup(targetPickup);
+        }
+        if (this.carryCurrent == this.carryCapacity) {
+          this.creep.say("Pick Done");
           this.task.taskDone = true;
         }
         break;
@@ -253,13 +263,13 @@ export class CreepBase {
   //   return result;
   // }
 
-  //     pickup(resource: Resource) {
-  //       let result = this.creep.pickup(resource);
-  //       if (result == ERR_NOT_IN_RANGE) {
-  //         this.goTo(resource.pos);
-  //       }
-  //       return result;
-  //     }
+  pickup(resource: Resource) {
+    let result = this.creep.pickup(resource);
+    if (result == ERR_NOT_IN_RANGE) {
+      this.goTo(resource.pos);
+    }
+    return result;
+  }
 
   upgradeController(controller: StructureController) {
     let result = this.creep.upgradeController(controller);

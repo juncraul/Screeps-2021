@@ -1,9 +1,11 @@
-import { Helper } from "Helper";
+import { Helper } from "Helpers/Helper";
 import SourceSite from "Sites/SourceSite";
 import UpgradeSite from "Sites/UpgradeSite";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import CarrySite from "Sites/CarrySite";
 import ConstructionArea from "Sites/ConstructionArea";
+import { Cannon } from "Cannon";
+import { GetRoomObjects } from "Helpers/GetRoomObjects";
 
 export default class Overseer implements IOverseer {
 
@@ -11,10 +13,12 @@ export default class Overseer implements IOverseer {
   refresh(): void {
     let currentRoom: Room = Game.rooms["W6N1"];
     let tasks: SpawnTask[] = [];
+    let cannons: Cannon[] = GetRoomObjects.getRoomCannons(currentRoom);
 
     tasks = tasks.concat(this.overseeRoom(currentRoom));
 
     this.handleRoomTasks(currentRoom, tasks);
+    cannons.forEach(cannon => {cannon.cannonLogic()})
   }
 
   private overseeRoom(room: Room): SpawnTask[] {
@@ -30,7 +34,7 @@ export default class Overseer implements IOverseer {
     if (!room.controller)
       return [];
     let tasks: SpawnTask[] = [];
-    let sources: Source[] = Helper.getRoomSources(room);
+    let sources: Source[] = GetRoomObjects.getRoomSources(room);
     sources.forEach(source => {
       let sourceSite: SourceSite = new SourceSite(source, room.controller!);
       tasks = tasks.concat(sourceSite.handleSourceSite());
@@ -78,7 +82,7 @@ export default class Overseer implements IOverseer {
   }
 
   private createNewCreep(room: Room, task: SpawnTask): Creep | null {
-    let spawns: StructureSpawn[] = Helper.getRoomSpawns(room, true);
+    let spawns: StructureSpawn[] = GetRoomObjects.getRoomSpawns(room, true);
     let theNewCreep: Creep | null = null;
     spawns.forEach(spawn => {
       if (spawn.spawning == null) {
