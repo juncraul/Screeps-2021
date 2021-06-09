@@ -43,11 +43,14 @@ export default class CreepTask implements ICreepTask {
 }
 
 export enum Activity {
-    Harvest = 0,
-    Construct = 1,
-    Deposit = 2,
-    Move = 3,
-    Collect = 4,
-    Upgrade = 5,
-    Pickup = 6
+  Harvest = 0,
+  Construct = 1,
+  Deposit = 2,
+  Move = 3,
+  Collect = 4,
+  Upgrade = 5,
+  Pickup = 6,
+  Claim = 7,
+  MoveDifferentRoom = 8,
+  Reserve = 9,
 }

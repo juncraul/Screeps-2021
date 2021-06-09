@@ -138,6 +138,29 @@ export class CreepBase {
           this.task.taskDone = true;
         }
         break;
+      case Activity.Claim:
+        let controller2: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
+        if (controller2) {
+          if(this.claim(controller2) == OK){
+            this.creep.say("Claim Done");
+            this.task.taskDone = true;
+          }
+        }
+        break;
+      case Activity.MoveDifferentRoom:
+        let pos: RoomPosition = CreepTask.getRoomPositionFromTarget(this.task.targetPlace)
+        this.goTo(pos);
+        if (pos.roomName == this.room.name) {
+          this.creep.say("Move Done");
+          this.task.taskDone = true;
+        }
+        break;
+      case Activity.Reserve:
+          let controller3: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
+          if (controller3) {
+            this.reserve(controller3);
+          }
+          break;
     }
   }
 
@@ -279,23 +302,21 @@ export class CreepBase {
     return result;
   }
 
-  //     reserve(controller: StructureController) {
-  //       let result = this.creep.reserveController(controller);
-  //       if (result == ERR_NOT_IN_RANGE) {
-  //         this.goTo(controller.pos);
-  //       }
-  //       this.memory.targetId = controller.id;
-  //       return result;
-  //     }
+  reserve(controller: StructureController) {
+    let result = this.creep.reserveController(controller);
+    if (result == ERR_NOT_IN_RANGE) {
+      this.goTo(controller.pos);
+    }
+    return result;
+  }
 
-  //     claim(controller: StructureController) {
-  //       let result = this.creep.claimController(controller);
-  //       if (result == ERR_NOT_IN_RANGE) {
-  //         this.goTo(controller.pos);
-  //       }
-  //       this.memory.targetId = controller.id;
-  //       return result;
-  //     }
+  claim(controller: StructureController) {
+    let result = this.creep.claimController(controller);
+    if (result == ERR_NOT_IN_RANGE) {
+      this.goTo(controller.pos);
+    }
+    return result;
+  }
 
   //     attack(creep: Creep | Structure) {
   //       let result = this.creep.attack(creep);

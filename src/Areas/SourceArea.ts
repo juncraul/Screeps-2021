@@ -1,10 +1,9 @@
 import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
-import { CreepBase } from "../CreepBase";
-import BaseSite from "./BaseSite";
+import BaseArea from "./BaseArea";
 
-export default class SourceSite extends BaseSite {
+export default class SourceArea extends BaseArea {
   source: Source;
   room: Room;
   maxWorkerCount: number;
@@ -13,23 +12,23 @@ export default class SourceSite extends BaseSite {
   containerConstructionSiteNextToSource: ConstructionSite | null;
 
   constructor(source: Source, controller: StructureController) {
-    super("SourceSite", source.id, source.pos);
+    super("SourceArea", source.id, source.pos);
     this.source = source;
     this.room = source.room;
     this.maxWorkerCount = 1;
     this.controllerLevel = controller.level;
     let potentialContainer = source.pos.findInRange(FIND_STRUCTURES, 2, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
-    let potentialContainerConstructionSite = source.pos.findInRange(FIND_MY_CONSTRUCTION_SITES, 1, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
+    let potentialContainerConstructionArea = source.pos.findInRange(FIND_MY_CONSTRUCTION_SITES, 1, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
     this.containerNextToSource = (potentialContainer instanceof StructureContainer) ? potentialContainer : null;
-    this.containerConstructionSiteNextToSource = (potentialContainerConstructionSite instanceof ConstructionSite) ? potentialContainerConstructionSite : null;
+    this.containerConstructionSiteNextToSource = (potentialContainerConstructionArea instanceof ConstructionSite) ? potentialContainerConstructionArea : null;
   }
 
-  public handleSourceSite(): SpawnTask[] {
-    let tasksForThisSourceSite: SpawnTask[] = [];
+  public handleSourceArea(): SpawnTask[] {
+    let tasksForThisSourceArea: SpawnTask[] = [];
     if (this.creeps.length < this.maxWorkerCount + this.getNumberOfDyingCreeps()) {
-      let task: SpawnTask | null = this.createNewHarvesterCreeps();
+      let task: SpawnTask | null = this.createCreepForThisArea();
       if (task) {
-        tasksForThisSourceSite.push(task);
+        tasksForThisSourceArea.push(task);
       }
     }
     if (this.containerConstructionSiteNextToSource) {
@@ -53,10 +52,10 @@ export default class SourceSite extends BaseSite {
           this.creeps[i].addTask(new CreepTask(Activity.Deposit, this.containerNextToSource.pos))
       }
     }
-    return tasksForThisSourceSite;
+    return tasksForThisSourceArea;
   }
 
-  private createNewHarvesterCreeps(): SpawnTask | null {
+  private createCreepForThisArea(): SpawnTask | null {
     let bodyPartConstants: BodyPartConstant[] =[]
     let buildCheapestCreep = this.creeps.length == 0;//We might get in a deadend where resources will never be more available.
     if(this.containerNextToSource){

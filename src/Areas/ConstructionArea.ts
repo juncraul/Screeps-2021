@@ -1,10 +1,9 @@
-import { CreepBase } from "CreepBase";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
-import BaseSite from "./BaseSite";
+import BaseArea from "./BaseArea";
 
 
-export default class ConstructionArea extends BaseSite {
+export default class ConstructionArea extends BaseArea {
     controller: StructureController;
     room: Room;
     maxWorkerCount: number;
@@ -23,11 +22,11 @@ export default class ConstructionArea extends BaseSite {
     }
   
     public handleConstructionArea(): SpawnTask[] {
-      let tasksForThisSite: SpawnTask[] = [];
+      let tasksForThisArea: SpawnTask[] = [];
       if (this.creeps.length < this.maxWorkerCount) {
-        let task: SpawnTask | null = this.createNewConstructionCreeps();
+        let task: SpawnTask | null = this.createCreepForThisArea();
         if (task) {
-          tasksForThisSite.push(task);
+          tasksForThisArea.push(task);
         }
       }
       for(let i: number = 0; i < this.creeps.length; i ++){
@@ -55,7 +54,7 @@ export default class ConstructionArea extends BaseSite {
         }
       }
       
-      return tasksForThisSite;
+      return tasksForThisArea;
     }
 
     private getConstructionClosestByPoint(position: RoomPosition) {
@@ -74,18 +73,8 @@ export default class ConstructionArea extends BaseSite {
       return Math.floor(sumOfConstructionPoint / 5000 >= 3 ? 3 : Math.ceil(sumOfConstructionPoint / 5000));
     }
   
-    private createNewConstructionCreeps(): SpawnTask | null {
-      switch (this.controllerLevel) {
-        case 1:
-        case 2:
-        case 3:
-          return this.createHarvesterWithCarry();
-      }
-      return null
-    }
-  
-    private createHarvesterWithCarry(): SpawnTask {
-      return new SpawnTask(SpawnType.Constructor, this.siteId, "Constructor", [WORK, CARRY, MOVE]);
+    private createCreepForThisArea(): SpawnTask {
+      return new SpawnTask(SpawnType.Constructor, this.areaId, "Constructor", [WORK, CARRY, MOVE]);
     }
   }
   

@@ -1,12 +1,11 @@
-import { CreepBase } from "CreepBase";
+
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
-import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
-import BaseSite from "./BaseSite";
+import BaseArea from "./BaseArea";
 
 
-export default class CarrySite extends BaseSite {
+export default class CarryArea extends BaseArea {
     controller: StructureController;
     room: Room;
     maxWorkerCount: number;
@@ -20,7 +19,7 @@ export default class CarrySite extends BaseSite {
     droppedResourcesToCollectFrom: Resource[];
   
     constructor(controller: StructureController) {
-      super("CarrySite", controller.room.name, controller.pos)
+      super("CarryArea", controller.room.name, controller.pos)
       this.controller = controller;
       this.maxWorkerCount = 1;
       this.room = controller.room;
@@ -35,12 +34,12 @@ export default class CarrySite extends BaseSite {
       this.droppedResourcesToCollectFrom = this.getDroppedResourcesToCollectFrom(RESOURCE_ENERGY);
     }
   
-    public handleCarrySite(): SpawnTask[] {
-      let tasksForThisUpgradeSite: SpawnTask[] = [];
+    public handleCarryArea(): SpawnTask[] {
+      let tasksForThisUpgradeArea: SpawnTask[] = [];
       if (this.creeps.length < this.maxWorkerCount + this.getNumberOfDyingCreeps()) {
-        let task: SpawnTask | null = this.createNewCarrierCreeps();
+        let task: SpawnTask | null = this.createCreepForThisArea();
         if (task) {
-          tasksForThisUpgradeSite.push(task);
+          tasksForThisUpgradeArea.push(task);
         }
       }
       for(let i: number = 0; i < this.creeps.length; i ++){
@@ -78,7 +77,7 @@ export default class CarrySite extends BaseSite {
           }
         }
       }
-      return tasksForThisUpgradeSite;
+      return tasksForThisUpgradeArea;
     }
 
     private getGeneralDeposits():(StructureContainer)[]{
@@ -102,7 +101,7 @@ export default class CarrySite extends BaseSite {
       return structures;
     }
   
-    private createNewCarrierCreeps(): SpawnTask | null {
+    private createCreepForThisArea(): SpawnTask | null {
       let bodyPartConstants: BodyPartConstant[] =[]
       let segments = Math.floor(this.room.energyCapacityAvailable / 100);//Carry-50; Move-50
       if(this.creeps.length == 0){//Note: In this situation, there is no way to fill extensions
@@ -121,10 +120,18 @@ export default class CarrySite extends BaseSite {
         bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
       } else if(segments == 7){//700 energy - 350 Store
         bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
-      } else if(segments >= 8){//800 energy - 400 Store
+      } else if(segments == 8){//800 energy - 400 Store
         bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
+      } else if(segments == 9){//900 energy - 450 Store
+        bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
+      } else if(segments == 10){//1000 energy - 500 Store
+        bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
+      } else if(segments == 11){//1100 energy - 550 Store
+        bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
+      } else if(segments >= 12){//1200 energy - 600 Store
+        bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
       }
-      return new SpawnTask(SpawnType.Carrier, this.siteId, "Carrier", bodyPartConstants);
+      return new SpawnTask(SpawnType.Carrier, this.areaId, "Carrier", bodyPartConstants);
     }
   }
   

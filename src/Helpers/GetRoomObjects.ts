@@ -1,4 +1,7 @@
 
+//Flags: Primary - Secondary
+//PURPLE - PURPLE Reserve this room
+
 export class GetRoomObjects {
 
   //--------------------------
@@ -7,6 +10,15 @@ export class GetRoomObjects {
   //--------------------------
   public static getAllMyCreeps(includingSpawning: boolean = false): Creep[] {
     return _.filter(Game.creeps, (creep) => creep.spawning == includingSpawning);
+  }
+
+  public static getAllRoomsToReserve(): string[] {
+    let flags = _.filter(Game.flags, (flag) => flag.color == COLOR_PURPLE);
+    let roomNames: string[] = [];
+    flags.forEach(flag => {
+      roomNames.push(flag.pos.roomName)
+    })
+    return roomNames;
   }
 
   //--------------------------

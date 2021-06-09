@@ -1,12 +1,12 @@
 export default class SpawnTask  {
   spawnType: SpawnType;
-  siteId: string;
+  areaId: string;
   name: string;
   bodyPartConstant: BodyPartConstant[];
 
-  constructor(spawnType: SpawnType, siteId: string, name: string, bodyPartConstant: BodyPartConstant[]) {
+  constructor(spawnType: SpawnType, areaId: string, name: string, bodyPartConstant: BodyPartConstant[]) {
     this.spawnType = spawnType;
-    this.siteId = siteId;
+    this.areaId = areaId;
     this.name = name;
     this.bodyPartConstant = bodyPartConstant;
   }
@@ -21,6 +21,8 @@ export default class SpawnTask  {
       return "Carrier";
       case SpawnType.Constructor:
       return "Constructor";
+      case SpawnType.Claimer:
+      return "Claimer";
     }
   }
 }
@@ -29,5 +31,6 @@ export enum SpawnType {
   Harvester = 0,
   Upgrader = 1,
   Carrier = 2,
-  Constructor = 3
+  Constructor = 3,
+  Claimer = 4
 }

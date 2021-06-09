@@ -1,12 +1,13 @@
 import { Helper } from "Helpers/Helper";
-import SourceSite from "Sites/SourceSite";
-import UpgradeSite from "Sites/UpgradeSite";
+import SourceArea from "Areas/SourceArea";
+import UpgradeArea from "Areas/UpgradeArea";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
-import CarrySite from "Sites/CarrySite";
-import ConstructionArea from "Sites/ConstructionArea";
+import CarryArea from "Areas/CarryArea";
+import ConstructionArea from "Areas/ConstructionArea";
 import { Cannon } from "Cannon";
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { BaseBuilder } from "BaseBuilder/BaseBuilder";
+import RemoteArea from "Areas/RemoteArea";
 
 export default class Overseer implements IOverseer {
 
@@ -27,40 +28,44 @@ export default class Overseer implements IOverseer {
 
   private overseeRoom(room: Room): SpawnTask[] {
     let tasks: SpawnTask[] = [];
-    tasks = tasks.concat(this.handleHarvestSite(room));
-    tasks = tasks.concat(this.handleUpgradeSite(room));
-    tasks = tasks.concat(this.handleCarrySite(room));
+    let roomsToReserve = GetRoomObjects.getAllRoomsToReserve();
+    tasks = tasks.concat(this.handleHarvestArea(room));
+    tasks = tasks.concat(this.handleUpgradeArea(room));
+    tasks = tasks.concat(this.handleCarryArea(room));
     tasks = tasks.concat(this.handleConstructionArea(room));
+    for(let i = 0; i < roomsToReserve.length; i ++)
+      tasks = tasks.concat(this.handleRemoteArea(roomsToReserve[i]));
+
     return tasks;
   }
 
-  private handleHarvestSite(room: Room): SpawnTask[] {
+  private handleHarvestArea(room: Room): SpawnTask[] {
     if (!room.controller)
       return [];
     let tasks: SpawnTask[] = [];
     let sources: Source[] = GetRoomObjects.getRoomSources(room);
     sources.forEach(source => {
-      let sourceSite: SourceSite = new SourceSite(source, room.controller!);
-      tasks = tasks.concat(sourceSite.handleSourceSite());
+      let sourceArea: SourceArea = new SourceArea(source, room.controller!);
+      tasks = tasks.concat(sourceArea.handleSourceArea());
     });
     return tasks;
   }
 
-  private handleUpgradeSite(room: Room): SpawnTask[] {
+  private handleUpgradeArea(room: Room): SpawnTask[] {
     if (!room.controller)
       return [];
     let tasks: SpawnTask[] = [];
-      let upgradeSite: UpgradeSite = new UpgradeSite(room.controller);
-      tasks = tasks.concat(upgradeSite.handleUpgradeSite());
+      let upgradeArea: UpgradeArea = new UpgradeArea(room.controller);
+      tasks = tasks.concat(upgradeArea.handleUpgradeArea());
     return tasks;
   }
 
-  private handleCarrySite(room: Room): SpawnTask[] {
+  private handleCarryArea(room: Room): SpawnTask[] {
     if (!room.controller)
       return [];
     let tasks: SpawnTask[] = [];
-      let carrySite: CarrySite = new CarrySite(room.controller);
-      tasks = tasks.concat(carrySite.handleCarrySite());
+      let carryArea: CarryArea = new CarryArea(room.controller);
+      tasks = tasks.concat(carryArea.handleCarryArea());
     return tasks;
   }
 
@@ -68,8 +73,15 @@ export default class Overseer implements IOverseer {
     if (!room.controller)
       return [];
     let tasks: SpawnTask[] = [];
-      let constructionSite: ConstructionArea = new ConstructionArea(room.controller);
-      tasks = tasks.concat(constructionSite.handleConstructionArea());
+      let constructionArea: ConstructionArea = new ConstructionArea(room.controller);
+      tasks = tasks.concat(constructionArea.handleConstructionArea());
+    return tasks;
+  }
+
+  private handleRemoteArea(roomName: string): SpawnTask[] {
+    let tasks: SpawnTask[] = [];
+      let remoteArea: RemoteArea = new RemoteArea(roomName);
+      tasks = tasks.concat(remoteArea.handleThisArea());
     return tasks;
   }
 
@@ -99,24 +111,29 @@ export default class Overseer implements IOverseer {
         let creepNames: [string];
         switch(task.spawnType){
           case SpawnType.Harvester:
-            creepNames = Helper.getCashedMemory(`SourceSite-${task.siteId}`, []);
+            creepNames = Helper.getCashedMemory(`SourceArea-${task.areaId}`, []);
             creepNames.push(creepName)
-            Helper.setCashedMemory(`SourceSite-${task.siteId}`, creepNames);
+            Helper.setCashedMemory(`SourceArea-${task.areaId}`, creepNames);
             break;
           case SpawnType.Upgrader:
-            creepNames = Helper.getCashedMemory(`Controller-${task.siteId}`, []);
+            creepNames = Helper.getCashedMemory(`UpgradeArea-${task.areaId}`, []);
             creepNames.push(creepName)
-            Helper.setCashedMemory(`Controller-${task.siteId}`, creepNames);
+            Helper.setCashedMemory(`UpgradeArea-${task.areaId}`, creepNames);
             break;
           case SpawnType.Carrier:
-            creepNames = Helper.getCashedMemory(`CarrySite-${task.siteId}`, []);
+            creepNames = Helper.getCashedMemory(`CarryArea-${task.areaId}`, []);
             creepNames.push(creepName)
-            Helper.setCashedMemory(`CarrySite-${task.siteId}`, creepNames);
+            Helper.setCashedMemory(`CarryArea-${task.areaId}`, creepNames);
             break;
           case SpawnType.Constructor:
-            creepNames = Helper.getCashedMemory(`ConstructionArea-${task.siteId}`, []);
+              creepNames = Helper.getCashedMemory(`ConstructionArea-${task.areaId}`, []);
+              creepNames.push(creepName)
+              Helper.setCashedMemory(`ConstructionArea-${task.areaId}`, creepNames);
+              break;
+          case SpawnType.Claimer:
+            creepNames = Helper.getCashedMemory(`RemoteArea-${task.areaId}`, []);
             creepNames.push(creepName)
-            Helper.setCashedMemory(`ConstructionArea-${task.siteId}`, creepNames);
+            Helper.setCashedMemory(`RemoteArea-${task.areaId}`, creepNames);
             break;
           default:
             throw `Spawn type not implemented: ${task.spawnType}`

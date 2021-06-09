@@ -1,10 +1,9 @@
-import { CreepBase } from "CreepBase";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
-import BaseSite from "./BaseSite";
+import BaseArea from "./BaseArea";
 
 
-export default class UpgradeSite extends BaseSite {
+export default class UpgradeArea extends BaseArea {
     controller: StructureController;
     room: Room;
     maxWorkerCount: number;
@@ -13,23 +12,23 @@ export default class UpgradeSite extends BaseSite {
     containerConstructionSiteNextToUpgrade: ConstructionSite | null;
   
     constructor(controller: StructureController) {
-      super("Controller", controller.id, controller.pos)
+      super("UpgradeArea", controller.id, controller.pos)
       this.controller = controller;
       this.maxWorkerCount = this.calculateMaxWorkerCount();
       this.room = controller.room;
       this.controllerLevel = controller.level;
       let potentialContainer = controller.pos.findInRange(FIND_STRUCTURES, 3, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
-      let potentialContainerConstructionSite = controller.pos.findInRange(FIND_MY_CONSTRUCTION_SITES, 2, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
+      let potentialContainerConstructionArea = controller.pos.findInRange(FIND_MY_CONSTRUCTION_SITES, 2, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
       this.containerNextToUpgrade = (potentialContainer instanceof StructureContainer) ? potentialContainer : null;
-      this.containerConstructionSiteNextToUpgrade = (potentialContainerConstructionSite instanceof ConstructionSite) ? potentialContainerConstructionSite : null;
+      this.containerConstructionSiteNextToUpgrade = (potentialContainerConstructionArea instanceof ConstructionSite) ? potentialContainerConstructionArea : null;
     }
   
-    public handleUpgradeSite(): SpawnTask[] {
-      let tasksForThisUpgradeSite: SpawnTask[] = [];
+    public handleUpgradeArea(): SpawnTask[] {
+      let tasksForThisUpgradeArea: SpawnTask[] = [];
       if (this.creeps.length < this.maxWorkerCount) {
-        let task: SpawnTask | null = this.createNewUpgraderCreeps();
+        let task: SpawnTask | null = this.createCreepForThisArea();
         if (task) {
-          tasksForThisUpgradeSite.push(task);
+          tasksForThisUpgradeArea.push(task);
         }
       }
       if (this.containerConstructionSiteNextToUpgrade) {
@@ -56,11 +55,11 @@ export default class UpgradeSite extends BaseSite {
             this.creeps[i].addTask(new CreepTask(Activity.Upgrade, this.controller.pos))
         }
       }
-      return tasksForThisUpgradeSite;
+      return tasksForThisUpgradeArea;
     }
 
     private getStructureWithMoreThan100Energy(): AnyStructure | null {
-      return this.sitePos.findClosestByRange(FIND_STRUCTURES, {filter: (str) => {return str.structureType == STRUCTURE_CONTAINER && str.store[RESOURCE_ENERGY] > 100}})
+      return this.areaPos.findClosestByRange(FIND_STRUCTURES, {filter: (str) => {return str.structureType == STRUCTURE_CONTAINER && str.store[RESOURCE_ENERGY] > 100}})
     }
 
     private calculateMaxWorkerCount(): number{
@@ -71,18 +70,8 @@ export default class UpgradeSite extends BaseSite {
       }
     }
   
-    private createNewUpgraderCreeps(): SpawnTask | null {
-      switch (this.controllerLevel) {
-        case 1:
-        case 2:
-        case 3:
-          return this.createHarvesterWithCarry();
-      }
-      return null
-    }
-  
-    private createHarvesterWithCarry(): SpawnTask {
-      return new SpawnTask(SpawnType.Upgrader, this.siteId, "Upgrader", [WORK, CARRY, MOVE]);
+    private createCreepForThisArea(): SpawnTask {
+      return new SpawnTask(SpawnType.Upgrader, this.areaId, "Upgrader", [WORK, CARRY, MOVE]);
     }
   }
   
