@@ -1,5 +1,5 @@
 import { BaseLayout, Coord } from "./BaseLayout";
-import { layoutSieve, layoutRooftop, layoutReverseRooftop, layoutUtility } from "./Layout";
+import { layoutSieve, layoutRooftop, layoutReverseRooftop, layoutFourWays, layoutUtility } from "./Layout";
 import { Helper } from "./../Helpers/Helper";
 import { GetRoomObjects } from "./../Helpers/GetRoomObjects";
 
@@ -55,6 +55,9 @@ export class BaseBuilder {
           break;
         case COLOR_BROWN:
           layoutToBeUsed = layoutReverseRooftop;
+          break;
+        case COLOR_ORANGE:
+          layoutToBeUsed = layoutFourWays;
           break;
         default:
           continue;
@@ -121,6 +124,7 @@ export class BaseBuilder {
     let extensionCoordinates = layout[controllerLevel]!.buildings["extension"].pos;
     let wallCoordinates = layout[controllerLevel]!.buildings["wall"].pos;
     let rampartCoordinates = layout[controllerLevel]!.buildings["rampart"].pos;
+    let containerCoordinates = layout[controllerLevel]!.buildings["container"].pos;
     let observerCoordinates = layout[controllerLevel]!.buildings["observer"].pos;
     let powerSpawnCoordinates = layout[controllerLevel]!.buildings["powerSpawn"].pos;
     let linkCoordinates = layout[controllerLevel]!.buildings["link"].pos;
@@ -131,12 +135,14 @@ export class BaseBuilder {
     let labCoordinates = layout[controllerLevel]!.buildings["lab"].pos;
 
     this.buildBuildingType(anchor, spawnCoordinates, STRUCTURE_SPAWN, previewInsteadOfBuild, layout);
-    if (GetRoomObjects.getRoomSpawns(Game.rooms[anchor.roomName]).length == 0)//Don't build the other stuff while Spawn is not built yet
+    if (GetRoomObjects.getRoomSpawns(Game.rooms[anchor.roomName], true).length == 0)//Don't build the other stuff while Spawn is not built yet
       return;
     this.buildBuildingType(anchor, roadCoordinates, STRUCTURE_ROAD, previewInsteadOfBuild, layout);
+    Game.rooms[anchor.roomName].visual.connectRoads();
     this.buildBuildingType(anchor, extensionCoordinates, STRUCTURE_EXTENSION, previewInsteadOfBuild, layout);
     this.buildBuildingType(anchor, wallCoordinates, STRUCTURE_WALL, previewInsteadOfBuild, layout);
     this.buildBuildingType(anchor, rampartCoordinates, STRUCTURE_RAMPART, previewInsteadOfBuild, layout);
+    this.buildBuildingType(anchor, containerCoordinates, STRUCTURE_CONTAINER, previewInsteadOfBuild, layout);
     this.buildBuildingType(anchor, observerCoordinates, STRUCTURE_OBSERVER, previewInsteadOfBuild, layout);
     this.buildBuildingType(anchor, powerSpawnCoordinates, STRUCTURE_POWER_SPAWN, previewInsteadOfBuild, layout);
     this.buildBuildingType(anchor, linkCoordinates, STRUCTURE_LINK, previewInsteadOfBuild, layout);
@@ -152,7 +158,7 @@ export class BaseBuilder {
       let x = coord.x - layout.data.anchor.x + anchor.x;
       let y = coord.y - layout.data.anchor.y + anchor.y;
       if (previewInsteadOfBuild) {
-        Game.rooms[anchor.roomName].visual.structure(x, y, constructionType, { align: 'center', opacity: 0.5, color: "#ff0000" });
+        Game.rooms[anchor.roomName].visual.structure(x, y, constructionType);
       }
       else {
         if (Game.rooms[anchor.roomName].lookForAt(LOOK_TERRAIN, x, y)[0] != "wall") {
@@ -243,7 +249,7 @@ export class BaseBuilder {
       }
     }
     if (previewInsteadOfBuild) {
-      room.visual.structure(x, y, type, { align: 'center', opacity: 0.5, color: "#ff0000" });
+      room.visual.structure(x, y, type);
     }
     else {
       switch (type) {

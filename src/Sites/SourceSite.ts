@@ -43,12 +43,8 @@ export default class SourceSite extends BaseSite {
     if (this.containerNextToSource){
       for (let i: number = 0; i < this.creeps.length; i++){
         if(!this.creeps[i].isFull() && this.creeps[i].isFree()){
-          if(i == 0){//Move only the first creep on top of container.
-            if(!Helper.isSamePosition(this.containerNextToSource.pos, this.creeps[i].pos)){
-              this.creeps[i].addTask(new CreepTask(Activity.Move, this.containerNextToSource.pos))
-            }else{
-              this.creeps[i].addTask(new CreepTask(Activity.Harvest, this.source.pos))
-            }
+          if(!Helper.isSamePosition(this.containerNextToSource.pos, this.creeps[i].pos)){
+            this.creeps[i].addTask(new CreepTask(Activity.Move, this.containerNextToSource.pos))
           }else{
             this.creeps[i].addTask(new CreepTask(Activity.Harvest, this.source.pos))
           }

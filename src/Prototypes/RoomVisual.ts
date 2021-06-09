@@ -195,9 +195,8 @@ RoomVisual.prototype.structure = function(x: number, y: number, type: BuildableS
 				stroke : undefined,
 				opacity: opts.opacity
 			});
-            //No idea where roads is taken from.
-			//if (!this.roads) this.roads = [];
-			//this.roads.push([x, y]);
+			if (!this.roads) this.roads = [];
+			this.roads.push([x, y]);
 			break;
 		case STRUCTURE_RAMPART:
 			this.circle(x, y, {
@@ -302,6 +301,43 @@ RoomVisual.prototype.structure = function(x: number, y: number, type: BuildableS
 			});
 			break;
 	}
+
+	return this;
+};
+
+const dirs = [
+	[],
+	[0, -1],
+	[1, -1],
+	[1, 0],
+	[1, 1],
+	[0, 1],
+	[-1, 1],
+	[-1, 0],
+	[-1, -1]
+];
+
+RoomVisual.prototype.connectRoads = function(opts = {}): RoomVisual | void {
+	_.defaults(opts, {opacity: 0.5});
+	const color = opts.color || colors.road || 'white';
+	if (!this.roads) return;
+	// this.text(this.roads.map(r=>r.join(',')).join(' '),25,23)
+	this.roads.forEach((r: number[]) => {
+		// this.text(`${r[0]},${r[1]}`,r[0],r[1],{ size: 0.2 })
+		for (let i = 1; i <= 4; i++) {
+			const d = dirs[i];
+			const c = [r[0] + d[0], r[1] + d[1]];
+			const rd = _.some(<number[][]>this.roads, r => r[0] == c[0] && r[1] == c[1]);
+			// this.text(`${c[0]},${c[1]}`,c[0],c[1],{ size: 0.2, color: rd?'green':'red' })
+			if (rd) {
+				this.line(r[0], r[1], c[0], c[1], {
+					color  : color,
+					width  : 0.35,
+					opacity: opts.opacity
+				});
+			}
+		}
+	});
 
 	return this;
 };
