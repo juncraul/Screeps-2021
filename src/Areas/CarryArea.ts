@@ -14,7 +14,7 @@ export default class CarryArea extends BaseArea {
     spawns: StructureSpawn[];
     extensions: StructureExtension[];
     depositToGeneralStore: (StructureContainer)[];
-    depositToLimitedStore: (StructureSpawn | StructureExtension | StructureTower)[];
+    depositToLimitedStore: (StructureSpawn | StructureExtension | StructureTower | StructureLink)[];
     containersToCollectFrom: (StructureContainer | Ruin)[];
     droppedResourcesToCollectFrom: Resource[];
   
@@ -24,8 +24,7 @@ export default class CarryArea extends BaseArea {
       this.maxWorkerCount = 1;
       this.room = controller.room;
       this.controllerLevel = controller.level;
-      let potentialContainer = controller.pos.findInRange(FIND_STRUCTURES, 3, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
-      this.containerNextToController = (potentialContainer instanceof StructureContainer) ? potentialContainer : null;
+      this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 3);
       this.spawns = GetRoomObjects.getRoomSpawns(controller.room, true);
       this.extensions = GetRoomObjects.getRoomExtensions(controller.room, true);
       this.depositToGeneralStore = this.getGeneralDeposits();
@@ -59,11 +58,12 @@ export default class CarryArea extends BaseArea {
           }
         }
         let foundSomewhereToDeposit = false;
+        let depositToLimitedStoreSorted = this.depositToLimitedStore.sort((a, b) => a.pos.getRangeTo(this.creeps[i].pos.x, this.creeps[i].pos.y) - b.pos.getRangeTo(this.creeps[i].pos.x, this.creeps[i].pos.y))
         if(!this.creeps[i].isEmpty() && this.creeps[i].isFree()){
-          for(let j: number = 0; j < this.depositToLimitedStore.length; j ++){
-            if(this.depositToLimitedStore[j].store.getFreeCapacity(RESOURCE_ENERGY) == 0)
+          for(let j: number = 0; j < depositToLimitedStoreSorted.length; j ++){
+            if(depositToLimitedStoreSorted[j].store.getFreeCapacity(RESOURCE_ENERGY) == 0)
               continue;
-            this.creeps[i].addTask(new CreepTask(Activity.Deposit, this.depositToLimitedStore[j].pos))
+            this.creeps[i].addTask(new CreepTask(Activity.Deposit, depositToLimitedStoreSorted[j].pos))
             foundSomewhereToDeposit = true;
             break;
           }
@@ -87,16 +87,24 @@ export default class CarryArea extends BaseArea {
       return structures;
     }
 
-    private getLimitedDeposits():(StructureSpawn | StructureExtension | StructureTower)[]{
-      let structures: (StructureSpawn | StructureExtension | StructureTower)[] = [];
+    private getLimitedDeposits():(StructureSpawn | StructureExtension | StructureTower | StructureLink)[]{
+      let structures: (StructureSpawn | StructureExtension | StructureTower | StructureLink)[] = [];
       this.extensions.forEach(extension =>{
-        structures.push(extension);
+        if(extension.store.getFreeCapacity(RESOURCE_ENERGY) != 0)
+          structures.push(extension);
       })
       this.spawns.forEach(spawn =>{
-        structures.push(spawn);
+        if(spawn.store.getFreeCapacity(RESOURCE_ENERGY) != 0)
+          structures.push(spawn);
       })
       GetRoomObjects.getRoomTowers(this.room).forEach(tower => {
-        structures.push(tower);
+        if(tower.store.getFreeCapacity(RESOURCE_ENERGY) > 200)
+          structures.push(tower);
+      })
+      GetRoomObjects.getRoomSources(this.room).forEach(source =>{
+        let potentialLink = GetRoomObjects.getWithinRangeLink(source.pos, 3);
+        if(potentialLink && potentialLink.store.getFreeCapacity(RESOURCE_ENERGY) != 0)
+          structures.push(potentialLink)
       })
       return structures;
     }

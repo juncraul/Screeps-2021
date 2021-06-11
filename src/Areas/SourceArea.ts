@@ -1,3 +1,4 @@
+import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
@@ -9,6 +10,8 @@ export default class SourceArea extends BaseArea {
   maxWorkerCount: number;
   controllerLevel: number;
   containerNextToSource: StructureContainer | null;
+  linkNextToSource: StructureLink | null;
+  linksForDeposits: StructureLink[];
   containerConstructionSiteNextToSource: ConstructionSite | null;
 
   constructor(source: Source, controller: StructureController) {
@@ -17,13 +20,19 @@ export default class SourceArea extends BaseArea {
     this.room = source.room;
     this.maxWorkerCount = 1;
     this.controllerLevel = controller.level;
-    let potentialContainer = source.pos.findInRange(FIND_STRUCTURES, 2, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
-    let potentialContainerConstructionArea = source.pos.findInRange(FIND_MY_CONSTRUCTION_SITES, 1, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
-    this.containerNextToSource = (potentialContainer instanceof StructureContainer) ? potentialContainer : null;
-    this.containerConstructionSiteNextToSource = (potentialContainerConstructionArea instanceof ConstructionSite) ? potentialContainerConstructionArea : null;
+    this.containerNextToSource = GetRoomObjects.getWithinRangeContainer(source.pos, 2);
+    this.containerConstructionSiteNextToSource = GetRoomObjects.getWithinRangeConstructionSite(source.pos, 1, STRUCTURE_CONTAINER);
+    this.linkNextToSource = GetRoomObjects.getWithinRangeLink(source.pos, 2);
+    this.linksForDeposits = this.populateLinksForDeposits();
   }
 
-  public handleSourceArea(): SpawnTask[] {
+  public handleSourceArea(): SpawnTask[]{
+    let tasksForThisArea: SpawnTask[] = this.handleCreeps();
+    this.handleLinks();
+    return tasksForThisArea;
+  }
+
+  private handleCreeps(): SpawnTask[] {
     let tasksForThisSourceArea: SpawnTask[] = [];
     if (this.creeps.length < this.maxWorkerCount + this.getNumberOfDyingCreeps()) {
       let task: SpawnTask | null = this.createCreepForThisArea();
@@ -53,6 +62,36 @@ export default class SourceArea extends BaseArea {
       }
     }
     return tasksForThisSourceArea;
+  }
+
+  private handleLinks(){
+    if(!this.linkNextToSource || this.linkNextToSource.store.energy != 800)
+      return;
+    for(let i = 0; i < this.linksForDeposits.length; i ++){
+      if(this.linksForDeposits[i].store.energy > 100)
+        continue;
+      this.linkNextToSource.transferEnergy(this.linksForDeposits[i])
+    }
+  }
+  
+  private populateLinksForDeposits(): StructureLink[] {
+    let links: StructureLink[] = []
+    let spawn = GetRoomObjects.getRoomSpawns(this.room, true)[0];
+    let storage = GetRoomObjects.getRoomStorage(this.room);
+    let potentialLink: StructureLink | null;
+    if(spawn){
+      potentialLink = GetRoomObjects.getWithinRangeLink(spawn.pos, 4);
+      if(potentialLink){
+        links.push(potentialLink);
+      }
+    }
+    if(storage){
+      potentialLink = GetRoomObjects.getWithinRangeLink(storage.pos, 4);
+      if(potentialLink){
+        links.push(potentialLink);
+      }
+    }
+    return links;
   }
 
   private createCreepForThisArea(): SpawnTask | null {

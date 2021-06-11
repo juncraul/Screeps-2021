@@ -138,12 +138,12 @@ export class GetRoomObjects {
   //Get Within Range Functions
   //Functions to return objects within a certain range from position
   //--------------------------
-  public static getWithinRangeConstructionSite(pos: RoomPosition, structureType: StructureConstant, range: number): ConstructionSite | null {
+  public static getWithinRangeConstructionSite(pos: RoomPosition, range: number, structureType: StructureConstant): ConstructionSite | null {
     let construnctionSite = pos.findInRange(FIND_CONSTRUCTION_SITES, range, { filter: (structure: any) => structure.structureType == structureType })[0];
     return construnctionSite;
   }
 
-  public static getWithinRangeStructures(roomPosition: RoomPosition, structureToLookFor: StructureConstant, range: number): Structure[] {
+  public static getWithinRangeStructures(roomPosition: RoomPosition, range: number, structureToLookFor: StructureConstant): Structure[] {
     let structures = roomPosition.findInRange(FIND_STRUCTURES, range);
     let structuresFiltered: Structure[];
     structuresFiltered = [];
@@ -153,6 +153,16 @@ export class GetRoomObjects {
       }
     })
     return structuresFiltered;
+  }
+
+  public static getWithinRangeContainer(pos: RoomPosition, range: number): StructureContainer | null {
+    let structure = pos.findInRange(FIND_STRUCTURES, range, { filter: { structureType: STRUCTURE_CONTAINER } })[0]
+    return (structure instanceof StructureContainer) ? structure : null;
+  }
+
+  public static getWithinRangeLink(pos: RoomPosition, range: number): StructureLink | null {
+    let structure = pos.findInRange(FIND_STRUCTURES, range, { filter: { structureType: STRUCTURE_LINK } })[0]
+    return (structure instanceof StructureLink) ? structure : null;
   }
 
   //--------------------------

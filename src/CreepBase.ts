@@ -86,7 +86,7 @@ export class CreepBase {
         if (structure) {
           this.transfer(structure, RESOURCE_ENERGY);
         }
-        if(structure instanceof StructureSpawn || structure instanceof StructureExtension || structure instanceof StructureTower){
+        if(structure instanceof StructureSpawn || structure instanceof StructureExtension || structure instanceof StructureTower || structure instanceof StructureLink){
           if(structure.store.getFreeCapacity(RESOURCE_ENERGY) == 0){
             this.creep.say("Str Full");
             this.task.taskDone = true;
@@ -158,7 +158,11 @@ export class CreepBase {
       case Activity.Reserve:
           let controller3: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
           if (controller3) {
-            this.reserve(controller3);
+            if(controller3.reservation?.username != Helper.getUserName()){
+              this.attackController(controller3)
+            }else{
+              this.reserve(controller3);
+            }
           }
           break;
     }
@@ -296,6 +300,14 @@ export class CreepBase {
 
   upgradeController(controller: StructureController) {
     let result = this.creep.upgradeController(controller);
+    if (result == ERR_NOT_IN_RANGE) {
+      this.goTo(controller.pos);
+    }
+    return result;
+  }
+
+  attackController(controller: StructureController) {
+    let result = this.creep.attackController(controller);
     if (result == ERR_NOT_IN_RANGE) {
       this.goTo(controller.pos);
     }

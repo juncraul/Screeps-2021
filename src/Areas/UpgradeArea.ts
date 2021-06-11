@@ -1,3 +1,4 @@
+import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
@@ -17,10 +18,8 @@ export default class UpgradeArea extends BaseArea {
       this.maxWorkerCount = this.calculateMaxWorkerCount();
       this.room = controller.room;
       this.controllerLevel = controller.level;
-      let potentialContainer = controller.pos.findInRange(FIND_STRUCTURES, 3, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
-      let potentialContainerConstructionArea = controller.pos.findInRange(FIND_MY_CONSTRUCTION_SITES, 2, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
-      this.containerNextToUpgrade = (potentialContainer instanceof StructureContainer) ? potentialContainer : null;
-      this.containerConstructionSiteNextToUpgrade = (potentialContainerConstructionArea instanceof ConstructionSite) ? potentialContainerConstructionArea : null;
+      this.containerNextToUpgrade = GetRoomObjects.getWithinRangeContainer(controller.pos, 2);
+      this.containerConstructionSiteNextToUpgrade = GetRoomObjects.getWithinRangeConstructionSite(controller.pos, 2, STRUCTURE_CONTAINER);
     }
   
     public handleUpgradeArea(): SpawnTask[] {
