@@ -13,17 +13,19 @@ export default class Overseer implements IOverseer {
 
 
   refresh(): void {
-    let currentRoom: Room = Game.rooms["W6N1"];
-    let tasks: SpawnTask[] = [];
-    let towers: StructureTower[] = GetRoomObjects.getRoomTowers(currentRoom);
-
-    tasks = tasks.concat(this.overseeRoom(currentRoom));
-
-    this.handleRoomTasks(currentRoom, tasks);
-    towers.forEach(tower => {
-      let cannon = new Cannon(tower);
-      cannon.cannonLogic()})
-    BaseBuilder.logicCreateConstructionSites();
+    let roomsWithSpawns = GetRoomObjects.getAllRoomsWithSpawns();
+    roomsWithSpawns.forEach(roomWithSpawn => {
+      let tasks: SpawnTask[] = [];
+      let towers: StructureTower[] = GetRoomObjects.getRoomTowers(roomWithSpawn);
+  
+      tasks = tasks.concat(this.overseeRoom(roomWithSpawn));
+  
+      this.handleRoomTasks(roomWithSpawn, tasks);
+      towers.forEach(tower => {
+        let cannon = new Cannon(tower);
+        cannon.cannonLogic()})
+      BaseBuilder.logicCreateConstructionSites();
+    })
   }
 
   private overseeRoom(room: Room): SpawnTask[] {
@@ -46,7 +48,8 @@ export default class Overseer implements IOverseer {
     let sources: Source[] = GetRoomObjects.getRoomSources(room);
     sources.forEach(source => {
       let sourceArea: SourceArea = new SourceArea(source, room.controller!);
-      tasks = tasks.concat(sourceArea.handleSourceArea());
+      tasks = tasks.concat(sourceArea.handleSpawnTasks());
+      sourceArea.handleThisArea();
     });
     return tasks;
   }
@@ -56,7 +59,8 @@ export default class Overseer implements IOverseer {
       return [];
     let tasks: SpawnTask[] = [];
       let upgradeArea: UpgradeArea = new UpgradeArea(room.controller);
-      tasks = tasks.concat(upgradeArea.handleUpgradeArea());
+      tasks = tasks.concat(upgradeArea.handleSpawnTasks());
+      upgradeArea.handleThisArea();
     return tasks;
   }
 
@@ -65,7 +69,8 @@ export default class Overseer implements IOverseer {
       return [];
     let tasks: SpawnTask[] = [];
       let carryArea: CarryArea = new CarryArea(room.controller);
-      tasks = tasks.concat(carryArea.handleCarryArea());
+      tasks = tasks.concat(carryArea.handleSpawnTasks());
+      carryArea.handleThisArea();
     return tasks;
   }
 
@@ -74,14 +79,16 @@ export default class Overseer implements IOverseer {
       return [];
     let tasks: SpawnTask[] = [];
       let constructionArea: ConstructionArea = new ConstructionArea(room.controller);
-      tasks = tasks.concat(constructionArea.handleConstructionArea());
+      tasks = tasks.concat(constructionArea.handleSpawnTasks());
+      constructionArea.handleThisArea();
     return tasks;
   }
 
   private handleRemoteArea(roomName: string): SpawnTask[] {
     let tasks: SpawnTask[] = [];
       let remoteArea: RemoteArea = new RemoteArea(roomName);
-      tasks = tasks.concat(remoteArea.handleThisArea());
+      tasks = tasks.concat(remoteArea.handleSpawnTasks());
+      remoteArea.handleThisArea();
     return tasks;
   }
 
@@ -105,38 +112,9 @@ export default class Overseer implements IOverseer {
         let creepName: string = `${task.name}-${Game.time}`;
         if (spawn.spawnCreep(task.bodyPartConstant, creepName) == OK) {
           theNewCreep = Game.creeps[creepName];
+          task.area.handleNewCreepMemory(creepName);
         }else{
           return;
-        }
-        let creepNames: [string];
-        switch(task.spawnType){
-          case SpawnType.Harvester:
-            creepNames = Helper.getCashedMemory(`SourceArea-${task.areaId}`, []);
-            creepNames.push(creepName)
-            Helper.setCashedMemory(`SourceArea-${task.areaId}`, creepNames);
-            break;
-          case SpawnType.Upgrader:
-            creepNames = Helper.getCashedMemory(`UpgradeArea-${task.areaId}`, []);
-            creepNames.push(creepName)
-            Helper.setCashedMemory(`UpgradeArea-${task.areaId}`, creepNames);
-            break;
-          case SpawnType.Carrier:
-            creepNames = Helper.getCashedMemory(`CarryArea-${task.areaId}`, []);
-            creepNames.push(creepName)
-            Helper.setCashedMemory(`CarryArea-${task.areaId}`, creepNames);
-            break;
-          case SpawnType.Constructor:
-              creepNames = Helper.getCashedMemory(`ConstructionArea-${task.areaId}`, []);
-              creepNames.push(creepName)
-              Helper.setCashedMemory(`ConstructionArea-${task.areaId}`, creepNames);
-              break;
-          case SpawnType.Claimer:
-            creepNames = Helper.getCashedMemory(`RemoteArea-${task.areaId}`, []);
-            creepNames.push(creepName)
-            Helper.setCashedMemory(`RemoteArea-${task.areaId}`, creepNames);
-            break;
-          default:
-            throw `Spawn type not implemented: ${task.spawnType}`
         }
       }
     })

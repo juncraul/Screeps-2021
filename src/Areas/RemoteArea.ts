@@ -6,24 +6,21 @@ import BaseArea from "./BaseArea";
 export default class RemoteArea extends BaseArea {
     controller: StructureController | null;
     roomName: string;
-    room: Room | null;
     maxWorkerCount: number;
   
     constructor(roomName: string) {
-      super("RemoteArea", roomName, new RoomPosition(25, 25, roomName))
+      super("RemoteArea", roomName, new RoomPosition(25, 25, roomName), Game.rooms[roomName])
       this.maxWorkerCount = 1;
       this.roomName = roomName;
       if(Game.rooms[roomName] && Game.rooms[roomName].controller){
         this.controller = Game.rooms[roomName].controller!;
-        this.room = Game.rooms[roomName] ? Game.rooms[roomName] : null;
       } else{
         //We have no visiblity to this room.
         this.controller = null;
-        this.room = null;
       }
     }
-  
-    public handleThisArea(): SpawnTask[] {
+
+    public handleSpawnTasks(): SpawnTask[]{
       let tasksForThisArea: SpawnTask[] = [];
       if (this.creeps.length < this.maxWorkerCount) {
         let task: SpawnTask | null = this.createCreepForThisArea();
@@ -31,6 +28,11 @@ export default class RemoteArea extends BaseArea {
           tasksForThisArea.push(task);
         }
       }
+      return tasksForThisArea;
+    }
+  
+    public handleThisArea() {
+      
       for (let i: number = 0; i < this.creeps.length; i++){
         if(this.creeps[i].isFree()){
           if(this.creeps[i].pos.roomName != this.roomName){
@@ -42,11 +44,10 @@ export default class RemoteArea extends BaseArea {
           }
         }
       }
-      return tasksForThisArea;
     }
   
     private createCreepForThisArea(): SpawnTask {
-      return new SpawnTask(SpawnType.Claimer, this.areaId, "Claimer", [CLAIM, MOVE]);
+      return new SpawnTask(SpawnType.Claimer, this.areaId, "Claimer", [CLAIM, MOVE], this);
     }
   }
   

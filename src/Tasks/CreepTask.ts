@@ -18,8 +18,9 @@ export default class CreepTask implements ICreepTask {
     return (new RoomPosition(target.x, target.y, target.roomName)).findInRange(FIND_MY_CONSTRUCTION_SITES, 0)[0];
   }
 
-  public static getStructureFromTarget(target: RoomPosition): Structure | null {
-    return (new RoomPosition(target.x, target.y, target.roomName)).findInRange(FIND_STRUCTURES, 0)[0];
+  public static getStructureFromTargetNoRoadNoRampart(target: RoomPosition): Structure | null {
+    return (new RoomPosition(target.x, target.y, target.roomName))
+    .findInRange(FIND_STRUCTURES, 0, {filter: function(structure) {return structure.structureType != STRUCTURE_ROAD && structure.structureType != STRUCTURE_RAMPART}})[0];
   }
 
   public static getResourceFromTarget(target: RoomPosition): Resource | null {

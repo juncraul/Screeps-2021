@@ -7,7 +7,6 @@ import BaseArea from "./BaseArea";
 
 export default class CarryArea extends BaseArea {
     controller: StructureController;
-    room: Room;
     maxWorkerCount: number;
     controllerLevel: number;
     containerNextToController: StructureContainer | null;
@@ -15,39 +14,50 @@ export default class CarryArea extends BaseArea {
     extensions: StructureExtension[];
     depositToGeneralStore: (StructureContainer)[];
     depositToLimitedStore: (StructureSpawn | StructureExtension | StructureTower | StructureLink)[];
-    containersToCollectFrom: (StructureContainer | Ruin)[];
+    collectFromGeneralStore: (StructureContainer | Ruin)[];
+    collectFromLimitedStore: (StructureLink)[];
     droppedResourcesToCollectFrom: Resource[];
   
     constructor(controller: StructureController) {
-      super("CarryArea", controller.room.name, controller.pos)
+      super("CarryArea", controller.room.name, controller.pos, controller.room)
       this.controller = controller;
       this.maxWorkerCount = 1;
-      this.room = controller.room;
       this.controllerLevel = controller.level;
       this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 3);
       this.spawns = GetRoomObjects.getRoomSpawns(controller.room, true);
       this.extensions = GetRoomObjects.getRoomExtensions(controller.room, true);
       this.depositToGeneralStore = this.getGeneralDeposits();
       this.depositToLimitedStore = this.getLimitedDeposits();
-      this.containersToCollectFrom = this.getContainersToCollectFrom();
+      this.collectFromGeneralStore = this.getGeneralStoreToCollectFrom();
+      this.collectFromLimitedStore = this.getLimitedStoreToCollectFrom();
       this.droppedResourcesToCollectFrom = this.getDroppedResourcesToCollectFrom(RESOURCE_ENERGY);
     }
-  
-    public handleCarryArea(): SpawnTask[] {
-      let tasksForThisUpgradeArea: SpawnTask[] = [];
+
+    public handleSpawnTasks(): SpawnTask[]{
+      let tasksForThisArea: SpawnTask[] = [];
       if (this.creeps.length < this.maxWorkerCount + this.getNumberOfDyingCreeps()) {
         let task: SpawnTask | null = this.createCreepForThisArea();
         if (task) {
-          tasksForThisUpgradeArea.push(task);
+          tasksForThisArea.push(task);
         }
       }
+      return tasksForThisArea;
+    }
+  
+    public handleThisArea() {
       for(let i: number = 0; i < this.creeps.length; i ++){
         if(this.creeps[i].isEmpty() && this.creeps[i].isFree()){
           let foundSomewhereToCollectFrom = false;
-          for( let j: number = 0; j < this.containersToCollectFrom.length; j ++){
-            if(this.containersToCollectFrom[j].store.energy < 200)
+          for( let j: number = 0; j < this.collectFromLimitedStore.length && !foundSomewhereToCollectFrom; j ++){
+            if(this.collectFromLimitedStore[j].store.energy < 200)
               continue;
-            this.creeps[i].addTask(new CreepTask(Activity.Collect, this.containersToCollectFrom[j].pos))
+            this.creeps[i].addTask(new CreepTask(Activity.Collect, this.collectFromLimitedStore[j].pos))
+            foundSomewhereToCollectFrom = true;
+          }
+          for( let j: number = 0; j < this.collectFromGeneralStore.length; j ++){
+            if(this.collectFromGeneralStore[j].store.energy < 200)
+              continue;
+            this.creeps[i].addTask(new CreepTask(Activity.Collect, this.collectFromGeneralStore[j].pos))
             foundSomewhereToCollectFrom = true;
           }
           for( let j: number = 0; j < this.droppedResourcesToCollectFrom.length && !foundSomewhereToCollectFrom; j ++){
@@ -77,7 +87,6 @@ export default class CarryArea extends BaseArea {
           }
         }
       }
-      return tasksForThisUpgradeArea;
     }
 
     private getGeneralDeposits():(StructureContainer)[]{
@@ -139,7 +148,7 @@ export default class CarryArea extends BaseArea {
       } else if(segments >= 12){//1200 energy - 600 Store
         bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
       }
-      return new SpawnTask(SpawnType.Carrier, this.areaId, "Carrier", bodyPartConstants);
+      return new SpawnTask(SpawnType.Carrier, this.areaId, "Carrier", bodyPartConstants, this);
     }
   }
   

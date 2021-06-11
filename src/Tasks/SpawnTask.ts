@@ -1,14 +1,18 @@
+import BaseArea from "Areas/BaseArea";
+
 export default class SpawnTask  {
   spawnType: SpawnType;
   areaId: string;
   name: string;
   bodyPartConstant: BodyPartConstant[];
+  area: BaseArea;
 
-  constructor(spawnType: SpawnType, areaId: string, name: string, bodyPartConstant: BodyPartConstant[]) {
+  constructor(spawnType: SpawnType, areaId: string, name: string, bodyPartConstant: BodyPartConstant[], area: BaseArea) {
     this.spawnType = spawnType;
     this.areaId = areaId;
     this.name = name;
     this.bodyPartConstant = bodyPartConstant;
+    this.area = area
   }
 
   public getSpawnTypeText(): string {

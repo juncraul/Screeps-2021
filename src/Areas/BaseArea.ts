@@ -1,3 +1,4 @@
+import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { Helper } from "Helpers/Helper";
 import { CreepBase } from "../CreepBase";
 
@@ -6,12 +7,21 @@ export default class SourceArea {
   areaId: string;
   areaPos: RoomPosition;
   creeps: CreepBase[];
+  room: Room;
 
-  constructor(memoryType: string, areaId: string, areaPos: RoomPosition) {
+  constructor(memoryType: string, areaId: string, areaPos: RoomPosition, room: Room) {
     this.memoryType = memoryType;
     this.areaId = areaId;
     this.areaPos = areaPos;
     this.creeps = this.getCreepsAssignedToThisArea();
+    this.room = room;
+  }
+
+  public handleNewCreepMemory(creepName: string): string{
+    let creepNames = Helper.getCashedMemory(`${this.memoryType}-${this.areaId}`, []);
+    creepNames.push(creepName)
+    Helper.setCashedMemory(`${this.memoryType}-${this.areaId}`, creepNames);
+    return creepName;
   }
 
   getCreepsAssignedToThisArea(): CreepBase[] {
@@ -30,7 +40,7 @@ export default class SourceArea {
     return creeps;
   }
   
-  getContainersToCollectFrom(): (StructureContainer | Ruin)[]{
+  getGeneralStoreToCollectFrom(): (StructureContainer | Ruin)[]{
     let containers: (StructureContainer | Ruin)[] = [];
     let sources: Source[] = Game.rooms[this.areaPos.roomName].find(FIND_SOURCES);
     for (let i: number = sources.length - 1; i >= 0; i --){
@@ -45,6 +55,26 @@ export default class SourceArea {
         containers.push(ruins[i]);
     }
     return containers;
+  }
+
+  getLimitedStoreToCollectFrom(): (StructureLink)[]{
+    let links: StructureLink[] = []
+    let spawn = GetRoomObjects.getRoomSpawns(this.room, true)[0];
+    let storage = GetRoomObjects.getRoomStorage(this.room);
+    let potentialLink: StructureLink | null;
+    if(spawn){
+      potentialLink = GetRoomObjects.getWithinRangeLink(spawn.pos, 4);
+      if(potentialLink){
+        links.push(potentialLink);
+      }
+    }
+    if(storage){
+      potentialLink = GetRoomObjects.getWithinRangeLink(storage.pos, 4);
+      if(potentialLink){
+        links.push(potentialLink);
+      }
+    }
+    return links;
   }
 
   getDroppedResourcesToCollectFrom(resourceType: ResourceConstant): Resource[]{

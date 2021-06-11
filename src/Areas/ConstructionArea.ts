@@ -5,23 +5,21 @@ import BaseArea from "./BaseArea";
 
 export default class ConstructionArea extends BaseArea {
     controller: StructureController;
-    room: Room;
     maxWorkerCount: number;
     controllerLevel: number;
     containersToCollectFrom: (StructureContainer | Ruin)[];
     droppedResourcesToCollectFrom: Resource[];
   
     constructor(controller: StructureController) {
-      super("ConstructionArea", controller.room.name, controller.pos)
+      super("ConstructionArea", controller.room.name, controller.pos, controller.room)
       this.controller = controller;
-      this.room = controller.room;
       this.controllerLevel = controller.level;
-      this.containersToCollectFrom = this.getContainersToCollectFrom();
+      this.containersToCollectFrom = this.getGeneralStoreToCollectFrom();
       this.maxWorkerCount = this.calculateMaxWorkerCount();
       this.droppedResourcesToCollectFrom = this.getDroppedResourcesToCollectFrom(RESOURCE_ENERGY);
     }
-  
-    public handleConstructionArea(): SpawnTask[] {
+
+    public handleSpawnTasks(): SpawnTask[]{
       let tasksForThisArea: SpawnTask[] = [];
       if (this.creeps.length < this.maxWorkerCount) {
         let task: SpawnTask | null = this.createCreepForThisArea();
@@ -29,6 +27,10 @@ export default class ConstructionArea extends BaseArea {
           tasksForThisArea.push(task);
         }
       }
+      return tasksForThisArea;
+    }
+  
+    public handleThisArea() {
       for(let i: number = 0; i < this.creeps.length; i ++){
         if(this.creeps[i].isEmpty() && this.creeps[i].isFree()){
           let foundSomewhereToCollectFrom: boolean = false;
@@ -53,8 +55,6 @@ export default class ConstructionArea extends BaseArea {
           }
         }
       }
-      
-      return tasksForThisArea;
     }
 
     private getConstructionClosestByPoint(position: RoomPosition) {
@@ -74,7 +74,7 @@ export default class ConstructionArea extends BaseArea {
     }
   
     private createCreepForThisArea(): SpawnTask {
-      return new SpawnTask(SpawnType.Constructor, this.areaId, "Constructor", [WORK, CARRY, MOVE]);
+      return new SpawnTask(SpawnType.Constructor, this.areaId, "Constructor", [WORK, CARRY, MOVE], this);
     }
   }
   

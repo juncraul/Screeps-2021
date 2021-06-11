@@ -21,6 +21,17 @@ export class GetRoomObjects {
     return roomNames;
   }
 
+  public static getAllRoomsWithSpawns(): Room[] {
+    var mySpawns = Object.getOwnPropertyNames(Game.spawns)
+    var roomsWithSpawns = []
+    for (var i = 0; i < mySpawns.length; i++) {
+      if(roomsWithSpawns.filter(room => room.name == Game.spawns[mySpawns[i]].room.name).length != 0)
+        continue;//Skip adding the same room again if we have more than one spawner in the same room
+      roomsWithSpawns.push(Game.spawns[mySpawns[i]].room)
+    }
+    return roomsWithSpawns;
+  }
+
   //--------------------------
   //Get Room Functions
   //Functions to return objects within the room

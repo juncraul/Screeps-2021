@@ -82,7 +82,7 @@ export class CreepBase {
         }
         break;
       case Activity.Deposit:
-        let structure: Structure | null = CreepTask.getStructureFromTarget(this.task.targetPlace);
+        let structure: Structure | null = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
         if (structure) {
           this.transfer(structure, RESOURCE_ENERGY);
         }
@@ -106,8 +106,8 @@ export class CreepBase {
         }
         break;
       case Activity.Collect:
-        let targetCollect: Structure | Ruin | null = CreepTask.getStructureFromTarget(this.task.targetPlace);
-        if (!targetCollect || targetCollect.structureType == STRUCTURE_ROAD || targetCollect.structureType == STRUCTURE_RAMPART){
+        let targetCollect: Structure | Ruin | null = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
+        if (!targetCollect){
           targetCollect = CreepTask.getRuinFromTarget(this.task.targetPlace);
         }
         if (targetCollect) {

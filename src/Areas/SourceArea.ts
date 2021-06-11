@@ -6,7 +6,6 @@ import BaseArea from "./BaseArea";
 
 export default class SourceArea extends BaseArea {
   source: Source;
-  room: Room;
   maxWorkerCount: number;
   controllerLevel: number;
   containerNextToSource: StructureContainer | null;
@@ -15,9 +14,8 @@ export default class SourceArea extends BaseArea {
   containerConstructionSiteNextToSource: ConstructionSite | null;
 
   constructor(source: Source, controller: StructureController) {
-    super("SourceArea", source.id, source.pos);
+    super("SourceArea", source.id, source.pos, source.room);
     this.source = source;
-    this.room = source.room;
     this.maxWorkerCount = 1;
     this.controllerLevel = controller.level;
     this.containerNextToSource = GetRoomObjects.getWithinRangeContainer(source.pos, 2);
@@ -26,20 +24,23 @@ export default class SourceArea extends BaseArea {
     this.linksForDeposits = this.populateLinksForDeposits();
   }
 
-  public handleSourceArea(): SpawnTask[]{
-    let tasksForThisArea: SpawnTask[] = this.handleCreeps();
-    this.handleLinks();
-    return tasksForThisArea;
-  }
-
-  private handleCreeps(): SpawnTask[] {
-    let tasksForThisSourceArea: SpawnTask[] = [];
+  public handleSpawnTasks(): SpawnTask[]{
+    let tasksForThisArea: SpawnTask[] = [];
     if (this.creeps.length < this.maxWorkerCount + this.getNumberOfDyingCreeps()) {
       let task: SpawnTask | null = this.createCreepForThisArea();
       if (task) {
-        tasksForThisSourceArea.push(task);
+        tasksForThisArea.push(task);
       }
     }
+    return tasksForThisArea;
+  }
+
+  public handleThisArea(){
+    this.handleCreeps();
+    this.handleLinks();
+  }
+
+  private handleCreeps() {
     if (this.containerConstructionSiteNextToSource) {
       for (let i: number = 0; i < this.creeps.length; i++){
         if(this.creeps[i].store.energy == 0 && this.creeps[i].isFree())
@@ -61,7 +62,6 @@ export default class SourceArea extends BaseArea {
           this.creeps[i].addTask(new CreepTask(Activity.Deposit, this.containerNextToSource.pos))
       }
     }
-    return tasksForThisSourceArea;
   }
 
   private handleLinks(){
@@ -87,6 +87,12 @@ export default class SourceArea extends BaseArea {
     }
     if(storage){
       potentialLink = GetRoomObjects.getWithinRangeLink(storage.pos, 4);
+      if(potentialLink){
+        links.push(potentialLink);
+      }
+    }
+    if(this.room.controller){
+      potentialLink = GetRoomObjects.getWithinRangeLink(this.room.controller.pos, 4);
       if(potentialLink){
         links.push(potentialLink);
       }
@@ -126,6 +132,6 @@ export default class SourceArea extends BaseArea {
         bodyPartConstants = [WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE, CARRY, CARRY, CARRY, CARRY]
       }
     }
-    return new SpawnTask(SpawnType.Harvester, this.source.id, "Harvester", bodyPartConstants);
+    return new SpawnTask(SpawnType.Harvester, this.source.id, "Harvester", bodyPartConstants, this);
   }
 }
