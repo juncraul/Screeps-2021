@@ -133,7 +133,7 @@ export class GetRoomObjects {
     return null;
   }
 
-  public static geRoomtLabs(room: Room): StructureLab[] {
+  public static getRoomLabs(room: Room): StructureLab[] {
     let structures = room.find(FIND_MY_STRUCTURES, { filter: structure => structure.structureType == STRUCTURE_LAB });
     let labs: StructureLab[] = [];
     for (let i in structures) {

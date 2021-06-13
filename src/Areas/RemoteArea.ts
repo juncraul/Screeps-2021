@@ -1,3 +1,4 @@
+import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
@@ -22,6 +23,9 @@ export default class RemoteArea extends BaseArea {
 
     public handleSpawnTasks(): SpawnTask[]{
       let tasksForThisArea: SpawnTask[] = [];
+      if(this.controller && this.controller.reservation && this.controller.reservation.username == Helper.getUserName() && this.controller.reservation.ticksToEnd < 1000){
+        return [];//Skip creating a claimer if is already researved by me and has plenty of ticks left.
+      }
       if (this.creeps.length < this.maxWorkerCount) {
         let task: SpawnTask | null = this.createCreepForThisArea();
         if (task) {
@@ -47,7 +51,9 @@ export default class RemoteArea extends BaseArea {
     }
   
     private createCreepForThisArea(): SpawnTask {
-      return new SpawnTask(SpawnType.Claimer, this.areaId, "Claimer", [CLAIM, MOVE], this);
+      let bodyPartConstants: BodyPartConstant[] =[]
+      bodyPartConstants = [CLAIM, CLAIM, MOVE, MOVE]//1300 energy
+      return new SpawnTask(SpawnType.Claimer, this.areaId, "Claimer", bodyPartConstants, this);
     }
   }
   

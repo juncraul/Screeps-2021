@@ -24,7 +24,7 @@ export default class SourceArea extends BaseArea {
     this.linksForDeposits = this.populateLinksForDeposits();
   }
 
-  public handleSpawnTasks(): SpawnTask[]{
+  public handleSpawnTasks(): SpawnTask[] {
     let tasksForThisArea: SpawnTask[] = [];
     if (this.creeps.length < this.maxWorkerCount + this.getNumberOfDyingCreeps()) {
       let task: SpawnTask | null = this.createCreepForThisArea();
@@ -35,65 +35,72 @@ export default class SourceArea extends BaseArea {
     return tasksForThisArea;
   }
 
-  public handleThisArea(){
+  public handleThisArea() {
     this.handleCreeps();
     this.handleLinks();
   }
 
   private handleCreeps() {
-    if (this.containerConstructionSiteNextToSource) {
-      for (let i: number = 0; i < this.creeps.length; i++){
-        if(this.creeps[i].store.energy == 0 && this.creeps[i].isFree())
+    for (let i: number = 0; i < this.creeps.length; i++) {
+      if (this.containerConstructionSiteNextToSource) {
+        if (this.creeps[i].store.energy == 0 && this.creeps[i].isFree())
           this.creeps[i].addTask(new CreepTask(Activity.Harvest, this.source.pos))
-        if(this.creeps[i].isFull() && this.creeps[i].isFree())
+        if (this.creeps[i].isFull() && this.creeps[i].isFree())
           this.creeps[i].addTask(new CreepTask(Activity.Construct, this.containerConstructionSiteNextToSource.pos))
       }
-    }
-    if (this.containerNextToSource){
-      for (let i: number = 0; i < this.creeps.length; i++){
-        if(!this.creeps[i].isFull() && this.creeps[i].isFree()){
-          if(!Helper.isSamePosition(this.containerNextToSource.pos, this.creeps[i].pos)){
+      if (this.linkNextToSource && this.containerNextToSource){
+        if (this.creeps[i].store.energy == 0 && this.creeps[i].isFree()){
+          if (!Helper.isSamePosition(this.containerNextToSource.pos, this.creeps[i].pos)) {
             this.creeps[i].addTask(new CreepTask(Activity.Move, this.containerNextToSource.pos))
-          }else{
+          } else {
+            this.creeps[i].addTask(new CreepTask(Activity.HarvestAndDeposit, this.source.pos, this.linkNextToSource.pos))
+          }
+        }
+      }else if (this.containerNextToSource) {
+        if (!this.creeps[i].isFull() && this.creeps[i].isFree()) {
+          if (!Helper.isSamePosition(this.containerNextToSource.pos, this.creeps[i].pos)) {
+            this.creeps[i].addTask(new CreepTask(Activity.Move, this.containerNextToSource.pos))
+          } else {
             this.creeps[i].addTask(new CreepTask(Activity.Harvest, this.source.pos))
           }
         }
-        if(this.creeps[i].isFull() && this.creeps[i].isFree())
+        if (this.creeps[i].isFull() && this.creeps[i].isFree())
           this.creeps[i].addTask(new CreepTask(Activity.Deposit, this.containerNextToSource.pos))
       }
     }
   }
 
-  private handleLinks(){
-    if(!this.linkNextToSource || this.linkNextToSource.store.energy != 800)
+  private handleLinks() {
+    if (!this.linkNextToSource || this.linkNextToSource.store.energy != 800)
       return;
-    for(let i = 0; i < this.linksForDeposits.length; i ++){
-      if(this.linksForDeposits[i].store.energy > 100)
+    for (let i = 0; i < this.linksForDeposits.length; i++) {
+      if (this.linksForDeposits[i].store.energy > 300)
         continue;
       this.linkNextToSource.transferEnergy(this.linksForDeposits[i])
+      break;
     }
   }
-  
+
   private populateLinksForDeposits(): StructureLink[] {
     let links: StructureLink[] = []
     let spawn = GetRoomObjects.getRoomSpawns(this.room, true)[0];
     let storage = GetRoomObjects.getRoomStorage(this.room);
     let potentialLink: StructureLink | null;
-    if(spawn){
+    if (spawn) {
       potentialLink = GetRoomObjects.getWithinRangeLink(spawn.pos, 4);
-      if(potentialLink){
+      if (potentialLink) {
         links.push(potentialLink);
       }
     }
-    if(storage){
+    if (storage) {
       potentialLink = GetRoomObjects.getWithinRangeLink(storage.pos, 4);
-      if(potentialLink){
+      if (potentialLink) {
         links.push(potentialLink);
       }
     }
-    if(this.room.controller){
+    if (this.room.controller) {
       potentialLink = GetRoomObjects.getWithinRangeLink(this.room.controller.pos, 4);
-      if(potentialLink){
+      if (potentialLink) {
         links.push(potentialLink);
       }
     }
@@ -101,34 +108,41 @@ export default class SourceArea extends BaseArea {
   }
 
   private createCreepForThisArea(): SpawnTask | null {
-    let bodyPartConstants: BodyPartConstant[] =[]
+    let bodyPartConstants: BodyPartConstant[] = []
     let buildCheapestCreep = this.creeps.length == 0;//We might get in a deadend where resources will never be more available.
-    if(this.containerNextToSource){
+    if (this.containerNextToSource) {
       let segments = Math.floor(this.room.energyCapacityAvailable / 150);//Work-100; Move-50
       segments = buildCheapestCreep ? this.room.energyAvailable / 150 : segments;
-      if(segments < 2){
+      if (segments < 2) {
         console.log("Something wrong with room capacity")
-      } else if(segments == 2){//300 energy
+      } else if (segments == 2) {//300 energy
         bodyPartConstants = [WORK, WORK, MOVE, MOVE]
-      } else if(segments == 3){//450 energy
+      } else if (segments == 3) {//450 energy
         bodyPartConstants = [WORK, WORK, WORK, MOVE, MOVE, MOVE]
-      } else if(segments == 4){//600 energy
+      } else if (segments == 4) {//600 energy
         bodyPartConstants = [WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE]
-      } else if(segments >= 5){//800 energy - This is the ideal creep with 10 energy collected per tick, enough for source refresh.
+      } else if (segments >= 5) {//800 energy - This is the ideal creep with 10 energy collected per tick, enough for source refresh.
         bodyPartConstants = [WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE, MOVE]
       }
-    }else{
+    } if (this.linkNextToSource) {
+      if (buildCheapestCreep && this.room.energyAvailable < 700) {
+        bodyPartConstants = [WORK, WORK, MOVE, CARRY]
+      } else {
+        //5 X Work; 3 X Move; 1 X Carry. 700 Ene. Walk time empty/full: plain=2/2 road=1/1 swamp=9/10  
+        bodyPartConstants = [WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, CARRY]
+      }
+    } else {
       let segments = Math.floor(this.room.energyCapacityAvailable / 200);//Work-100; Move-50; Carry-50
       segments = buildCheapestCreep ? this.room.energyAvailable / 200 : segments;
-      if(segments < 1){
+      if (segments < 1) {
         console.log("Something wrong with room capacity")
-      } else if(segments == 1){//200 energy
+      } else if (segments == 1) {//200 energy
         bodyPartConstants = [WORK, MOVE, CARRY]
-      } else if(segments == 2){//400 energy
+      } else if (segments == 2) {//400 energy
         bodyPartConstants = [WORK, WORK, MOVE, MOVE, CARRY, CARRY]
-      } else if(segments == 3){//600 energy
+      } else if (segments == 3) {//600 energy
         bodyPartConstants = [WORK, WORK, WORK, MOVE, MOVE, MOVE, CARRY, CARRY, CARRY]
-      } else if(segments >= 4){//800 energy
+      } else if (segments >= 4) {//800 energy
         bodyPartConstants = [WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE, CARRY, CARRY, CARRY, CARRY]
       }
     }

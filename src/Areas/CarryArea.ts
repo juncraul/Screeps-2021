@@ -49,7 +49,7 @@ export default class CarryArea extends BaseArea {
         if(this.creeps[i].isEmpty() && this.creeps[i].isFree()){
           let foundSomewhereToCollectFrom = false;
           for( let j: number = 0; j < this.collectFromLimitedStore.length && !foundSomewhereToCollectFrom; j ++){
-            if(this.collectFromLimitedStore[j].store.energy < 200)
+            if(this.collectFromLimitedStore[j].store.energy < 100)
               continue;
             this.creeps[i].addTask(new CreepTask(Activity.Collect, this.collectFromLimitedStore[j].pos))
             foundSomewhereToCollectFrom = true;
@@ -110,11 +110,11 @@ export default class CarryArea extends BaseArea {
         if(tower.store.getFreeCapacity(RESOURCE_ENERGY) > 200)
           structures.push(tower);
       })
-      GetRoomObjects.getRoomSources(this.room).forEach(source =>{
-        let potentialLink = GetRoomObjects.getWithinRangeLink(source.pos, 3);
-        if(potentialLink && potentialLink.store.getFreeCapacity(RESOURCE_ENERGY) != 0)
-          structures.push(potentialLink)
-      })
+      // GetRoomObjects.getRoomSources(this.room).forEach(source =>{
+      //   let potentialLink = GetRoomObjects.getWithinRangeLink(source.pos, 3);
+      //   if(potentialLink && potentialLink.store.getFreeCapacity(RESOURCE_ENERGY) != 0)
+      //     structures.push(potentialLink)
+      // })
       return structures;
     }
   
@@ -145,8 +145,12 @@ export default class CarryArea extends BaseArea {
         bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
       } else if(segments == 11){//1100 energy - 550 Store
         bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
-      } else if(segments >= 12){//1200 energy - 600 Store
+      } else if(segments == 12){//1200 energy - 600 Store
         bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
+      } else if(segments == 13){//1300 energy - 650 Store
+        bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
+      } else if(segments >= 14){//1400 energy - 700 Store
+        bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
       }
       return new SpawnTask(SpawnType.Carrier, this.areaId, "Carrier", bodyPartConstants, this);
     }

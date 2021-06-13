@@ -61,7 +61,7 @@ export class CreepBase {
     if(!this.task)
       return;
     switch (this.task.activity) {
-      case Activity.Harvest:
+      case Activity.Harvest://0
         let source: Source | null = CreepTask.getSourceFromTarget(this.task.targetPlace);
         if (source) {
           this.harvest(source);
@@ -71,7 +71,7 @@ export class CreepBase {
           this.task.taskDone = true;
         }
         break;
-      case Activity.Construct:
+      case Activity.Construct://1
         let constructionSite: ConstructionSite | null = CreepTask.getConstructionSiteFromTarget(this.task.targetPlace);
         if (constructionSite) {
           this.build(constructionSite);
@@ -81,7 +81,7 @@ export class CreepBase {
           this.task.taskDone = true;
         }
         break;
-      case Activity.Deposit:
+      case Activity.Deposit://2
         let structure: Structure | null = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
         if (structure) {
           this.transfer(structure, RESOURCE_ENERGY);
@@ -97,7 +97,7 @@ export class CreepBase {
           this.task.taskDone = true;
         }
         break;
-      case Activity.Move:
+      case Activity.Move://3
         let roomPosition = CreepTask.getRoomPositionFromTarget(this.task.targetPlace)
         this.goTo(roomPosition);
         if (Helper.isSamePosition(this.pos, roomPosition)) {
@@ -105,7 +105,7 @@ export class CreepBase {
           this.task.taskDone = true;
         }
         break;
-      case Activity.Collect:
+      case Activity.Collect://4
         let targetCollect: Structure | Ruin | null = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
         if (!targetCollect){
           targetCollect = CreepTask.getRuinFromTarget(this.task.targetPlace);
@@ -113,12 +113,31 @@ export class CreepBase {
         if (targetCollect) {
           this.withdraw(targetCollect, RESOURCE_ENERGY);
         }
+        if(targetCollect instanceof StructureContainer 
+          || targetCollect instanceof StructureStorage
+          || targetCollect instanceof StructureTerminal
+          || targetCollect instanceof StructureLab){
+          if(targetCollect.store.energy == 0){
+            this.creep.say("Col Done");
+            this.task.taskDone = true;
+          }
+        }
+        if(targetCollect instanceof StructureLink
+          || targetCollect instanceof StructureExtension
+          || targetCollect instanceof StructureLab
+          || targetCollect instanceof StructureSpawn
+          || targetCollect instanceof StructureTower){
+          if(targetCollect.energy == 0){
+            this.creep.say("Col Done");
+            this.task.taskDone = true;
+          }
+        }
         if (this.carryCurrent == this.carryCapacity) {
           this.creep.say("Col Done");
           this.task.taskDone = true;
         }
         break;
-      case Activity.Upgrade:
+      case Activity.Upgrade://5
         let controller: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
         if (controller) {
           this.upgradeController(controller);
@@ -128,7 +147,7 @@ export class CreepBase {
           this.task.taskDone = true;
         }
         break;
-      case Activity.Pickup:
+      case Activity.Pickup://6
         let targetPickup: Resource | null = CreepTask.getResourceFromTarget(this.task.targetPlace);
         if (targetPickup) {
           this.pickup(targetPickup);
@@ -138,7 +157,7 @@ export class CreepBase {
           this.task.taskDone = true;
         }
         break;
-      case Activity.Claim:
+      case Activity.Claim://7
         let controller2: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
         if (controller2) {
           if(this.claim(controller2) == OK){
@@ -147,7 +166,7 @@ export class CreepBase {
           }
         }
         break;
-      case Activity.MoveDifferentRoom:
+      case Activity.MoveDifferentRoom://8
         let pos: RoomPosition = CreepTask.getRoomPositionFromTarget(this.task.targetPlace)
         this.goTo(pos);
         if (pos.roomName == this.room.name) {
@@ -155,16 +174,32 @@ export class CreepBase {
           this.task.taskDone = true;
         }
         break;
-      case Activity.Reserve:
+      case Activity.Reserve://9
           let controller3: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
           if (controller3) {
-            if(controller3.reservation?.username != Helper.getUserName()){
+            if(controller3.reservation && controller3.reservation.username != Helper.getUserName()){
               this.attackController(controller3)
             }else{
               this.reserve(controller3);
             }
           }
           break;
+      case Activity.HarvestAndDeposit://10
+        let source2: Source | null = CreepTask.getSourceFromTarget(this.task.targetPlace);
+        if (source2) {
+          this.harvest(source2);
+        }
+        if(this.task.targetPlaceSecond){
+          let structure2: Structure | null = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlaceSecond);
+          if (structure2) {
+            if(this.transfer(structure2, RESOURCE_ENERGY) != OK){
+              this.drop(RESOURCE_ENERGY);
+            }
+          }
+        }else{
+          this.drop(RESOURCE_ENERGY);
+        }
+        break;
     }
   }
 
@@ -330,6 +365,11 @@ export class CreepBase {
     return result;
   }
 
+  drop(resouce: ResourceConstant) {
+    let result = this.creep.drop(resouce);
+    return result;
+  }
+
   //     attack(creep: Creep | Structure) {
   //       let result = this.creep.attack(creep);
   //       if (result == ERR_NOT_IN_RANGE) {
@@ -425,25 +465,25 @@ export class CreepBase {
   //       }
   //     }
 
-  //     getNumberOfBoostedBodyPart(bodyType: BodyPartConstant): number {
-  //       let total = 0;
-  //       for (let i in this.creep.body) {
-  //         if (this.creep.body[i].type == bodyType && this.creep.body[i].boost) {
-  //           total++;
-  //         }
-  //       }
-  //       return total;
-  //     }
+  getNumberOfBoostedBodyPart(bodyType: BodyPartConstant): number {
+    let total = 0;
+    for (let i in this.creep.body) {
+      if (this.creep.body[i].type == bodyType && this.creep.body[i].boost) {
+        total++;
+      }
+    }
+    return total;
+  }
 
-  //     getNumberOfBodyPart(bodyType: BodyPartConstant): number {
-  //       let total = 0;
-  //       for (let i in this.creep.body) {
-  //         if (this.creep.body[i].type == bodyType) {
-  //           total++;
-  //         }
-  //       }
-  //       return total;
-  //     }
+  getNumberOfBodyPart(bodyType: BodyPartConstant): number {
+    let total = 0;
+    for (let i in this.creep.body) {
+      if (this.creep.body[i].type == bodyType) {
+        total++;
+      }
+    }
+    return total;
+  }
 
   //     static getActiveBodyPartsFromArrayOfProbes(probes: Probe[], bodyPart: BodyPartConstant) {
   //     var bodyParts = 0;

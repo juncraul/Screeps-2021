@@ -1,13 +1,13 @@
-import { Helper } from "Helpers/Helper";
 import SourceArea from "Areas/SourceArea";
 import UpgradeArea from "Areas/UpgradeArea";
-import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
+import SpawnTask from "Tasks/SpawnTask";
 import CarryArea from "Areas/CarryArea";
 import ConstructionArea from "Areas/ConstructionArea";
 import { Cannon } from "Cannon";
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { BaseBuilder } from "BaseBuilder/BaseBuilder";
 import RemoteArea from "Areas/RemoteArea";
+import UtilityArea from "Areas/UtilityArea";
 
 export default class Overseer implements IOverseer {
 
@@ -35,9 +35,9 @@ export default class Overseer implements IOverseer {
     tasks = tasks.concat(this.handleUpgradeArea(room));
     tasks = tasks.concat(this.handleCarryArea(room));
     tasks = tasks.concat(this.handleConstructionArea(room));
+    tasks = tasks.concat(this.handleUtilityArea(room));
     for(let i = 0; i < roomsToReserve.length; i ++)
       tasks = tasks.concat(this.handleRemoteArea(roomsToReserve[i]));
-
     return tasks;
   }
 
@@ -89,6 +89,18 @@ export default class Overseer implements IOverseer {
       let remoteArea: RemoteArea = new RemoteArea(roomName);
       tasks = tasks.concat(remoteArea.handleSpawnTasks());
       remoteArea.handleThisArea();
+    return tasks;
+  }
+
+  private handleUtilityArea(room: Room): SpawnTask[] {
+    let tasks: SpawnTask[] = [];
+      let storage: StructureStorage | null = GetRoomObjects.getRoomStorage(room);
+      if(!storage){
+        return [];
+      }
+      let utilityArea: UtilityArea = new UtilityArea(storage);
+      tasks = tasks.concat(utilityArea.handleSpawnTasks());
+      utilityArea.handleThisArea();
     return tasks;
   }
 

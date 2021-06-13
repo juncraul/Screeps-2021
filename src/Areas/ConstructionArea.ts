@@ -1,3 +1,4 @@
+import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
@@ -9,6 +10,7 @@ export default class ConstructionArea extends BaseArea {
     controllerLevel: number;
     containersToCollectFrom: (StructureContainer | Ruin)[];
     droppedResourcesToCollectFrom: Resource[];
+    storage: StructureStorage | null;
   
     constructor(controller: StructureController) {
       super("ConstructionArea", controller.room.name, controller.pos, controller.room)
@@ -17,6 +19,7 @@ export default class ConstructionArea extends BaseArea {
       this.containersToCollectFrom = this.getGeneralStoreToCollectFrom();
       this.maxWorkerCount = this.calculateMaxWorkerCount();
       this.droppedResourcesToCollectFrom = this.getDroppedResourcesToCollectFrom(RESOURCE_ENERGY);
+      this.storage = GetRoomObjects.getRoomStorage(controller.room);
     }
 
     public handleSpawnTasks(): SpawnTask[]{
@@ -46,6 +49,9 @@ export default class ConstructionArea extends BaseArea {
               continue;
             this.creeps[i].addTask(new CreepTask(Activity.Pickup, this.droppedResourcesToCollectFrom[j].pos))
             foundSomewhereToCollectFrom = true;
+          }
+          if(!foundSomewhereToCollectFrom && this.storage && this.storage.store.energy > 200){
+            this.creeps[i].addTask(new CreepTask(Activity.Collect, this.storage.pos))//TODO:Add Energy type in here.
           }
         }
         if(!this.creeps[i].isEmpty() && this.creeps[i].isFree()){

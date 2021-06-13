@@ -2,12 +2,14 @@
 export default class CreepTask implements ICreepTask {
   activity: number;
   targetPlace: RoomPosition;
+  targetPlaceSecond: RoomPosition | null;
   taskDone: boolean;
 
-  constructor(activity: number, targetPlace: RoomPosition) {
+  constructor(activity: number, targetPlace: RoomPosition, targetPlaceSecond: RoomPosition | null = null) {
     this.activity = activity;
     this.targetPlace = targetPlace;
     this.taskDone = false;
+    this.targetPlaceSecond = targetPlaceSecond;
   }
 
   public static getSourceFromTarget(target: RoomPosition): Source | null {
@@ -43,6 +45,7 @@ export default class CreepTask implements ICreepTask {
   }
 }
 
+
 export enum Activity {
   Harvest = 0,
   Construct = 1,
@@ -54,4 +57,5 @@ export enum Activity {
   Claim = 7,
   MoveDifferentRoom = 8,
   Reserve = 9,
+  HarvestAndDeposit = 10
 }
