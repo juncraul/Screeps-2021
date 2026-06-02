@@ -6,6 +6,9 @@
     "moduleResolution": "Node",
     "outDir": "dist",
     "baseUrl": "src/",
+    "paths": {
+      "@/*": ["src/*"]
+    },
     "sourceMap": true,
     "strict": true,
     "experimentalDecorators": true,

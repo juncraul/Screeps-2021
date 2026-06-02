@@ -2,31 +2,31 @@ import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 
 export class CreepBase {
-  creep: Creep; 						// The creep that this wrapper class will control
-  body: BodyPartDefinition[];    	 	// These properties are all wrapped from this.creep.* to this.*
-  store: StoreDefinition;				// |
-  carryCurrent: number
-  carryCapacity: number;				// |
-  fatigue: number;					// |
-  hits: number;						// |
-  hitsMax: number;					// |
-  id: string;							// |
-  memory: CreepMemory;				// | See the ICreepMemory interface for structure
-  my: boolean;						// |
-  name: string;						// |
-  owner: Owner; 						// |
-  pos: RoomPosition;					// |
-  //ref: string;						// |
-  roleName: string;					// |
-  room: Room;							// |
-  saying: string;						// |
-  spawning: boolean;					// |
-  ticksToLive: number | undefined;	// |
-  //lifetime: number;
-  actionLog: { [actionName: string]: boolean }; // Tracks the actions that a creep has completed this tick
-  task: CreepTask;
+  public creep: Creep; // The creep that this wrapper class will control
+  public body: BodyPartDefinition[]; // These properties are all wrapped from this.creep.* to this.*
+  public store: StoreDefinition; // |
+  public carryCurrent: number;
+  public carryCapacity: number; // |
+  public fatigue: number; // |
+  public hits: number; // |
+  public hitsMax: number; // |
+  public id: string; // |
+  public memory: CreepMemory; // | See the ICreepMemory interface for structure
+  public my: boolean; // |
+  public name: string; // |
+  public owner: Owner; // |
+  public pos: RoomPosition; // |
+  // public ref: string;						// |
+  public roleName: string; // |
+  public room: Room; // |
+  public saying: string; // |
+  public spawning: boolean; // |
+  public ticksToLive: number | undefined; // |
+  // public lifetime: number;
+  public actionLog: { [actionName: string]: boolean }; // Tracks the actions that a creep has completed this tick
+  public task: CreepTask | undefined;
 
-  constructor(creep: Creep) {
+  public constructor(creep: Creep) {
     this.creep = creep;
     this.body = creep.body;
     this.store = creep.store;
@@ -46,166 +46,191 @@ export class CreepBase {
     this.saying = creep.saying;
     this.spawning = creep.spawning;
     this.ticksToLive = creep.ticksToLive;
-    //this.lifetime = this.getBodyparts(CLAIM) > 0 ? CREEP_CLAIM_LIFE_TIME : CREEP_LIFE_TIME;
+    // this.lifetime = this.getBodyparts(CLAIM) > 0 ? CREEP_CLAIM_LIFE_TIME : CREEP_LIFE_TIME;
     this.actionLog = {};
-    this.task = creep.memory.task;
-    //this.task.targetPlace = new RoomPosition(this.task.targetPlace.x, this.task.targetPlace.y, this.task.targetPlace.roomName)//This to make it back to an object
+    this.task = creep.memory.task as CreepTask | undefined;
+    // this.task.targetPlace = new RoomPosition(this.task.targetPlace.x, this.task.targetPlace.y, this.task.targetPlace.roomName)//This to make it back to an object
   }
 
-  addTask(task: CreepTask){
+  public addTask(task: CreepTask): void {
     this.task = task;
     this.creep.memory.task = task;
   }
 
-  workTheTask() {
-    if(!this.task)
-      return;
+  public workTheTask(): void {
+    if (!this.task) return;
     switch (this.task.activity) {
-      case Activity.Harvest://0
-        let source: Source | null = CreepTask.getSourceFromTarget(this.task.targetPlace);
+      case Activity.Harvest: {
+        const source: Source | null = CreepTask.getSourceFromTarget(this.task.targetPlace);
         if (source) {
           this.harvest(source);
         }
-        if (this.carryCapacity > 0 && this.carryCapacity == this.carryCurrent) {
+        if (this.carryCapacity > 0 && this.carryCapacity === this.carryCurrent) {
           this.creep.say("Har Done");
           this.task.taskDone = true;
         }
         break;
-      case Activity.Construct://1
-        let constructionSite: ConstructionSite | null = CreepTask.getConstructionSiteFromTarget(this.task.targetPlace);
+      }
+      case Activity.Construct: {
+        const constructionSite: ConstructionSite | null = CreepTask.getConstructionSiteFromTarget(
+          this.task.targetPlace
+        );
         if (constructionSite) {
           this.build(constructionSite);
         }
-        if (this.carryCurrent == 0 || !constructionSite) {
+        if (this.carryCurrent === 0 || !constructionSite) {
           this.creep.say("Con Done");
           this.task.taskDone = true;
         }
         break;
-      case Activity.Deposit://2
-        let structure: Structure | null = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
+      }
+      case Activity.Deposit: {
+        const structure: Structure | null = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
         if (structure) {
           this.transfer(structure, RESOURCE_ENERGY);
         }
-        if(structure instanceof StructureSpawn || structure instanceof StructureExtension || structure instanceof StructureTower || structure instanceof StructureLink){
-          if(structure.store.getFreeCapacity(RESOURCE_ENERGY) == 0){
+        if (
+          structure instanceof StructureSpawn ||
+          structure instanceof StructureExtension ||
+          structure instanceof StructureTower ||
+          structure instanceof StructureLink
+        ) {
+          if (structure.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
             this.creep.say("Str Full");
             this.task.taskDone = true;
           }
         }
-        if (this.carryCurrent == 0) {
+        if (this.carryCurrent === 0) {
           this.creep.say("Dep Done");
           this.task.taskDone = true;
         }
         break;
-      case Activity.Move://3
-        let roomPosition = CreepTask.getRoomPositionFromTarget(this.task.targetPlace)
+      }
+      case Activity.Move: {
+        const roomPosition = CreepTask.getRoomPositionFromTarget(this.task.targetPlace);
         this.goTo(roomPosition);
         if (Helper.isSamePosition(this.pos, roomPosition)) {
           this.creep.say("Move Done");
           this.task.taskDone = true;
         }
         break;
-      case Activity.Collect://4
-        let targetCollect: Structure | Ruin | null = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
-        if (!targetCollect){
+      }
+      case Activity.Collect: {
+        let targetCollect: Structure | Ruin | null = CreepTask.getStructureFromTargetNoRoadNoRampart(
+          this.task.targetPlace
+        );
+        if (!targetCollect) {
           targetCollect = CreepTask.getRuinFromTarget(this.task.targetPlace);
         }
         if (targetCollect) {
           this.withdraw(targetCollect, RESOURCE_ENERGY);
         }
-        if(targetCollect instanceof StructureContainer 
-          || targetCollect instanceof StructureStorage
-          || targetCollect instanceof StructureTerminal
-          || targetCollect instanceof StructureLab){
-          if(targetCollect.store.energy == 0){
+        if (
+          targetCollect instanceof StructureContainer ||
+          targetCollect instanceof StructureStorage ||
+          targetCollect instanceof StructureTerminal ||
+          targetCollect instanceof StructureLab
+        ) {
+          if (targetCollect.store.energy === 0) {
             this.creep.say("Col Done");
             this.task.taskDone = true;
           }
         }
-        if(targetCollect instanceof StructureLink
-          || targetCollect instanceof StructureExtension
-          || targetCollect instanceof StructureLab
-          || targetCollect instanceof StructureSpawn
-          || targetCollect instanceof StructureTower){
-          if(targetCollect.energy == 0){
+        if (
+          targetCollect instanceof StructureLink ||
+          targetCollect instanceof StructureExtension ||
+          targetCollect instanceof StructureLab ||
+          targetCollect instanceof StructureSpawn ||
+          targetCollect instanceof StructureTower
+        ) {
+          if (targetCollect.energy === 0) {
             this.creep.say("Col Done");
             this.task.taskDone = true;
           }
         }
-        if (this.carryCurrent == this.carryCapacity) {
+        if (this.carryCurrent === this.carryCapacity) {
           this.creep.say("Col Done");
           this.task.taskDone = true;
         }
         break;
-      case Activity.Upgrade://5
-        let controller: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
+      }
+      case Activity.Upgrade: {
+        const controller: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
         if (controller) {
           this.upgradeController(controller);
         }
-        if (this.carryCurrent == 0) {
+        if (this.carryCurrent === 0) {
           this.creep.say("Upg Done");
           this.task.taskDone = true;
         }
         break;
-      case Activity.Pickup://6
-        let targetPickup: Resource | null = CreepTask.getResourceFromTarget(this.task.targetPlace);
+      }
+      case Activity.Pickup: {
+        const targetPickup: Resource | null = CreepTask.getResourceFromTarget(this.task.targetPlace);
         if (targetPickup) {
           this.pickup(targetPickup);
         }
-        if (this.carryCurrent == this.carryCapacity) {
+        if (this.carryCurrent === this.carryCapacity) {
           this.creep.say("Pick Done");
           this.task.taskDone = true;
         }
         break;
-      case Activity.Claim://7
-        let controller2: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
+      }
+      case Activity.Claim: {
+        const controller2: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
         if (controller2) {
-          if(this.claim(controller2) == OK){
+          if (this.claim(controller2) === OK) {
             this.creep.say("Claim Done");
             this.task.taskDone = true;
           }
         }
         break;
-      case Activity.MoveDifferentRoom://8
-        let pos: RoomPosition = CreepTask.getRoomPositionFromTarget(this.task.targetPlace)
+      }
+      case Activity.MoveDifferentRoom: {
+        const pos: RoomPosition = CreepTask.getRoomPositionFromTarget(this.task.targetPlace);
         this.goTo(pos);
-        if (pos.roomName == this.room.name) {
+        if (pos.roomName === this.room.name) {
           this.creep.say("Move Done");
           this.task.taskDone = true;
         }
         break;
-      case Activity.Reserve://9
-          let controller3: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
-          if (controller3) {
-            if(controller3.reservation && controller3.reservation.username != Helper.getUserName()){
-              this.attackController(controller3)
-            }else{
-              this.reserve(controller3);
-            }
+      }
+      case Activity.Reserve: {
+        const controller3: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
+        if (controller3) {
+          if (controller3.reservation && controller3.reservation.username !== Helper.getUserName()) {
+            this.attackController(controller3);
+          } else {
+            this.reserve(controller3);
           }
-          break;
-      case Activity.HarvestAndDeposit://10
-        let source2: Source | null = CreepTask.getSourceFromTarget(this.task.targetPlace);
+        }
+        break;
+      }
+      case Activity.HarvestAndDeposit: {
+        const source2: Source | null = CreepTask.getSourceFromTarget(this.task.targetPlace);
         if (source2) {
           this.harvest(source2);
         }
-        if(this.task.targetPlaceSecond){
-          let structure2: Structure | null = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlaceSecond);
+        if (this.task.targetPlaceSecond) {
+          const structure2: Structure | null = CreepTask.getStructureFromTargetNoRoadNoRampart(
+            this.task.targetPlaceSecond
+          );
           if (structure2) {
-            if(this.transfer(structure2, RESOURCE_ENERGY) != OK){
+            if (this.transfer(structure2, RESOURCE_ENERGY) !== OK) {
               this.drop(RESOURCE_ENERGY);
             }
           }
-        }else{
+        } else {
           this.drop(RESOURCE_ENERGY);
         }
         break;
+      }
     }
   }
 
-  build(structure: ConstructionSite) {
-    let result = this.creep.build(structure);
-    if (result == ERR_NOT_IN_RANGE) {
+  public build(structure: ConstructionSite): ScreepsReturnCode {
+    const result = this.creep.build(structure);
+    if (result === ERR_NOT_IN_RANGE) {
       this.goTo(structure.pos);
     }
     return result;
@@ -220,53 +245,65 @@ export class CreepBase {
   //   return result;
   // }
 
-  harvest(source: Source | Mineral) {//Don't think will ever have the creep's internal cooldown longer than EXTRACTOR_COOLDOWN
-    let result = this.creep.harvest(source);
-    if (result == ERR_NOT_IN_RANGE) {
+  public harvest(source: Source | Mineral): ScreepsReturnCode {
+    // Don't think will ever have the creep's internal cooldown longer than EXTRACTOR_COOLDOWN
+    const result = this.creep.harvest(source);
+    if (result === ERR_NOT_IN_RANGE) {
       this.goTo(source.pos);
     }
     return result;
   }
 
-  goTo(destination: RoomPosition//, movementOption: MovementOption = {}
+  public goTo(
+    destination: RoomPosition // , movementOption: MovementOption = {}
   ) {
     return this.creep.moveTo(destination);
-  };
-
-  isEmpty(): boolean{
-    return this.store.getUsedCapacity() == 0;
   }
 
-  isFree(): boolean{
+  public isEmpty(): boolean {
+    return this.store.getUsedCapacity() === 0;
+  }
+
+  public isFree(): boolean {
     return this.task == null || this.task.taskDone;
   }
 
-  isFull(): boolean{
-    return this.store.getFreeCapacity() == 0;
+  public isFull(): boolean {
+    return this.store.getFreeCapacity() === 0;
   }
 
-  say(whatToSay: string, toPublic?: boolean){
-    this.creep.say(whatToSay, toPublic);
+  public say(whatToSay: string, toPublic?: boolean): ScreepsReturnCode {
+    return this.creep.say(whatToSay, toPublic);
   }
 
-  transfer(target: Creep | CreepBase | Structure, resourceType: ResourceConstant, amount?: number) {
+  public transfer(
+    target: Creep | CreepBase | Structure,
+    resourceType: ResourceConstant,
+    amount?: number
+  ): ScreepsReturnCode {
     let result: ScreepsReturnCode;
     if (target instanceof CreepBase) {
       if (amount) {
-          result = this.creep.transfer(target.creep, resourceType, this.store[resourceType]! < amount ? this.store[resourceType]! : amount);
-      }
-      else {
+        result = this.creep.transfer(
+          target.creep,
+          resourceType,
+          this.store[resourceType]! < amount ? this.store[resourceType]! : amount
+        );
+      } else {
         result = this.creep.transfer(target.creep, resourceType);
       }
     } else {
       if (amount) {
-        result = this.creep.transfer(target, resourceType, this.store[resourceType]! < amount ? this.store[resourceType]! : amount);
-      }
-      else {
+        result = this.creep.transfer(
+          target,
+          resourceType,
+          this.store[resourceType]! < amount ? this.store[resourceType]! : amount
+        );
+      } else {
         result = this.creep.transfer(target, resourceType);
       }
     }
-    if (result == ERR_NOT_IN_RANGE) {
+    if (result === ERR_NOT_IN_RANGE) {
       this.goTo(target.pos);
     }
     return result;
@@ -290,16 +327,19 @@ export class CreepBase {
   //       return result;
   //     }
 
-  withdraw(target: Tombstone | Structure | Ruin, resourceType: ResourceConstant, amount?: number) {
-    let result;
+  public withdraw(
+    target: Tombstone | Structure | Ruin,
+    resourceType: ResourceConstant,
+    amount?: number
+  ): ScreepsReturnCode {
+    let result: ScreepsReturnCode;
     if (amount) {
-      let freeSpace = this.store.getFreeCapacity();
+      const freeSpace = this.store.getFreeCapacity();
       result = this.creep.withdraw(target, resourceType, freeSpace < amount ? freeSpace : amount);
-    }
-    else {
+    } else {
       result = this.creep.withdraw(target, resourceType);
     }
-    if (result == ERR_NOT_IN_RANGE) {
+    if (result === ERR_NOT_IN_RANGE) {
       this.goTo(target.pos);
     }
     return result;
@@ -325,48 +365,48 @@ export class CreepBase {
   //   return result;
   // }
 
-  pickup(resource: Resource) {
-    let result = this.creep.pickup(resource);
-    if (result == ERR_NOT_IN_RANGE) {
+  public pickup(resource: Resource): ScreepsReturnCode {
+    const result = this.creep.pickup(resource);
+    if (result === ERR_NOT_IN_RANGE) {
       this.goTo(resource.pos);
     }
     return result;
   }
 
-  upgradeController(controller: StructureController) {
-    let result = this.creep.upgradeController(controller);
-    if (result == ERR_NOT_IN_RANGE) {
+  public upgradeController(controller: StructureController): ScreepsReturnCode {
+    const result = this.creep.upgradeController(controller);
+    if (result === ERR_NOT_IN_RANGE) {
       this.goTo(controller.pos);
     }
     return result;
   }
 
-  attackController(controller: StructureController) {
-    let result = this.creep.attackController(controller);
-    if (result == ERR_NOT_IN_RANGE) {
+  public attackController(controller: StructureController): ScreepsReturnCode {
+    const result = this.creep.attackController(controller);
+    if (result === ERR_NOT_IN_RANGE) {
       this.goTo(controller.pos);
     }
     return result;
   }
 
-  reserve(controller: StructureController) {
-    let result = this.creep.reserveController(controller);
-    if (result == ERR_NOT_IN_RANGE) {
+  public reserve(controller: StructureController): ScreepsReturnCode {
+    const result = this.creep.reserveController(controller);
+    if (result === ERR_NOT_IN_RANGE) {
       this.goTo(controller.pos);
     }
     return result;
   }
 
-  claim(controller: StructureController) {
-    let result = this.creep.claimController(controller);
-    if (result == ERR_NOT_IN_RANGE) {
+  public claim(controller: StructureController): ScreepsReturnCode {
+    const result = this.creep.claimController(controller);
+    if (result === ERR_NOT_IN_RANGE) {
       this.goTo(controller.pos);
     }
     return result;
   }
 
-  drop(resouce: ResourceConstant) {
-    let result = this.creep.drop(resouce);
+  public drop(resouce: ResourceConstant): ScreepsReturnCode {
+    const result = this.creep.drop(resouce);
     return result;
   }
 
@@ -465,20 +505,20 @@ export class CreepBase {
   //       }
   //     }
 
-  getNumberOfBoostedBodyPart(bodyType: BodyPartConstant): number {
+  public getNumberOfBoostedBodyPart(bodyType: BodyPartConstant): number {
     let total = 0;
-    for (let i in this.creep.body) {
-      if (this.creep.body[i].type == bodyType && this.creep.body[i].boost) {
+    for (const part of this.creep.body) {
+      if (part.type === bodyType && part.boost) {
         total++;
       }
     }
     return total;
   }
 
-  getNumberOfBodyPart(bodyType: BodyPartConstant): number {
+  public getNumberOfBodyPart(bodyType: BodyPartConstant): number {
     let total = 0;
-    for (let i in this.creep.body) {
-      if (this.creep.body[i].type == bodyType) {
+    for (const part of this.creep.body) {
+      if (part.type === bodyType) {
         total++;
       }
     }
