@@ -1,6 +1,5 @@
 import { BaseLayout } from "./BaseLayout";
 
-
 export const layoutSieve: BaseLayout = {
   data: {
     anchor: {
@@ -11,7 +10,7 @@ export const layoutSieve: BaseLayout = {
   4: {
     controllerLevel: 4,
     buildings: {
-      "spawn": {
+      spawn: {
         pos: [
           {
             x: 25,
@@ -19,7 +18,7 @@ export const layoutSieve: BaseLayout = {
           }
         ]
       },
-      "extension": {
+      extension: {
         pos: [
           { x: 22, y: 25 },
           { x: 20, y: 25 },
@@ -53,21 +52,21 @@ export const layoutSieve: BaseLayout = {
           { x: 20, y: 17 }
         ]
       },
-      "road": { pos: [] },
-      "wall": { pos: [] },
-      "rampart": { pos: [] },
-      "container": { pos: [] },
-      "observer": { pos: [] },
-      "powerSpawn": { pos: [] },
-      "link": { pos: [] },
-      "terminal": { pos: [] },
-      "tower": { pos: [] },
-      "nuker": { pos: [] },
-      "storage": { pos: [] },
-      "lab": { pos: [] }
+      road: { pos: [] },
+      wall: { pos: [] },
+      rampart: { pos: [] },
+      container: { pos: [] },
+      observer: { pos: [] },
+      powerSpawn: { pos: [] },
+      link: { pos: [] },
+      terminal: { pos: [] },
+      tower: { pos: [] },
+      nuker: { pos: [] },
+      storage: { pos: [] },
+      lab: { pos: [] }
     }
   }
-}
+};
 
 export const layoutRooftop: BaseLayout = {
   data: {
@@ -79,7 +78,7 @@ export const layoutRooftop: BaseLayout = {
   4: {
     controllerLevel: 4,
     buildings: {
-      "spawn": {
+      spawn: {
         pos: [
           {
             x: 25,
@@ -87,7 +86,7 @@ export const layoutRooftop: BaseLayout = {
           }
         ]
       },
-      "extension": {
+      extension: {
         pos: [
           { x: 22, y: 17 },
           { x: 22, y: 18 },
@@ -151,7 +150,7 @@ export const layoutRooftop: BaseLayout = {
           { x: 21, y: 26 }
         ]
       },
-      "road": {
+      road: {
         pos: [
           { x: 24, y: 17 },
           { x: 23, y: 18 },
@@ -209,20 +208,20 @@ export const layoutRooftop: BaseLayout = {
           { x: 20, y: 25 }
         ]
       },
-      "wall": { pos: [] },
-      "rampart": { pos: [] },
-      "container": { pos: [] },
-      "observer": { pos: [] },
-      "powerSpawn": { pos: [] },
-      "link": { pos: [] },
-      "terminal": { pos: [] },
-      "tower": { pos: [] },
-      "nuker": { pos: [] },
-      "storage": { pos: [] },
-      "lab": { pos: [] }
+      wall: { pos: [] },
+      rampart: { pos: [] },
+      container: { pos: [] },
+      observer: { pos: [] },
+      powerSpawn: { pos: [] },
+      link: { pos: [] },
+      terminal: { pos: [] },
+      tower: { pos: [] },
+      nuker: { pos: [] },
+      storage: { pos: [] },
+      lab: { pos: [] }
     }
   }
-}
+};
 
 export const layoutReverseRooftop: BaseLayout = {
   data: {
@@ -234,7 +233,7 @@ export const layoutReverseRooftop: BaseLayout = {
   4: {
     controllerLevel: 4,
     buildings: {
-      "spawn": {
+      spawn: {
         pos: [
           {
             x: 25,
@@ -242,7 +241,7 @@ export const layoutReverseRooftop: BaseLayout = {
           }
         ]
       },
-      "extension": {
+      extension: {
         pos: [
           { x: 22, y: 22 },
           { x: 22, y: 23 },
@@ -306,7 +305,7 @@ export const layoutReverseRooftop: BaseLayout = {
           { x: 21, y: 35 }
         ]
       },
-      "road": {
+      road: {
         pos: [
           { x: 24, y: 19 },
           { x: 23, y: 22 },
@@ -365,183 +364,175 @@ export const layoutReverseRooftop: BaseLayout = {
           { x: 20, y: 35 }
         ]
       },
-      "wall": {
-        pos: [
-        ]
+      wall: {
+        pos: []
       },
-      "rampart": {
-        pos: [
-        ]
+      rampart: {
+        pos: []
       },
-      "container": { pos: [] },
-      "observer": { pos: [] },
-      "powerSpawn": { pos: [] },
-      "link": { pos: [] },
-      "terminal": { pos: [] },
-      "tower": { pos: [] },
-      "nuker": { pos: [] },
-      "storage": { pos: [] },
-      "lab": { pos: [] }
+      container: { pos: [] },
+      observer: { pos: [] },
+      powerSpawn: { pos: [] },
+      link: { pos: [] },
+      terminal: { pos: [] },
+      tower: { pos: [] },
+      nuker: { pos: [] },
+      storage: { pos: [] },
+      lab: { pos: [] }
     }
   }
-}
+};
 
 export const layoutFourWays: BaseLayout = {
-    data: {
-      anchor: {
-        x: 0,
-        y: 0
-      }
-    },
-    4: {
-      controllerLevel: 4,
-      buildings: {
-        "spawn": {
-          pos: [
-            { x: 5, y: 4},
-            { x: 4, y: 5},
-            { x: 6, y: 5}
-          ]
-        },
-        "extension": {
-          pos: [
-            { x: 0, y: 0 },
-            { x: 1, y: 0 },
-            { x: 2, y: 0 },
-            { x: 8, y: 0 },
-            { x: 9, y: 0 },
-            { x: 10, y: 0 },
-            { x: 0, y: 1 },
-            { x: 2, y: 1 },
-            { x: 3, y: 1 },
-            { x: 7, y: 1 },
-            { x: 8, y: 1 },
-            { x: 10, y: 1 },
-            { x: 0, y: 2 },
-            { x: 1, y: 2 },
-            { x: 3, y: 2 },
-            { x: 4, y: 2 },
-            { x: 6, y: 2 },
-            { x: 7, y: 2 },
-            { x: 9, y: 2 },
-            { x: 10, y: 2 },
-            { x: 1, y: 3 },
-            { x: 2, y: 3 },
-            { x: 4, y: 3 },
-            { x: 6, y: 3 },
-            { x: 8, y: 3 },
-            { x: 9, y: 3 },
-            { x: 2, y: 4 },
-            { x: 3, y: 4 },
-            { x: 7, y: 4 },
-            { x: 8, y: 4 },
-            { x: 2, y: 6 },
-            { x: 3, y: 6 },
-            { x: 7, y: 6 },
-            { x: 8, y: 6 },
-            { x: 1, y: 7 },
-            { x: 2, y: 7 },
-            { x: 4, y: 7 },
-            { x: 6, y: 7 },
-            { x: 8, y: 7 },
-            { x: 9, y: 7 },
-            { x: 0, y: 8 },
-            { x: 1, y: 8 },
-            { x: 3, y: 8 },
-            { x: 4, y: 8 },
-            { x: 6, y: 8 },
-            { x: 7, y: 8 },
-            { x: 9, y: 8 },
-            { x: 10, y: 8 },
-            { x: 0, y: 9 },
-            { x: 2, y: 9 },
-            { x: 3, y: 9 },
-            { x: 7, y: 9 },
-            { x: 8, y: 9 },
-            { x: 10, y: 9 },
-            { x: 0, y: 10 },
-            { x: 1, y: 10 },
-            { x: 2, y: 10 },
-            { x: 8, y: 10 },
-            { x: 9, y: 10 },
-            { x: 10, y: 10 },
-          ]
-        },
-        "road": {
-          pos: [
-            { x: 1, y: 1 },
-            { x: 2, y: 2 },
-            { x: 3, y: 3 },
-            { x: 4, y: 4 },
-            { x: 9, y: 1 },
-            { x: 8, y: 2 },
-            { x: 7, y: 3 },
-            { x: 6, y: 4 },
-            { x: 1, y: 9 },
-            { x: 2, y: 8 },
-            { x: 3, y: 7 },
-            { x: 4, y: 6 },
-            { x: 9, y: 9 },
-            { x: 8, y: 8 },
-            { x: 7, y: 7 },
-            { x: 6, y: 6 },
-            { x: 5, y: 0 },
-            { x: 4, y: 1 },
-            { x: 6, y: 1 },
-            { x: 5, y: 2 },
-            { x: 5, y: 3 },
-            { x: 5, y: 10 },
-            { x: 4, y: 9 },
-            { x: 6, y: 9 },
-            { x: 5, y: 8 },
-            { x: 5, y: 7 },
-            { x: 0, y: 5 },
-            { x: 1, y: 4 },
-            { x: 1, y: 6 },
-            { x: 2, y: 5 },
-            { x: 3, y: 5 },
-            { x: 10, y: 5 },
-            { x: 9, y: 4 },
-            { x: 9, y: 6 },
-            { x: 8, y: 5 },
-            { x: 7, y: 5 },
-          ]
-        },
-        "wall": {
-          pos: [
-          ]
-        },
-        "rampart": {
-          pos: [
-          ]
-        },
-        "container": { 
-            pos: [
-                { x: 5, y: 5}
-            ] 
-        },
-        "observer": { pos: [] },
-        "powerSpawn": { pos: [] },
-        "link": { 
-            pos: [
-                { x: 5, y: 6}
-            ] 
-        },
-        "terminal": { pos: [] },
-        "tower": { 
-            pos: [
-                { x: 5, y: 1},
-                { x: 5, y: 9},
-                { x: 1, y: 5},
-                { x: 9, y: 5},
-            ] 
-        },
-        "nuker": { pos: [] },
-        "storage": { pos: [] },
-        "lab": { pos: [] }
-      }
+  data: {
+    anchor: {
+      x: 0,
+      y: 0
+    }
+  },
+  4: {
+    controllerLevel: 4,
+    buildings: {
+      spawn: {
+        pos: [
+          { x: 5, y: 4 },
+          { x: 4, y: 5 },
+          { x: 6, y: 5 }
+        ]
+      },
+      extension: {
+        pos: [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 },
+          { x: 2, y: 0 },
+          { x: 8, y: 0 },
+          { x: 9, y: 0 },
+          { x: 10, y: 0 },
+          { x: 0, y: 1 },
+          { x: 2, y: 1 },
+          { x: 3, y: 1 },
+          { x: 7, y: 1 },
+          { x: 8, y: 1 },
+          { x: 10, y: 1 },
+          { x: 0, y: 2 },
+          { x: 1, y: 2 },
+          { x: 3, y: 2 },
+          { x: 4, y: 2 },
+          { x: 6, y: 2 },
+          { x: 7, y: 2 },
+          { x: 9, y: 2 },
+          { x: 10, y: 2 },
+          { x: 1, y: 3 },
+          { x: 2, y: 3 },
+          { x: 4, y: 3 },
+          { x: 6, y: 3 },
+          { x: 8, y: 3 },
+          { x: 9, y: 3 },
+          { x: 2, y: 4 },
+          { x: 3, y: 4 },
+          { x: 7, y: 4 },
+          { x: 8, y: 4 },
+          { x: 2, y: 6 },
+          { x: 3, y: 6 },
+          { x: 7, y: 6 },
+          { x: 8, y: 6 },
+          { x: 1, y: 7 },
+          { x: 2, y: 7 },
+          { x: 4, y: 7 },
+          { x: 6, y: 7 },
+          { x: 8, y: 7 },
+          { x: 9, y: 7 },
+          { x: 0, y: 8 },
+          { x: 1, y: 8 },
+          { x: 3, y: 8 },
+          { x: 4, y: 8 },
+          { x: 6, y: 8 },
+          { x: 7, y: 8 },
+          { x: 9, y: 8 },
+          { x: 10, y: 8 },
+          { x: 0, y: 9 },
+          { x: 2, y: 9 },
+          { x: 3, y: 9 },
+          { x: 7, y: 9 },
+          { x: 8, y: 9 },
+          { x: 10, y: 9 },
+          { x: 0, y: 10 },
+          { x: 1, y: 10 },
+          { x: 2, y: 10 },
+          { x: 8, y: 10 },
+          { x: 9, y: 10 },
+          { x: 10, y: 10 }
+        ]
+      },
+      road: {
+        pos: [
+          { x: 1, y: 1 },
+          { x: 2, y: 2 },
+          { x: 3, y: 3 },
+          { x: 4, y: 4 },
+          { x: 9, y: 1 },
+          { x: 8, y: 2 },
+          { x: 7, y: 3 },
+          { x: 6, y: 4 },
+          { x: 1, y: 9 },
+          { x: 2, y: 8 },
+          { x: 3, y: 7 },
+          { x: 4, y: 6 },
+          { x: 9, y: 9 },
+          { x: 8, y: 8 },
+          { x: 7, y: 7 },
+          { x: 6, y: 6 },
+          { x: 5, y: 0 },
+          { x: 4, y: 1 },
+          { x: 6, y: 1 },
+          { x: 5, y: 2 },
+          { x: 5, y: 3 },
+          { x: 5, y: 10 },
+          { x: 4, y: 9 },
+          { x: 6, y: 9 },
+          { x: 5, y: 8 },
+          { x: 5, y: 7 },
+          { x: 0, y: 5 },
+          { x: 1, y: 4 },
+          { x: 1, y: 6 },
+          { x: 2, y: 5 },
+          { x: 3, y: 5 },
+          { x: 10, y: 5 },
+          { x: 9, y: 4 },
+          { x: 9, y: 6 },
+          { x: 8, y: 5 },
+          { x: 7, y: 5 }
+        ]
+      },
+      wall: {
+        pos: []
+      },
+      rampart: {
+        pos: []
+      },
+      container: {
+        pos: [{ x: 5, y: 5 }]
+      },
+      observer: { pos: [] },
+      powerSpawn: { pos: [] },
+      link: {
+        pos: [{ x: 5, y: 6 }]
+      },
+      terminal: { pos: [] },
+      tower: {
+        pos: [
+          { x: 5, y: 1 },
+          { x: 5, y: 9 },
+          { x: 1, y: 5 },
+          { x: 9, y: 5 }
+        ]
+      },
+      nuker: { pos: [] },
+      storage: { pos: [] },
+      lab: { pos: [] }
     }
   }
+};
 
 export const layoutUtility: BaseLayout = {
   data: {
@@ -550,24 +541,74 @@ export const layoutUtility: BaseLayout = {
       y: 25
     }
   },
-  4:
-  {
+  4: {
     controllerLevel: 4,
     buildings: {
-      "spawn": { pos: [] },
-      "extension": { pos: [] },
-      "wall": { pos: [] },
-      "rampart": { pos: [] },
-      "container": { pos: [] },
-      "road": { pos: [{ x: 23, y: 20 }, { x: 24, y: 20 }, { x: 25, y: 20 }, { x: 26, y: 20 }, { x: 27, y: 20 }, { x: 28, y: 20 }, { x: 23, y: 21 }, { x: 28, y: 21 }, { x: 23, y: 22 }, { x: 25, y: 22 }, { x: 26, y: 22 }, { x: 28, y: 22 }, { x: 23, y: 23 }, { x: 24, y: 23 }, { x: 27, y: 23 }, { x: 28, y: 23 }, { x: 23, y: 24 }, { x: 24, y: 24 }, { x: 27, y: 24 }, { x: 28, y: 24 }, { x: 23, y: 25 }, { x: 28, y: 25 }, { x: 23, y: 26 }, { x: 28, y: 26 }, { x: 23, y: 27 }, { x: 24, y: 27 }, { x: 25, y: 27 }, { x: 26, y: 27 }, { x: 27, y: 27 }, { x: 28, y: 27 }] },
-      "observer": { pos: [{ x: 24, y: 22 }] },
-      "powerSpawn": { pos: [{ x: 25, y: 21 }] },
-      "link": { pos: [{ x: 26, y: 21 }] },
-      "terminal": { pos: [{ x: 25, y: 23 }] },
-      "tower": { pos: [{ x: 27, y: 21 }, { x: 24, y: 21 }] },
-      "nuker": { pos: [{ x: 27, y: 22 }] },
-      "storage": { pos: [{ x: 26, y: 23 }] },
-      "lab": { pos: [{ x: 25, y: 24 }, { x: 26, y: 24 }, { x: 24, y: 25 }, { x: 25, y: 25 }, { x: 26, y: 25 }, { x: 27, y: 25 }, { x: 24, y: 26 }, { x: 25, y: 26 }, { x: 26, y: 26 }, { x: 27, y: 26 }] }
+      spawn: { pos: [] },
+      extension: { pos: [] },
+      wall: { pos: [] },
+      rampart: { pos: [] },
+      container: { pos: [] },
+      road: {
+        pos: [
+          { x: 23, y: 20 },
+          { x: 24, y: 20 },
+          { x: 25, y: 20 },
+          { x: 26, y: 20 },
+          { x: 27, y: 20 },
+          { x: 28, y: 20 },
+          { x: 23, y: 21 },
+          { x: 28, y: 21 },
+          { x: 23, y: 22 },
+          { x: 25, y: 22 },
+          { x: 26, y: 22 },
+          { x: 28, y: 22 },
+          { x: 23, y: 23 },
+          { x: 24, y: 23 },
+          { x: 27, y: 23 },
+          { x: 28, y: 23 },
+          { x: 23, y: 24 },
+          { x: 24, y: 24 },
+          { x: 27, y: 24 },
+          { x: 28, y: 24 },
+          { x: 23, y: 25 },
+          { x: 28, y: 25 },
+          { x: 23, y: 26 },
+          { x: 28, y: 26 },
+          { x: 23, y: 27 },
+          { x: 24, y: 27 },
+          { x: 25, y: 27 },
+          { x: 26, y: 27 },
+          { x: 27, y: 27 },
+          { x: 28, y: 27 }
+        ]
+      },
+      observer: { pos: [{ x: 24, y: 22 }] },
+      powerSpawn: { pos: [{ x: 25, y: 21 }] },
+      link: { pos: [{ x: 26, y: 21 }] },
+      terminal: { pos: [{ x: 25, y: 23 }] },
+      tower: {
+        pos: [
+          { x: 27, y: 21 },
+          { x: 24, y: 21 }
+        ]
+      },
+      nuker: { pos: [{ x: 27, y: 22 }] },
+      storage: { pos: [{ x: 26, y: 23 }] },
+      lab: {
+        pos: [
+          { x: 25, y: 24 },
+          { x: 26, y: 24 },
+          { x: 24, y: 25 },
+          { x: 25, y: 25 },
+          { x: 26, y: 25 },
+          { x: 27, y: 25 },
+          { x: 24, y: 26 },
+          { x: 25, y: 26 },
+          { x: 26, y: 26 },
+          { x: 27, y: 26 }
+        ]
+      }
     }
-}
-}
+  }
+};

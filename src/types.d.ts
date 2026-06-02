@@ -9,7 +9,7 @@ interface CreepMemory {
 interface Memory {
   uuid: number;
   log: any;
-  Keys: any; //TODO: Find a proper type for this
+  Keys: any; // TODO: Find a proper type for this
 }
 
 interface ICreepTask {
