@@ -1,4 +1,39 @@
 import { BaseLayout } from "./BaseLayout";
+import layoutBunkerJson from "./LayoutBunker.json";
+
+interface BunkerCoord {
+  x: number;
+  y: number;
+}
+
+interface BunkerBuildings {
+  spawn?: BunkerCoord[];
+  extension?: BunkerCoord[];
+  road?: BunkerCoord[];
+  wall?: BunkerCoord[];
+  rampart?: BunkerCoord[];
+  container?: BunkerCoord[];
+  observer?: BunkerCoord[];
+  powerSpawn?: BunkerCoord[];
+  link?: BunkerCoord[];
+  terminal?: BunkerCoord[];
+  tower?: BunkerCoord[];
+  nuker?: BunkerCoord[];
+  storage?: BunkerCoord[];
+  lab?: BunkerCoord[];
+}
+
+interface BunkerLevelConfig {
+  buildings: BunkerBuildings;
+}
+
+interface BunkerLayoutConfig {
+  anchor: BunkerCoord;
+  size?: BunkerCoord;
+  levels: { [rcl: string]: BunkerLevelConfig };
+}
+
+const bunkerConfig = (layoutBunkerJson as unknown) as BunkerLayoutConfig;
 
 export const layoutSieve: BaseLayout = {
   data: {
@@ -612,3 +647,42 @@ export const layoutUtility: BaseLayout = {
     }
   }
 };
+
+export const layoutBunker: BaseLayout = Object.keys(bunkerConfig.levels).reduce(
+  (acc: BaseLayout, rclKey: string): BaseLayout => {
+    const controllerLevel = parseInt(rclKey, 10);
+    if (isNaN(controllerLevel)) {
+      return acc;
+    }
+
+    const buildings = bunkerConfig.levels[rclKey].buildings || {};
+
+    acc[controllerLevel] = {
+      controllerLevel,
+      buildings: {
+        spawn: { pos: buildings.spawn || [] },
+        extension: { pos: buildings.extension || [] },
+        road: { pos: buildings.road || [] },
+        wall: { pos: buildings.wall || [] },
+        rampart: { pos: buildings.rampart || [] },
+        container: { pos: buildings.container || [] },
+        observer: { pos: buildings.observer || [] },
+        powerSpawn: { pos: buildings.powerSpawn || [] },
+        link: { pos: buildings.link || [] },
+        terminal: { pos: buildings.terminal || [] },
+        tower: { pos: buildings.tower || [] },
+        nuker: { pos: buildings.nuker || [] },
+        storage: { pos: buildings.storage || [] },
+        lab: { pos: buildings.lab || [] }
+      }
+    };
+
+    return acc;
+  },
+  {
+    data: {
+      anchor: bunkerConfig.anchor,
+      size: bunkerConfig.size
+    }
+  } as BaseLayout
+);

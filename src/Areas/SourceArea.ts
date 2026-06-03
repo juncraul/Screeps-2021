@@ -161,9 +161,7 @@ export default class SourceArea extends BaseArea {
     } else {
       let segments = Math.floor(this.room.energyCapacityAvailable / 200); // Work-100; Move-50; Carry-50
       segments = buildCheapestCreep ? Math.floor(this.room.energyAvailable / 200) : segments;
-      if (segments < 1) {
-        console.log("SourceArea, no linkNextToSource: Something wrong with room capacity");
-      } else if (segments === 1) {
+      if (segments === 1) {
         // 200 energy
         bodyPartConstants = [WORK, MOVE, CARRY];
       } else if (segments === 2) {

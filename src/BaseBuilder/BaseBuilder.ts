@@ -1,18 +1,34 @@
 import { BaseLayout, Coord } from "./BaseLayout";
-import { layoutFourWays, layoutReverseRooftop, layoutRooftop, layoutSieve, layoutUtility } from "./Layout";
+import {
+  layoutBunker,
+  layoutFourWays,
+  layoutReverseRooftop,
+  layoutRooftop,
+  layoutSieve,
+  layoutUtility
+} from "./Layout";
 import { Helper } from "./../Helpers/Helper";
 import { GetRoomObjects } from "./../Helpers/GetRoomObjects";
+import "./DistanceTransform";
+import "./FloodFill";
 
 // Flags: Primary - Secondary
-// Layout construction, flag must also be named "ConstructionSite-*" where * is number from 0 to 9
+// Layout construction via the AutoPlaceBase flag
 // WHITE - WHITE Preview Layout Sieve
 // WHITE - GREY  Preview Layout Rooftop
 // WHITE - BROWN Preview Layout Reverse/Rooftop
+// WHITE - ORANGE Preview Layout FourWays
+// WHITE - GREEN Preview Layout Bunker
 // GREY  - WHITE Build Layout Sieve
 // GREY  - GREY  Build Layout Rooftop
 // GREY  - BROWN Build Layout Reverse/Rooftop
+// GREY  - ORANGE Build Layout FourWays
+// GREY  - GREEN Build Layout Bunker
 
 // BROWN - WHITE Build Rampart instead of wall
+
+// AutoPlaceBase automatically chooses a good anchor using distance transform + flood fill,
+// then repositions itself and uses its own colors for preview/build.
 
 export class BaseBuilder {
   public static storeBuildOptionInMemory() {
@@ -40,38 +56,32 @@ export class BaseBuilder {
   }
 
   public static logicCreateConstructionSites() {
-    for (let i = 0; i < 10; i++) {
-      const flag = Game.flags["ConstructionSite-" + i];
-      if (!flag) continue;
-      if (_.filter(Game.creeps, creep => creep.room === flag.room).length === 0) continue;
-      const controller = flag.room ? GetRoomObjects.getRoomController(flag.room) : null;
+    const autoPlaceFlag = Game.flags.AutoPlaceBase;
+    if (autoPlaceFlag && autoPlaceFlag.room) {
+      const controller = GetRoomObjects.getRoomController(autoPlaceFlag.room);
+      const layoutToBeUsed = this.getBaseLayout(autoPlaceFlag.secondaryColor);
 
-      let layoutToBeUsed: BaseLayout;
-      switch (flag.secondaryColor) {
-        case COLOR_WHITE:
-          layoutToBeUsed = layoutSieve;
-          break;
-        case COLOR_GREY:
-          layoutToBeUsed = layoutRooftop;
-          break;
-        case COLOR_BROWN:
-          layoutToBeUsed = layoutReverseRooftop;
-          break;
-        case COLOR_ORANGE:
-          layoutToBeUsed = layoutFourWays;
-          break;
-        default:
-          continue;
+      if (!controller) {
+        console.log("BaseBuilder: No controller found in the room of the AutoPlaceBase flag.");
+        return;
       }
-      if (flag.color === COLOR_WHITE) {
-        this.buildBase(flag.pos, layoutToBeUsed, 4, true);
-        this.createWall(Game.rooms[flag.pos.roomName], true);
-      } else if (flag.color === COLOR_GREY && Game.time % 10 === 0) {
-        // Construct only once every 10th tick
-        this.buildBase(flag.pos, layoutToBeUsed, 4, false);
-        if (controller && controller.level >= 3) {
-          // Build walls only if the controller is at least level 3 because that's when we can build Cannons.
-          this.createWall(Game.rooms[flag.pos.roomName], false);
+      if (!layoutToBeUsed || !layoutToBeUsed[controller.level]) {
+        return;
+      }
+
+      this.autoPlaceConstructionFlag(autoPlaceFlag, layoutToBeUsed, controller.level);
+
+      if (_.filter(Game.creeps, creep => creep.room === autoPlaceFlag.room).length !== 0) {
+        if (autoPlaceFlag.color === COLOR_WHITE) {
+          this.buildBase(autoPlaceFlag.pos, layoutToBeUsed, controller.level, true);
+          this.createWall(Game.rooms[autoPlaceFlag.pos.roomName], true);
+        } else if (autoPlaceFlag.color === COLOR_GREY && Game.time % 10 === 0) {
+          // Construct only once every 10th tick
+          this.buildBase(autoPlaceFlag.pos, layoutToBeUsed, controller.level, false);
+          if (controller.level >= 3) {
+            // Build walls only if the controller is at least level 3 because that's when we can build Cannons.
+            this.createWall(Game.rooms[autoPlaceFlag.pos.roomName], false);
+          }
         }
       }
     }
@@ -121,6 +131,23 @@ export class BaseBuilder {
         STRUCTURE_SPAWN,
         "Raul-" + createSpawnFlag.room.name + "-X"
       );
+    }
+  }
+
+  private static getBaseLayout(secondaryColor: ColorConstant): BaseLayout | null {
+    switch (secondaryColor) {
+      case COLOR_WHITE:
+        return layoutSieve;
+      case COLOR_GREY:
+        return layoutRooftop;
+      case COLOR_BROWN:
+        return layoutReverseRooftop;
+      case COLOR_ORANGE:
+        return layoutFourWays;
+      case COLOR_GREEN:
+        return layoutBunker;
+      default:
+        return null;
     }
   }
 
@@ -324,5 +351,78 @@ export class BaseBuilder {
           break;
       }
     }
+  }
+
+  /**
+   * Uses DistanceTransform to score tiles by openness (distance from walls) and FloodFill from
+   * the room's spawns to confirm reachability, then moves the AutoPlaceBase flag to the
+   * highest-scored position. The flag is only auto-positioned once; remove and place it again
+   * if you want to recompute the anchor.
+   */
+  public static autoPlaceConstructionFlag(flag: Flag, layout: BaseLayout, controllerLevel: number): void {
+    if (flag.memory.autoPlaced || !flag.room) {
+      return;
+    }
+
+    const room = flag.room;
+
+    // Mark walls in the initial cost matrix (255 = obstacle)
+    const initialCM = new PathFinder.CostMatrix();
+    const terrain = room.getTerrain();
+    for (let x = 0; x < 50; x++) {
+      for (let y = 0; y < 50; y++) {
+        if (terrain.get(x, y) === TERRAIN_MASK_WALL) {
+          initialCM.set(x, y, 255);
+        }
+      }
+    }
+
+    // Distance transform: high value = far from walls = open area
+    const distanceCM = room.distanceTransform(initialCM, false);
+
+    // Flood fill from spawns to determine reachability
+    const spawns = GetRoomObjects.getRoomSpawns(room, true);
+    const seeds: Coord[] = spawns.length > 0 ? spawns.map(s => ({ x: s.pos.x, y: s.pos.y })) : [{ x: 25, y: 25 }];
+    const floodCM = room.floodFill(seeds);
+
+    // Score each tile: maximise openness, penalise distance from spawn
+    // Constrain candidate anchors so the full base footprint fits in the room.
+    let bestScore = -1;
+    let bestPos: Coord = seeds[0];
+    const layoutSize = layout.data.size;
+    const halfWidth = layoutSize ? Math.floor(layoutSize.x / 2) : 2;
+    const halfHeight = layoutSize ? Math.floor(layoutSize.y / 2) : 2;
+    const minX = Math.max(2, halfWidth);
+    const maxX = Math.min(47, 49 - halfWidth);
+    const minY = Math.max(2, halfHeight);
+    const maxY = Math.min(47, 49 - halfHeight);
+
+    const planner = layout[controllerLevel];
+    if (!planner) {
+      return;
+    }
+
+    for (let x = minX; x <= maxX; x++) {
+      for (let y = minY; y <= maxY; y++) {
+        const floodDepth = floodCM.get(x, y);
+        if (floodDepth === 0) continue; // wall, seed tile, or unreachable
+
+        const distScore = distanceCM.get(x, y);
+        if (distScore === 0) continue; // immediately adjacent to a wall
+
+        // Weight openness heavily; slightly prefer tiles closer to spawn
+        const score = distScore * 100 - floodDepth;
+        if (score > bestScore) {
+          bestScore = score;
+          bestPos = { x, y };
+        }
+      }
+    }
+
+    if (flag.pos.x !== bestPos.x || flag.pos.y !== bestPos.y || flag.pos.roomName !== room.name) {
+      flag.setPosition(bestPos.x, bestPos.y);
+    }
+
+    flag.memory.autoPlaced = true;
   }
 }

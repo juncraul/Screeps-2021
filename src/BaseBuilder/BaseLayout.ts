@@ -12,5 +12,6 @@ export interface BaseLayout {
   [controllerLevel: number]: BasePlanner | undefined;
   data: {
     anchor: Coord;
+    size?: Coord;
   };
 }

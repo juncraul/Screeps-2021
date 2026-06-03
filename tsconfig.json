@@ -11,6 +11,7 @@
     },
     "sourceMap": true,
     "strict": true,
+    "resolveJsonModule": true,
     "experimentalDecorators": true,
     "noImplicitReturns": true,
     "allowSyntheticDefaultImports": true,

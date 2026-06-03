@@ -3,6 +3,7 @@
 const clear = require("rollup-plugin-clear");
 const resolve = require("@rollup/plugin-node-resolve");
 const commonjs = require("@rollup/plugin-commonjs");
+const json = require("@rollup/plugin-json");
 const typescript = require("rollup-plugin-typescript2");
 const screeps = require("rollup-plugin-screeps");
 
@@ -26,6 +27,7 @@ module.exports = {
     clear({ targets: ["dist"] }),
     resolve(),
     commonjs(),
+    json(),
     typescript({ tsconfig: "./tsconfig.json" }),
     screeps({ config: cfg, dryRun: cfg == null })
   ]

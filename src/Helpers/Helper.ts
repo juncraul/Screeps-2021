@@ -14,6 +14,9 @@ export class Helper {
   }
 
   public static getCashedMemory(key: string, defaultValue: any): any {
+    if (!Memory.Keys || typeof Memory.Keys !== "object") {
+      Memory.Keys = {};
+    }
     let obj = Memory.Keys[key];
     if (obj === undefined) {
       obj = defaultValue;
@@ -22,6 +25,9 @@ export class Helper {
   }
 
   public static setCashedMemory(key: string, value: any) {
+    if (!Memory.Keys || typeof Memory.Keys !== "object") {
+      Memory.Keys = {};
+    }
     Memory.Keys[key] = value;
   }
 
