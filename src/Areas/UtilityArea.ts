@@ -49,7 +49,7 @@ export default class CarryArea extends BaseArea {
     let bodyPartConstants: BodyPartConstant[] = [];
     const segments = Math.floor(this.room.energyCapacityAvailable / 100); // Carry-50; Move-50
     if (segments < 3) {
-      console.log("Something wrong with room capacity");
+      console.log("UtilityArea: Something wrong with room capacity");
     } else if (segments === 3) {
       // 300 energy - 150 Store
       bodyPartConstants = [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];

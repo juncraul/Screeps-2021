@@ -34,6 +34,9 @@ export default class CarryArea extends BaseArea {
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
     if (this.creeps.length < this.maxWorkerCount + this.getNumberOfDyingCreeps()) {
+      if (!this.containerNextToController) {
+        return tasksForThisArea; // If there is no container next to the controller, we don't want to spawn carries until there is one or at least a construction site for it.
+      }
       const task: SpawnTask | null = this.createCreepForThisArea();
       if (task) {
         tasksForThisArea.push(task);
@@ -120,7 +123,7 @@ export default class CarryArea extends BaseArea {
       segments = Math.floor(this.room.energyAvailable / 100) > 3 ? Math.floor(this.room.energyAvailable / 100) : 3;
     }
     if (segments < 3) {
-      console.log("Something wrong with room capacity");
+      console.log("CarryArea: Something wrong with room capacity");
     } else if (segments === 3) {
       // 300 energy - 150 Store
       bodyPartConstants = [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];

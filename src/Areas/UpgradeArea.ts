@@ -1,4 +1,5 @@
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
+import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
@@ -28,6 +29,9 @@ export default class UpgradeArea extends BaseArea {
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
     if (this.creeps.length < this.maxWorkerCount) {
+      if (!this.containerNextToController) {
+        return tasksForThisArea; // There is no container next to the controller.
+      }
       const task: SpawnTask | null = this.createCreepForThisArea();
       if (task) {
         tasksForThisArea.push(task);
@@ -37,6 +41,26 @@ export default class UpgradeArea extends BaseArea {
   }
 
   public handleThisArea() {
+    this.handleSetup();
+    this.handleCreeps();
+  }
+
+  private handleSetup() {
+    if (
+      !this.containerNextToController &&
+      !this.linkNextToController &&
+      !this.containerConstructionSiteNextToController
+    ) {
+      const positionForContainer = Helper.getFreeAdjacentPositions(this.controller.pos, this.room)[0];
+      if (positionForContainer) {
+        this.room.createConstructionSite(positionForContainer, STRUCTURE_CONTAINER);
+      } else {
+        console.log("UpgradeArea: No position for container next to controller");
+      }
+    }
+  }
+
+  private handleCreeps() {
     for (let i: number = this.creeps.length - 1; i >= 0; i--) {
       // Find some resources
       if (this.creeps[i].store.energy === 0 && this.creeps[i].isFree()) {

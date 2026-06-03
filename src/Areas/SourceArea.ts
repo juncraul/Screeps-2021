@@ -9,9 +9,10 @@ export default class SourceArea extends BaseArea {
   maxWorkerCount: number;
   controllerLevel: number;
   containerNextToSource: StructureContainer | null;
+  containerConstructionSiteNextToSource: ConstructionSite | null;
   linkNextToSource: StructureLink | null;
   linksForDeposits: StructureLink[];
-  containerConstructionSiteNextToSource: ConstructionSite | null;
+  maxEmptySpaceAroundSource: number;
 
   constructor(source: Source, controller: StructureController) {
     super("SourceArea", source.id, source.pos, source.room);
@@ -26,11 +27,16 @@ export default class SourceArea extends BaseArea {
     );
     this.linkNextToSource = GetRoomObjects.getWithinRangeLink(source.pos, 2);
     this.linksForDeposits = this.populateLinksForDeposits();
+    this.maxEmptySpaceAroundSource = Helper.getFreeAdjacentPositions(this.source.pos, this.room).length;
   }
 
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
-    if (this.creeps.length < this.maxWorkerCount + this.getNumberOfDyingCreeps()) {
+    let allowedWorkerCount = this.maxWorkerCount + this.getNumberOfDyingCreeps();
+    allowedWorkerCount = this.containerConstructionSiteNextToSource
+      ? allowedWorkerCount + this.maxEmptySpaceAroundSource - 1 // We can have more creeps if there is a construction site for a container, because they can stand around the source and build it at the same time.
+      : allowedWorkerCount; // If there is a construction site for a container, we want to spawn an extra creep to help build it.
+    if (this.creeps.length < allowedWorkerCount) {
       const task: SpawnTask | null = this.createCreepForThisArea();
       if (task) {
         tasksForThisArea.push(task);
@@ -40,8 +46,20 @@ export default class SourceArea extends BaseArea {
   }
 
   public handleThisArea() {
+    this.handleSetup();
     this.handleCreeps();
     this.handleLinks();
+  }
+
+  private handleSetup() {
+    if (!this.containerNextToSource && !this.linkNextToSource && !this.containerConstructionSiteNextToSource) {
+      const positionForContainer = Helper.getFreeAdjacentPositions(this.source.pos, this.room)[0];
+      if (positionForContainer) {
+        this.room.createConstructionSite(positionForContainer, STRUCTURE_CONTAINER);
+      } else {
+        console.log("SourceArea: No position for container next to source");
+      }
+    }
   }
 
   private handleCreeps() {
@@ -116,9 +134,9 @@ export default class SourceArea extends BaseArea {
     const buildCheapestCreep = this.creeps.length === 0; // We might get in a deadend where resources will never be more available.
     if (this.containerNextToSource) {
       let segments = Math.floor(this.room.energyCapacityAvailable / 150); // Work-100; Move-50
-      segments = buildCheapestCreep ? this.room.energyAvailable / 150 : segments;
+      segments = buildCheapestCreep ? Math.floor(this.room.energyAvailable / 150) : segments;
       if (segments < 2) {
-        console.log("Something wrong with room capacity");
+        console.log("SourceArea, containerNextToSource: Something wrong with room capacity");
       } else if (segments === 2) {
         // 300 energy
         bodyPartConstants = [WORK, WORK, MOVE, MOVE];
@@ -142,9 +160,9 @@ export default class SourceArea extends BaseArea {
       }
     } else {
       let segments = Math.floor(this.room.energyCapacityAvailable / 200); // Work-100; Move-50; Carry-50
-      segments = buildCheapestCreep ? this.room.energyAvailable / 200 : segments;
+      segments = buildCheapestCreep ? Math.floor(this.room.energyAvailable / 200) : segments;
       if (segments < 1) {
-        console.log("Something wrong with room capacity");
+        console.log("SourceArea, no linkNextToSource: Something wrong with room capacity");
       } else if (segments === 1) {
         // 200 energy
         bodyPartConstants = [WORK, MOVE, CARRY];

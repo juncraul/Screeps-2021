@@ -42,7 +42,7 @@ export class BaseBuilder {
   public static logicCreateConstructionSites() {
     for (let i = 0; i < 10; i++) {
       const flag = Game.flags["ConstructionSite-" + i];
-      if (flag === null) continue;
+      if (!flag) continue;
       if (_.filter(Game.creeps, creep => creep.room === flag.room).length === 0) continue;
       const controller = flag.room ? GetRoomObjects.getRoomController(flag.room) : null;
 
@@ -78,7 +78,7 @@ export class BaseBuilder {
 
     for (let i = 10; i < 20; i++) {
       const flag = Game.flags["ConstructionSite-" + i];
-      if (flag === null) continue;
+      if (!flag) continue;
       if (_.filter(Game.creeps, creep => creep.room === flag.room).length === 0) continue;
 
       let layoutToBeUsed: BaseLayout;
