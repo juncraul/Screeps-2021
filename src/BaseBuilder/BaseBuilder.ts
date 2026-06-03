@@ -65,23 +65,45 @@ export class BaseBuilder {
         console.log("BaseBuilder: No controller found in the room of the AutoPlaceBase flag.");
         return;
       }
-      if (!layoutToBeUsed || !layoutToBeUsed[controller.level]) {
+      if (!layoutToBeUsed) {
         return;
       }
 
-      this.autoPlaceConstructionFlag(autoPlaceFlag, layoutToBeUsed, controller.level);
+      let autoPlaceLevel = controller.level;
+      if (!layoutToBeUsed[autoPlaceLevel]) {
+        const fallbackLevel = [8, 7, 6, 5, 4, 3, 2].find(level => layoutToBeUsed[level]);
+        if (!fallbackLevel) {
+          return;
+        }
+        autoPlaceLevel = fallbackLevel;
+      }
 
-      if (_.filter(Game.creeps, creep => creep.room === autoPlaceFlag.room).length !== 0) {
-        if (autoPlaceFlag.color === COLOR_WHITE) {
-          this.buildBase(autoPlaceFlag.pos, layoutToBeUsed, controller.level, true);
-          this.createWall(Game.rooms[autoPlaceFlag.pos.roomName], true);
-        } else if (autoPlaceFlag.color === COLOR_GREY && Game.time % 10 === 0) {
-          // Construct only once every 10th tick
-          this.buildBase(autoPlaceFlag.pos, layoutToBeUsed, controller.level, false);
-          if (controller.level >= 3) {
-            // Build walls only if the controller is at least level 3 because that's when we can build Cannons.
-            this.createWall(Game.rooms[autoPlaceFlag.pos.roomName], false);
-          }
+      this.autoPlaceConstructionFlag(autoPlaceFlag, layoutToBeUsed, autoPlaceLevel);
+
+      if (autoPlaceFlag.color === COLOR_WHITE) {
+        const level = (Game.time % 7) + 2;
+
+        this.buildBase(autoPlaceFlag.pos, layoutToBeUsed, level, true);
+        this.createContainerRoadConnections(autoPlaceFlag.room, autoPlaceFlag.pos, layoutToBeUsed, level, true);
+        this.createWall(Game.rooms[autoPlaceFlag.pos.roomName], true);
+      } else if (
+        autoPlaceFlag.color === COLOR_GREY &&
+        Game.time % 10 === 0 &&
+        _.filter(Game.creeps, creep => creep.room === autoPlaceFlag.room).length !== 0 &&
+        layoutToBeUsed[controller.level]
+      ) {
+        // Construct only once every 10th tick
+        this.buildBase(autoPlaceFlag.pos, layoutToBeUsed, controller.level, false);
+        this.createContainerRoadConnections(
+          autoPlaceFlag.room,
+          autoPlaceFlag.pos,
+          layoutToBeUsed,
+          controller.level,
+          false
+        );
+        if (controller.level >= 3) {
+          // Build walls only if the controller is at least level 3 because that's when we can build Cannons.
+          this.createWall(Game.rooms[autoPlaceFlag.pos.roomName], false);
         }
       }
     }
@@ -157,6 +179,13 @@ export class BaseBuilder {
     controllerLevel: number,
     previewInsteadOfBuild: boolean
   ) {
+    if (previewInsteadOfBuild) {
+      Game.rooms[anchor.roomName].visual.text(`RCL ${controllerLevel}`, anchor.x + 2, anchor.y, {
+        color: "#ffffff",
+        font: 0.5
+      });
+    }
+
     const spawnCoordinates = layout[controllerLevel]!.buildings.spawn.pos;
     const roadCoordinates = layout[controllerLevel]!.buildings.road.pos;
     const extensionCoordinates = layout[controllerLevel]!.buildings.extension.pos;
@@ -209,6 +238,118 @@ export class BaseBuilder {
           Game.rooms[anchor.roomName].createConstructionSite(x, y, constructionType);
         }
       }
+    });
+  }
+
+  /**
+   * Connect all room containers to the nearest tile of the base road network using shortest paths.
+   */
+  private static createContainerRoadConnections(
+    room: Room,
+    anchor: RoomPosition,
+    layout: BaseLayout,
+    controllerLevel: number,
+    previewInsteadOfBuild: boolean
+  ): void {
+    const planner = layout[controllerLevel];
+    if (!planner) {
+      return;
+    }
+
+    const roadCoordinates = planner.buildings.road.pos;
+    if (roadCoordinates.length === 0) {
+      return;
+    }
+
+    const roadGoals = roadCoordinates.map(coord => {
+      const x = coord.x - layout.data.anchor.x + anchor.x;
+      const y = coord.y - layout.data.anchor.y + anchor.y;
+      return { pos: new RoomPosition(x, y, room.name), range: 0 };
+    });
+
+    const containerPositions: RoomPosition[] = [];
+    const containers = room.find(FIND_STRUCTURES, {
+      filter: structure => structure.structureType === STRUCTURE_CONTAINER
+    }) as StructureContainer[];
+    containers.forEach(container => containerPositions.push(container.pos));
+
+    const containerSites = room.find(FIND_CONSTRUCTION_SITES, {
+      filter: site => site.structureType === STRUCTURE_CONTAINER
+    });
+    containerSites.forEach(site => containerPositions.push(site.pos));
+
+    const seen = new Set<string>();
+    containerPositions.forEach(pos => {
+      const posKey = `${pos.x}:${pos.y}`;
+      if (seen.has(posKey)) {
+        return;
+      }
+      seen.add(posKey);
+
+      const search = PathFinder.search(pos, roadGoals, {
+        maxOps: 4000,
+        roomCallback: roomName => {
+          if (roomName !== room.name) {
+            return false;
+          }
+
+          const costs = new PathFinder.CostMatrix();
+          const terrain = Game.map.getRoomTerrain(roomName);
+
+          for (let x = 0; x < 50; x++) {
+            for (let y = 0; y < 50; y++) {
+              if (terrain.get(x, y) === TERRAIN_MASK_WALL) {
+                costs.set(x, y, 255);
+              }
+            }
+          }
+
+          room.find(FIND_STRUCTURES).forEach(structure => {
+            if (structure.structureType === STRUCTURE_ROAD) {
+              costs.set(structure.pos.x, structure.pos.y, 1);
+            } else if (
+              structure.structureType !== STRUCTURE_CONTAINER &&
+              (structure.structureType !== STRUCTURE_RAMPART || !structure.my)
+            ) {
+              costs.set(structure.pos.x, structure.pos.y, 255);
+            }
+          });
+
+          room.find(FIND_CONSTRUCTION_SITES).forEach(site => {
+            if (site.structureType !== STRUCTURE_ROAD && site.structureType !== STRUCTURE_CONTAINER) {
+              costs.set(site.pos.x, site.pos.y, 255);
+            }
+          });
+
+          roadGoals.forEach(goal => costs.set(goal.pos.x, goal.pos.y, 1));
+
+          return costs;
+        }
+      });
+
+      if (search.incomplete) {
+        return;
+      }
+
+      search.path.forEach((step, index) => {
+        if (index === 0) {
+          return;
+        }
+
+        if (previewInsteadOfBuild) {
+          room.visual.structure(step.x, step.y, STRUCTURE_ROAD);
+          return;
+        }
+
+        const existingRoad = step
+          .lookFor(LOOK_STRUCTURES)
+          .some(structure => structure.structureType === STRUCTURE_ROAD);
+        const roadSite = step.lookFor(LOOK_CONSTRUCTION_SITES).some(site => site.structureType === STRUCTURE_ROAD);
+
+        if (!existingRoad && !roadSite) {
+          room.createConstructionSite(step.x, step.y, STRUCTURE_ROAD);
+        }
+      });
     });
   }
 
