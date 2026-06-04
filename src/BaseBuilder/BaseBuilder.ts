@@ -13,9 +13,15 @@ import "./DistanceTransform";
 import "./FloodFill";
 
 interface BaseBuildPlan {
+  flagName: string;
   x: number;
   y: number;
   secondaryColor: ColorConstant;
+}
+
+interface BaseBuildData {
+  plans: BaseBuildPlan[];
+  ramparts: Coord[];
 }
 
 // Flags: Primary - Secondary
@@ -41,26 +47,52 @@ interface BaseBuildPlan {
 export class BaseBuilder {
   private static readonly BASE_BUILD_PLAN_KEY_PREFIX = "Base-Build-Plans-";
 
-  public static storeBuildOptionInMemory() {
+  public static storeBuildOptionInMemory(roomName?: string) {
+    const rampartFlagsToRemove: string[] = [];
+
     for (const flagName in Game.flags) {
       const flag = Game.flags[flagName];
+      if (roomName && flag.pos.roomName !== roomName) {
+        continue;
+      }
+
       switch (flag.color) {
         case COLOR_BROWN:
           switch (flag.secondaryColor) {
             case COLOR_WHITE:
-              const constructionRampart: RoomPosition[] = Helper.getCashedMemory("Construction-Rampart", []);
+              if (!flag.room) {
+                break;
+              }
+
+              const roomName = flag.pos.roomName;
+              const buildData = this.getBaseBuildData(roomName);
+              const constructionRampart = buildData.ramparts;
               if (
                 constructionRampart.filter(obj => {
-                  return obj.roomName === flag.pos.roomName && obj.x === flag.pos.x && obj.y === flag.pos.y;
+                  return obj.x === flag.pos.x && obj.y === flag.pos.y;
                 }).length === 0
               ) {
-                constructionRampart.push(flag.pos);
-                Helper.setCashedMemory("Construction-Rampart", constructionRampart);
+                constructionRampart.push({ x: flag.pos.x, y: flag.pos.y });
+                buildData.ramparts = constructionRampart;
+                this.setBaseBuildData(roomName, buildData);
               }
+
+              rampartFlagsToRemove.push(flag.name);
 
               break;
           }
           break;
+      }
+    }
+
+    for (const flagName of rampartFlagsToRemove) {
+      if (Memory.flags) {
+        delete Memory.flags[flagName];
+      }
+
+      const flag = Game.flags[flagName];
+      if (flag) {
+        flag.remove();
       }
     }
   }
@@ -88,8 +120,17 @@ export class BaseBuilder {
         continue;
       }
 
+      const roomName = autoPlaceFlag.pos.roomName;
+      const buildData = this.getBaseBuildData(roomName);
+      const existingPlan = buildData.plans.find(plan => plan.flagName === autoPlaceFlag.name);
+      const selectedSecondaryColor = existingPlan ? existingPlan.secondaryColor : autoPlaceFlag.secondaryColor;
+
+      if (existingPlan && autoPlaceFlag.secondaryColor !== selectedSecondaryColor) {
+        autoPlaceFlag.setColor(autoPlaceFlag.color, selectedSecondaryColor);
+      }
+
       const controller = GetRoomObjects.getRoomController(autoPlaceFlag.room);
-      const layoutToBeUsed = this.getBaseLayout(autoPlaceFlag.secondaryColor);
+      const layoutToBeUsed = this.getBaseLayout(selectedSecondaryColor);
 
       if (!controller) {
         console.log("BaseBuilder: No controller found in the room of the Base flag.");
@@ -113,12 +154,12 @@ export class BaseBuilder {
         continue;
       }
 
-      const roomName = autoPlaceFlag.pos.roomName;
-      let buildPlans = this.getBaseBuildPlans(roomName);
+      let buildPlans = buildData.plans;
 
       if (autoPlaceFlag.color === COLOR_WHITE) {
-        buildPlans = this.removeBuildPlansForLayout(buildPlans, autoPlaceFlag.secondaryColor);
-        this.setBaseBuildPlans(roomName, buildPlans);
+        buildPlans = this.removeBuildPlansForFlag(buildPlans, autoPlaceFlag.name);
+        buildData.plans = buildPlans;
+        this.setBaseBuildData(roomName, buildData);
 
         const availablePreviewLevels = [2, 3, 4, 5, 6, 7].filter(level => layoutToBeUsed[level] !== undefined);
         if (availablePreviewLevels.length === 0) {
@@ -132,11 +173,17 @@ export class BaseBuilder {
       } else if (autoPlaceFlag.color === COLOR_GREY) {
         // Persist minimal plan info and remove flag. Construction will continue from memory.
         buildPlans = this.upsertBuildPlan(buildPlans, {
+          flagName: autoPlaceFlag.name,
           x: autoPlaceFlag.pos.x,
           y: autoPlaceFlag.pos.y,
-          secondaryColor: autoPlaceFlag.secondaryColor
+          secondaryColor: selectedSecondaryColor
         });
-        this.setBaseBuildPlans(roomName, buildPlans);
+
+        this.storeBuildOptionInMemory(roomName);
+
+        const updatedBuildData = this.getBaseBuildData(roomName);
+        updatedBuildData.plans = buildPlans;
+        this.setBaseBuildData(roomName, updatedBuildData);
 
         delete Memory.flags[autoPlaceFlag.name];
         autoPlaceFlag.remove();
@@ -144,28 +191,7 @@ export class BaseBuilder {
     }
 
     for (const roomName in Game.rooms) {
-      this.executeBuildPlans(roomName, this.getBaseBuildPlans(roomName));
-    }
-
-    for (let i = 10; i < 20; i++) {
-      const flag = Game.flags["ConstructionSite-" + i];
-      if (!flag) continue;
-      if (_.filter(Game.creeps, creep => creep.room === flag.room).length === 0) continue;
-
-      let layoutToBeUsed: BaseLayout;
-      switch (flag.secondaryColor) {
-        case COLOR_WHITE:
-          layoutToBeUsed = layoutUtility;
-          break;
-        default:
-          continue;
-      }
-      if (flag.color === COLOR_WHITE) {
-        this.buildBase(flag.pos, layoutToBeUsed, 4, true);
-      } else if (flag.color === COLOR_GREY && Game.time % 10 === 0) {
-        // Construct only once every 10th tick
-        this.buildBase(flag.pos, layoutToBeUsed, 4, false);
-      }
+      this.executeBuildPlans(roomName, this.getBaseBuildData(roomName).plans);
     }
 
     const deleteStructuresFlag = Game.flags.DeleteStructures;
@@ -195,27 +221,39 @@ export class BaseBuilder {
     }
   }
 
-  private static getBaseBuildPlans(roomName: string): BaseBuildPlan[] {
-    return Helper.getCashedMemory(this.getBaseBuildPlanMemoryKey(roomName), []);
+  private static getBaseBuildData(roomName: string): BaseBuildData {
+    const cachedData = Helper.getCashedMemory(this.getBaseBuildPlanMemoryKey(roomName), {
+      plans: [],
+      ramparts: []
+    });
+
+    if (Array.isArray(cachedData)) {
+      return {
+        plans: cachedData as BaseBuildPlan[],
+        ramparts: []
+      };
+    }
+
+    return {
+      plans: cachedData.plans || [],
+      ramparts: cachedData.ramparts || []
+    };
   }
 
-  private static setBaseBuildPlans(roomName: string, buildPlans: BaseBuildPlan[]): void {
-    Helper.setCashedMemory(this.getBaseBuildPlanMemoryKey(roomName), buildPlans);
+  private static setBaseBuildData(roomName: string, buildData: BaseBuildData): void {
+    Helper.setCashedMemory(this.getBaseBuildPlanMemoryKey(roomName), buildData);
   }
 
   private static upsertBuildPlan(buildPlans: BaseBuildPlan[], plan: BaseBuildPlan): BaseBuildPlan[] {
     const filtered = buildPlans.filter(existing => {
-      return existing.secondaryColor !== plan.secondaryColor;
+      return existing.flagName !== plan.flagName;
     });
     filtered.push(plan);
     return filtered;
   }
 
-  private static removeBuildPlansForLayout(
-    buildPlans: BaseBuildPlan[],
-    secondaryColor: ColorConstant
-  ): BaseBuildPlan[] {
-    return buildPlans.filter(plan => plan.secondaryColor !== secondaryColor);
+  private static removeBuildPlansForFlag(buildPlans: BaseBuildPlan[], flagName: string): BaseBuildPlan[] {
+    return buildPlans.filter(plan => plan.flagName !== flagName);
   }
 
   private static executeBuildPlans(roomName: string, buildPlans: BaseBuildPlan[]): void {
@@ -286,7 +324,8 @@ export class BaseBuilder {
       { text: "BROWN  -> Reverse Rooftop", color: "#8b4513" },
       { text: "ORANGE -> FourWays", color: "#ffa500" },
       { text: "GREEN  -> Bunker", color: "#00ff00" },
-      { text: "CYAN   -> Utility", color: "#00ffff" }
+      { text: "CYAN   -> Utility", color: "#00ffff" },
+      { text: "Rampart: BROWN/WHITE", color: "#d2b48c" }
     ];
 
     const startX = 1;
@@ -599,10 +638,10 @@ export class BaseBuilder {
     type: BuildableStructureConstant,
     previewInsteadOfBuild: boolean
   ) {
-    const constructionRampart: RoomPosition[] = Helper.getCashedMemory("Construction-Rampart", []);
+    const constructionRampart = this.getBaseBuildData(room.name).ramparts;
     if (
       constructionRampart.filter(obj => {
-        return obj.roomName === room.name && obj.x === x && obj.y === y;
+        return obj.x === x && obj.y === y;
       }).length !== 0
     ) {
       if (type === STRUCTURE_WALL) {
@@ -631,11 +670,24 @@ export class BaseBuilder {
    */
   public static autoPlaceConstructionFlag(flag: Flag, layout: BaseLayout, controllerLevel: number): boolean {
     flag.memory.baseBuilder = flag.memory.baseBuilder || {};
-    if (flag.memory.baseBuilder.autoPlaced || !flag.room) {
+    if (!flag.room) {
       return true;
     }
 
     const room = flag.room;
+
+    const existingPlan = this.getBaseBuildData(room.name).plans.find(plan => plan.flagName === flag.name);
+    if (existingPlan) {
+      if (flag.pos.x !== existingPlan.x || flag.pos.y !== existingPlan.y || flag.pos.roomName !== room.name) {
+        flag.setPosition(existingPlan.x, existingPlan.y);
+      }
+      flag.memory.baseBuilder.autoPlaced = true;
+      return true;
+    }
+
+    if (flag.memory.baseBuilder.autoPlaced) {
+      return true;
+    }
 
     // Mark walls in the initial cost matrix (255 = obstacle)
     const initialCM = new PathFinder.CostMatrix();
