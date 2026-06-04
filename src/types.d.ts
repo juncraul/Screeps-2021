@@ -20,7 +20,9 @@ interface ICreepTask {
 }
 
 interface FlagMemory {
-  autoPlaced?: boolean;
+  baseBuilder?: {
+    autoPlaced?: boolean;
+  };
 }
 
 // `global` extension samples

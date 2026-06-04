@@ -14,6 +14,15 @@ export const loop = ErrorMapper.wrapLoop(() => {
     }
   }
 
+  // Automatically delete memory of missing flags
+  if (Memory.flags) {
+    for (const name in Memory.flags) {
+      if (!(name in Game.flags)) {
+        delete Memory.flags[name];
+      }
+    }
+  }
+
   const overseer: Overseer = new Overseer();
   overseer.refresh();
 
