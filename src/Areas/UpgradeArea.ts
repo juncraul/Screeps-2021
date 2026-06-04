@@ -15,7 +15,6 @@ export default class UpgradeArea extends BaseArea {
   constructor(controller: StructureController) {
     super("UpgradeArea", controller.id, controller.pos, controller.room);
     this.controller = controller;
-    this.maxWorkerCount = this.calculateMaxWorkerCount();
     this.controllerLevel = controller.level;
     this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 2);
     this.linkNextToController = GetRoomObjects.getWithinRangeLink(controller.pos, 2);
@@ -24,6 +23,7 @@ export default class UpgradeArea extends BaseArea {
       2,
       STRUCTURE_CONTAINER
     );
+    this.maxWorkerCount = this.calculateMaxWorkerCount();
   }
 
   public handleSpawnTasks(): SpawnTask[] {
@@ -88,23 +88,49 @@ export default class UpgradeArea extends BaseArea {
   }
 
   private calculateMaxWorkerCount(): number {
-    // If is too early, one upgrader is enough.
     // For level 8 there is no point having more than one upgrader.
-    switch (this.controllerLevel) {
-      case 1:
-        return 1;
-      case 2:
-      case 3:
-      case 4:
-      case 5:
-      case 6:
-      case 7:
-        return 3;
-      case 8:
-        return 1;
-      default:
-        return 1;
+    if (this.controllerLevel === 8) {
+      return 1;
     }
+
+    const availableUpgradeEnergy = this.getAvailableUpgradeEnergy();
+    let maxWorkerCount = 1;
+
+    if (availableUpgradeEnergy >= 1200) {
+      maxWorkerCount = 2;
+    }
+    if (availableUpgradeEnergy >= 2200) {
+      maxWorkerCount = 3;
+    }
+    if (availableUpgradeEnergy >= 3200) {
+      maxWorkerCount = 4;
+    }
+
+    // Early rooms can still scale up, but keep a safe cap so economy does not starve.
+    if (this.controllerLevel <= 2) {
+      return Math.min(maxWorkerCount, 4);
+    }
+
+    return Math.min(maxWorkerCount, 3);
+  }
+
+  private getAvailableUpgradeEnergy(): number {
+    let availableEnergy = 0;
+
+    if (this.containerNextToController) {
+      availableEnergy += this.containerNextToController.store[RESOURCE_ENERGY];
+    }
+
+    if (this.linkNextToController) {
+      availableEnergy += this.linkNextToController.store[RESOURCE_ENERGY];
+    }
+
+    const generalStores = this.getGeneralStoreToCollectFrom();
+    for (const structure of generalStores) {
+      availableEnergy += structure.store.getUsedCapacity(RESOURCE_ENERGY);
+    }
+
+    return availableEnergy;
   }
 
   private createCreepForThisArea(): SpawnTask {
