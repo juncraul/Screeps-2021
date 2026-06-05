@@ -11,6 +11,28 @@ interface Memory {
   log: any;
   Keys: any; // TODO: Find a proper type for this
   roomVisuals: boolean;
+  scoreHistory: ScoreCollectionRecord[];
+}
+
+interface ScoreCollectionRecord {
+  tick: number;
+  x: number;
+  y: number;
+  roomName: string;
+}
+
+// Season 10 Score items – not in @types/screeps, declared here.
+declare const FIND_SCORES: 10011;
+
+interface Score {
+  id: Id<Score>;
+  pos: RoomPosition;
+  score: number;
+  room: Room;
+}
+
+interface Room {
+  find(type: 10011): Score[];
 }
 
 interface ICreepTask {

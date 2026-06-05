@@ -8,6 +8,7 @@ import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { BaseBuilder } from "BaseBuilder/BaseBuilder";
 import RemoteArea from "Areas/RemoteArea";
 import UtilityArea from "Areas/UtilityArea";
+import SeasonArea from "Areas/SeasonArea";
 
 export default class Overseer implements IOverseer {
   public refresh(): void {
@@ -33,6 +34,7 @@ export default class Overseer implements IOverseer {
     tasks = tasks.concat(this.handleCarryArea(room));
     tasks = tasks.concat(this.handleConstructionArea(room));
     tasks = tasks.concat(this.handleUtilityArea(room));
+    tasks = tasks.concat(this.handleSeasonArea());
     for (const roomToReserve of roomsToReserve) {
       tasks = tasks.concat(this.handleRemoteArea(roomToReserve));
     }
@@ -103,6 +105,16 @@ export default class Overseer implements IOverseer {
     const utilityArea: UtilityArea = new UtilityArea(storage);
     tasks = tasks.concat(utilityArea.handleSpawnTasks());
     utilityArea.handleThisArea();
+    return tasks;
+  }
+
+  private handleSeasonArea(): SpawnTask[] {
+    const seasonArea = new SeasonArea();
+    if (seasonArea.scores.length === 0) {
+      return [];
+    }
+    const tasks: SpawnTask[] = seasonArea.handleSpawnTasks();
+    seasonArea.handleThisArea();
     return tasks;
   }
 

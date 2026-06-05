@@ -33,6 +33,8 @@ export default class SpawnTask {
         return "Constructor";
       case SpawnType.Claimer:
         return "Claimer";
+      case SpawnType.Collector:
+        return "Collector";
     }
   }
 }
@@ -42,5 +44,6 @@ export enum SpawnType {
   Upgrader = 1,
   Carrier = 2,
   Constructor = 3,
-  Claimer = 4
+  Claimer = 4,
+  Collector = 5
 }
