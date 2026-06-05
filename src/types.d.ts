@@ -5,13 +5,14 @@ interface CreepMemory {
   working: boolean;
   task: any;
 }
-
 interface Memory {
   uuid: number;
   log: any;
   Keys: any; // TODO: Find a proper type for this
   roomVisuals: boolean;
   scoreHistory: ScoreCollectionRecord[];
+  seasonExploredRooms?: ExploredRoom[];
+  seasonEnemyRooms?: string[];
 }
 
 interface ScoreCollectionRecord {
@@ -19,6 +20,12 @@ interface ScoreCollectionRecord {
   x: number;
   y: number;
   roomName: string;
+}
+
+// Extend Memory interface to include season properties
+interface ExploredRoom {
+  roomName: string;
+  exploredAt: number;
 }
 
 // Season 10 Score items – not in @types/screeps, declared here.

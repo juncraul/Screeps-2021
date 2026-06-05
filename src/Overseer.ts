@@ -30,8 +30,8 @@ export default class Overseer implements IOverseer {
     let tasks: SpawnTask[] = [];
     const roomsToReserve = GetRoomObjects.getAllRoomsToReserve();
     tasks = tasks.concat(this.handleHarvestArea(room));
-    tasks = tasks.concat(this.handleUpgradeArea(room));
     tasks = tasks.concat(this.handleCarryArea(room));
+    tasks = tasks.concat(this.handleUpgradeArea(room));
     tasks = tasks.concat(this.handleConstructionArea(room));
     tasks = tasks.concat(this.handleUtilityArea(room));
     tasks = tasks.concat(this.handleSeasonArea());

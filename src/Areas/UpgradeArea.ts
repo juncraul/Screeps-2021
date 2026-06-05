@@ -16,7 +16,7 @@ export default class UpgradeArea extends BaseArea {
     super("UpgradeArea", controller.id, controller.pos, controller.room);
     this.controller = controller;
     this.controllerLevel = controller.level;
-    this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 2);
+    this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 1);
     this.linkNextToController = GetRoomObjects.getWithinRangeLink(controller.pos, 2);
     this.containerConstructionSiteNextToController = GetRoomObjects.getWithinRangeConstructionSite(
       controller.pos,
@@ -134,6 +134,29 @@ export default class UpgradeArea extends BaseArea {
   }
 
   private createCreepForThisArea(): SpawnTask {
-    return new SpawnTask(SpawnType.Upgrader, this.areaId, "Upgrader", [WORK, CARRY, MOVE], this);
+    let bodyPartConstants: BodyPartConstant[] = [];
+    let segments = Math.floor(this.room.energyCapacityAvailable / 150); // WORK-100; CARRY-50; MOVE-50
+    if (this.creeps.length === 0) {
+      // Use energyAvailable for the first creep to ensure it can spawn sooner
+      segments = Math.floor(this.room.energyAvailable / 150);
+    }
+    if (segments < 1) {
+      segments = 1;
+    }
+    // Cap segments at reasonable limits based on controller level
+    if (this.controllerLevel <= 4 && segments > 5) {
+      segments = 5;
+    } else if (this.controllerLevel <= 6 && segments > 10) {
+      segments = 10;
+    } else if (segments > 20) {
+      segments = 20;
+    }
+    
+    // Build body parts with ratio: 2 WORK, 1 CARRY, 1 MOVE per segment
+    for (let i = 0; i < segments; i++) {
+      bodyPartConstants.push(WORK, WORK, CARRY, MOVE);
+    }
+    
+    return new SpawnTask(SpawnType.Upgrader, this.areaId, "Upgrader", bodyPartConstants, this);
   }
 }

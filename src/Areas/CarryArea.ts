@@ -21,7 +21,7 @@ export default class CarryArea extends BaseArea {
     this.controller = controller;
     this.maxWorkerCount = 1;
     this.controllerLevel = controller.level;
-    this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 3);
+    this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 1);
     this.spawns = GetRoomObjects.getRoomSpawns(controller.room, true);
     this.extensions = GetRoomObjects.getRoomExtensions(controller.room, true);
     this.depositToGeneralStore = this.getGeneralDeposits();
