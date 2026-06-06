@@ -58,7 +58,27 @@ export default class ConstructionArea extends BaseArea {
         }
       }
     }
+    //this.creepReset();
   }
+
+  // private creepReset(){
+  //   for (let i = 0; i < this.creeps.length; i++) {
+  //     //In case when the construction site disappeared, the task should be removed from creeps memory
+  //     if (this.creeps[i].memory.task && this.creeps[i].memory.task.type === Activity.Construct) {
+  //       const constructionArea = this.getConstructionClosestByPoint(this.creeps[i].memory.task.pos);
+  //       if (!constructionArea) {
+  //         delete this.creeps[i].memory.task;
+  //       }
+  //     }
+  //     //In case when the container disappeared, the task should be removed from creeps memory
+  //     if (this.creeps[i].memory.task && this.creeps[i].memory.task.type === Activity.Collect) {
+  //       const container = this.getContainerClosestByPoint(this.creeps[i].memory.task.pos);
+  //       if (!container) {
+  //         delete this.creeps[i].memory.task;
+  //       }
+  //     }
+  //   }
+  // }
 
   private getConstructionClosestByPoint(position: RoomPosition) {
     return position.findClosestByRange(FIND_MY_CONSTRUCTION_SITES);

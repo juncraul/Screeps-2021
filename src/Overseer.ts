@@ -34,7 +34,9 @@ export default class Overseer implements IOverseer {
     tasks = tasks.concat(this.handleUpgradeArea(room));
     tasks = tasks.concat(this.handleConstructionArea(room));
     tasks = tasks.concat(this.handleUtilityArea(room));
-    tasks = tasks.concat(this.handleSeasonArea());
+    if(Memory.Keys["IsSeason"]){
+      tasks = tasks.concat(this.handleSeasonArea());
+    }
     for (const roomToReserve of roomsToReserve) {
       tasks = tasks.concat(this.handleRemoteArea(roomToReserve));
     }
@@ -119,7 +121,7 @@ export default class Overseer implements IOverseer {
     if (newTasks.length > 0) {
       room.visual.text("List of spawns", 30, 25, { align: "left", opacity: 0.5, color: "#ff0000" });
       for (let i = 0; i < newTasks.length; i++) {
-        room.visual.text(newTasks[i].getSpawnTypeText(), 30, 26 + i, { align: "left", opacity: 0.5, color: "#ff0000" });
+        room.visual.text(`${newTasks[i].getSpawnTypeText()} - ${newTasks[i].getBodyPartAsTextAggregated()}`, 30, 26 + i, { align: "left", opacity: 0.5, color: "#ff0000" });
       }
     }
     if (newTasks.length > 0) {

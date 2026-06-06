@@ -103,6 +103,12 @@ export default class SourceArea extends BaseArea {
     }
   }
 
+  private hasCarryCreepsInRoom(): boolean {
+    const carryAreaMemoryKey = `CarryArea-${this.room.name}`;
+    const carryCreepNames = Helper.getCashedMemory(carryAreaMemoryKey, []);
+    return carryCreepNames.length > 0;
+  }
+
   private populateLinksForDeposits(): StructureLink[] {
     const links: StructureLink[] = [];
     const spawn = GetRoomObjects.getRoomSpawns(this.room, true)[0];
@@ -131,9 +137,10 @@ export default class SourceArea extends BaseArea {
 
   private createCreepForThisArea(): SpawnTask | null {
     let bodyPartConstants: BodyPartConstant[] = [];
-    const buildCheapestCreep = this.creeps.length === 0; // We might get in a deadend where resources will never be more available.
+    const buildCheapestCreep = this.creeps.length === 0 || !this.hasCarryCreepsInRoom(); // We might get in a deadend where resources will never be more available.
+    const amountOfEnergyUnused = this.room.energyCapacityAvailable > 500 ? 300 : 0;
     if (this.containerNextToSource) {
-      let segments = Math.floor(this.room.energyCapacityAvailable / 150); // Work-100; Move-50
+      let segments = Math.floor((this.room.energyCapacityAvailable - amountOfEnergyUnused) / 150); // Work-100; Move-50
       segments = buildCheapestCreep ? Math.floor(this.room.energyAvailable / 150) : segments;
       if (segments < 2) {
         console.log("SourceArea, containerNextToSource: Something wrong with room capacity");
@@ -159,7 +166,7 @@ export default class SourceArea extends BaseArea {
         bodyPartConstants = [WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, CARRY];
       }
     } else {
-      let segments = Math.floor(this.room.energyCapacityAvailable / 200); // Work-100; Move-50; Carry-50
+      let segments = Math.floor((this.room.energyCapacityAvailable - amountOfEnergyUnused) / 200); // Work-100; Move-50; Carry-50
       segments = buildCheapestCreep ? Math.floor(this.room.energyAvailable / 200) : segments;
       if (segments === 1) {
         // 200 energy

@@ -34,9 +34,6 @@ export default class CarryArea extends BaseArea {
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
     if (this.creeps.length < this.maxWorkerCount + this.getNumberOfDyingCreeps()) {
-      if (!this.containerNextToController) {
-        return tasksForThisArea; // If there is no container next to the controller, we don't want to spawn carries until there is one or at least a construction site for it.
-      }
       const task: SpawnTask | null = this.createCreepForThisArea();
       if (task) {
         tasksForThisArea.push(task);
@@ -53,6 +50,7 @@ export default class CarryArea extends BaseArea {
           if (this.collectFromLimitedStore[j].store.energy < 100) continue;
           this.creeps[i].addTask(new CreepTask(Activity.Collect, this.collectFromLimitedStore[j].pos));
           foundSomewhereToCollectFrom = true;
+          break;
         }
         const collectFromGeneralStoreSorted = this.collectFromGeneralStore.sort(
           (a, b) =>
@@ -63,11 +61,13 @@ export default class CarryArea extends BaseArea {
           if (collectFromGeneralStoreSorted[j].store.energy < 200) continue;
           this.creeps[i].addTask(new CreepTask(Activity.Collect, collectFromGeneralStoreSorted[j].pos));
           foundSomewhereToCollectFrom = true;
+          break;
         }
         for (let j = 0; j < this.droppedResourcesToCollectFrom.length && !foundSomewhereToCollectFrom; j++) {
           if (this.droppedResourcesToCollectFrom[j].amount < 200) continue;
           this.creeps[i].addTask(new CreepTask(Activity.Pickup, this.droppedResourcesToCollectFrom[j].pos));
           foundSomewhereToCollectFrom = true;
+          break;
         }
       }
       let foundSomewhereToDeposit = false;

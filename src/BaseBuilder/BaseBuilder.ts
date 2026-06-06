@@ -102,18 +102,7 @@ export class BaseBuilder {
       return flag.name === "Base" || flag.name.startsWith("Base-");
     });
 
-    const infoRooms = new Set<string>();
-    autoPlaceFlags.forEach(flag => {
-      if (flag.room) {
-        infoRooms.add(flag.room.name);
-      }
-    });
-    infoRooms.forEach(roomName => {
-      const room = Game.rooms[roomName];
-      if (room) {
-        this.drawBaseFlagInfo(room);
-      }
-    });
+    BaseBuilder.writeLegend(autoPlaceFlags);
 
     for (const autoPlaceFlag of autoPlaceFlags) {
       if (!autoPlaceFlag.room) {
@@ -219,6 +208,21 @@ export class BaseBuilder {
         "Raul-" + createSpawnFlag.room.name + "-X"
       );
     }
+  }
+
+  private static writeLegend(autoPlaceFlags: Flag[]) {
+    const infoRooms = new Set<string>();
+    autoPlaceFlags.forEach(flag => {
+      if (flag.room) {
+        infoRooms.add(flag.room.name);
+      }
+    });
+    infoRooms.forEach(roomName => {
+      const room = Game.rooms[roomName];
+      if (room) {
+        this.drawBaseFlagInfo(room);
+      }
+    });
   }
 
   private static getBaseBuildData(roomName: string): BaseBuildData {

@@ -37,6 +37,16 @@ export default class SpawnTask {
         return "Collector";
     }
   }
+
+  public getBodyPartAsTextAggregated(): string {
+    const partCounts: Record<BodyPartConstant, number> = {} as Record<BodyPartConstant, number>;
+    for (const part of this.bodyPartConstant) {
+      partCounts[part] = (partCounts[part] || 0) + 1;
+    }
+    return Object.entries(partCounts)
+      .map(([part, count]) => `${count}x${part}`)
+      .join(", ");
+  }
 }
 
 export enum SpawnType {
