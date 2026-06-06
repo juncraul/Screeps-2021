@@ -110,9 +110,6 @@ export default class Overseer implements IOverseer {
 
   private handleSeasonArea(): SpawnTask[] {
     const seasonArea = new SeasonArea();
-    if (seasonArea.scores.length === 0) {
-      return [];
-    }
     const tasks: SpawnTask[] = seasonArea.handleSpawnTasks();
     seasonArea.handleThisArea();
     return tasks;

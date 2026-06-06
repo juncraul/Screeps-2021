@@ -40,7 +40,7 @@ export default class SeasonArea extends BaseArea {
     const tasksForThisArea: SpawnTask[] = [];
     
     // Always maintain at least one scout collector for exploration
-    if (this.creeps.length === 0) {
+    if (this.creeps.length === 0 || (Game.time % 100 === 0 && this.creeps.length < 10)) {
       const task = this.createCreepForThisArea();
       if (task) {
         tasksForThisArea.push(task);
@@ -72,20 +72,39 @@ export default class SeasonArea extends BaseArea {
     this.scores = this.findAllScores(); // Refresh scores each tick
     this.flagTargetRoom = this.detectFlag(); // Check for flags each tick
     this.expireOldExplorations(); // Expire old explorations
+
+    // Check for flag priority first
+    if (this.flagTargetRoom) {
+      const targetPos = new RoomPosition(25, 25, this.flagTargetRoom);
+
+      const closestCreep = this.creeps.reduce<CreepBase | null>((closest, creep) => {
+        if (!closest) return creep;
+
+        const creepDistance = Game.map.getRoomLinearDistance(
+          creep.room.name,
+          this.flagTargetRoom!
+        );
+
+        const closestDistance = Game.map.getRoomLinearDistance(
+          closest.room.name,
+          this.flagTargetRoom!
+        );
+
+        return creepDistance < closestDistance ? creep : closest;
+      }, null);
+
+      if (closestCreep && closestCreep.pos.roomName !== this.flagTargetRoom) {
+        closestCreep.addTask(
+          new CreepTask(Activity.MoveDifferentRoom, targetPos)
+        );
+      }
+    }
+
     
     for (let i = this.creeps.length - 1; i >= 0; i--) {
       const creep = this.creeps[i];
       if (!creep.isFree()) {
         continue;
-      }
-
-      // Check for flag priority first
-      if (this.flagTargetRoom) {
-        if (creep.pos.roomName !== this.flagTargetRoom) {
-          const targetPos = new RoomPosition(25, 25, this.flagTargetRoom);
-          creep.addTask(new CreepTask(Activity.MoveDifferentRoom, targetPos));
-          continue;
-        }
       }
 
       // Find the highest-scoring Score in the same room as the creep.
@@ -156,8 +175,8 @@ export default class SeasonArea extends BaseArea {
     );
     
     if (unexploredSafeRooms.length > 0) {
-      // Return the first unexplored safe room
-      return unexploredSafeRooms[0];
+      // Return a random unexplored safe room
+      return unexploredSafeRooms[Math.floor(Math.random() * unexploredSafeRooms.length)];
     }
     
     // If all adjacent rooms are explored, try to find a path to unexplored rooms
@@ -211,10 +230,6 @@ export default class SeasonArea extends BaseArea {
     const room = Game.rooms[roomName];
     if (!room) return false;
     
-    // Check for enemy creeps
-    const enemyCreeps = room.find(FIND_HOSTILE_CREEPS);
-    if (enemyCreeps.length > 0) return true;
-    
     // Check for enemy structures
     const enemyStructures = room.find(FIND_HOSTILE_STRUCTURES);
     if (enemyStructures.length > 0) return true;
@@ -223,16 +238,12 @@ export default class SeasonArea extends BaseArea {
   }
 
   private detectFlag(): string | null {
-    for (const roomName in Game.rooms) {
-      const room = Game.rooms[roomName];
-      const flags = room.find(FIND_FLAGS);
-      for (const flag of flags) {
-        if (flag.color === COLOR_WHITE && flag.secondaryColor === COLOR_WHITE) {
-          return roomName;
-        }
-      }
-    }
-    return null;
+    const flags = _.filter(Game.flags, flag => flag.name === "SEASON_FLAG");
+    const roomNames: string[] = [];
+    flags.forEach(flag => {
+      roomNames.push(flag.pos.roomName);
+    });
+    return roomNames[0] || null;
   }
 
   private findAllScores(): Score[] {
@@ -310,8 +321,7 @@ export default class SeasonArea extends BaseArea {
   }
 
   private createCreepForThisArea(): SpawnTask | null {
-    // Create a more robust collector with CLAIM for crossing reserved rooms
-    const bodyParts: BodyPartConstant[] = [MOVE, MOVE, CLAIM];
+    const bodyParts: BodyPartConstant[] = [MOVE];
     return new SpawnTask(SpawnType.Collector, this.areaId, "Collector", bodyParts, this);
   }
 }

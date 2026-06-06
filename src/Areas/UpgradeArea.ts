@@ -135,10 +135,10 @@ export default class UpgradeArea extends BaseArea {
 
   private createCreepForThisArea(): SpawnTask {
     let bodyPartConstants: BodyPartConstant[] = [];
-    let segments = Math.floor(this.room.energyCapacityAvailable / 150); // WORK-100; CARRY-50; MOVE-50
+    let segments = Math.floor(this.room.energyCapacityAvailable / 200); // WORK-100; CARRY-50; MOVE-50
     if (this.creeps.length === 0) {
       // Use energyAvailable for the first creep to ensure it can spawn sooner
-      segments = Math.floor(this.room.energyAvailable / 150);
+      segments = Math.floor(this.room.energyAvailable / 200);
     }
     if (segments < 1) {
       segments = 1;
@@ -152,9 +152,9 @@ export default class UpgradeArea extends BaseArea {
       segments = 20;
     }
     
-    // Build body parts with ratio: 2 WORK, 1 CARRY, 1 MOVE per segment
+    // Build body parts with ratio: 1 WORK, 1 CARRY, 1 MOVE per segment
     for (let i = 0; i < segments; i++) {
-      bodyPartConstants.push(WORK, WORK, CARRY, MOVE);
+      bodyPartConstants.push(WORK, CARRY, MOVE);
     }
     
     return new SpawnTask(SpawnType.Upgrader, this.areaId, "Upgrader", bodyPartConstants, this);

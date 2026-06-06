@@ -54,9 +54,14 @@ export default class CarryArea extends BaseArea {
           this.creeps[i].addTask(new CreepTask(Activity.Collect, this.collectFromLimitedStore[j].pos));
           foundSomewhereToCollectFrom = true;
         }
-        for (let j = 0; j < this.collectFromGeneralStore.length; j++) {
-          if (this.collectFromGeneralStore[j].store.energy < 200) continue;
-          this.creeps[i].addTask(new CreepTask(Activity.Collect, this.collectFromGeneralStore[j].pos));
+        const collectFromGeneralStoreSorted = this.collectFromGeneralStore.sort(
+          (a, b) =>
+            a.pos.getRangeTo(this.creeps[i].pos.x, this.creeps[i].pos.y) -
+            b.pos.getRangeTo(this.creeps[i].pos.x, this.creeps[i].pos.y)
+        );
+        for (let j = 0; j < collectFromGeneralStoreSorted.length; j++) {
+          if (collectFromGeneralStoreSorted[j].store.energy < 200) continue;
+          this.creeps[i].addTask(new CreepTask(Activity.Collect, collectFromGeneralStoreSorted[j].pos));
           foundSomewhereToCollectFrom = true;
         }
         for (let j = 0; j < this.droppedResourcesToCollectFrom.length && !foundSomewhereToCollectFrom; j++) {
