@@ -19,7 +19,7 @@ export default class CarryArea extends BaseArea {
   constructor(controller: StructureController) {
     super("CarryArea", controller.room.name, controller.pos, controller.room);
     this.controller = controller;
-    this.maxWorkerCount = 1;
+    this.maxWorkerCount = 2;
     this.controllerLevel = controller.level;
     this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 1);
     this.spawns = GetRoomObjects.getRoomSpawns(controller.room, true);
@@ -71,11 +71,18 @@ export default class CarryArea extends BaseArea {
         }
       }
       let foundSomewhereToDeposit = false;
-      const depositToLimitedStoreSorted = this.depositToLimitedStore.sort(
-        (a, b) =>
+      const depositToLimitedStoreSorted = this.depositToLimitedStore.sort((a, b) => {
+        const aIsTower = a.structureType === STRUCTURE_TOWER;
+        const bIsTower = b.structureType === STRUCTURE_TOWER;
+
+        if (aIsTower && !bIsTower) return 1;
+        if (!aIsTower && bIsTower) return -1;
+
+        return (
           a.pos.getRangeTo(this.creeps[i].pos.x, this.creeps[i].pos.y) -
           b.pos.getRangeTo(this.creeps[i].pos.x, this.creeps[i].pos.y)
-      );
+        );
+      });
       if (!this.creeps[i].isEmpty() && this.creeps[i].isFree()) {
         for (let j = 0; j < depositToLimitedStoreSorted.length; j++) {
           if (depositToLimitedStoreSorted[j].store.getFreeCapacity(RESOURCE_ENERGY) === 0) continue;

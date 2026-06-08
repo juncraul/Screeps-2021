@@ -1,6 +1,6 @@
 import SourceArea from "Areas/SourceArea";
 import UpgradeArea from "Areas/UpgradeArea";
-import SpawnTask from "Tasks/SpawnTask";
+import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import CarryArea from "Areas/CarryArea";
 import ConstructionArea from "Areas/ConstructionArea";
 import { Cannon } from "Cannon";
@@ -9,6 +9,7 @@ import { BaseBuilder } from "BaseBuilder/BaseBuilder";
 import RemoteArea from "Areas/RemoteArea";
 import UtilityArea from "Areas/UtilityArea";
 import SeasonArea from "Areas/SeasonArea";
+import RepairArea from "Areas/RepairArea";
 
 export default class Overseer implements IOverseer {
   public refresh(): void {
@@ -27,56 +28,107 @@ export default class Overseer implements IOverseer {
   }
 
   private overseeRoom(room: Room): SpawnTask[] {
-    let tasks: SpawnTask[] = [];
     const roomsToReserve = GetRoomObjects.getAllRoomsToReserve();
-    tasks = tasks.concat(this.handleHarvestArea(room));
-    tasks = tasks.concat(this.handleCarryArea(room));
-    tasks = tasks.concat(this.handleUpgradeArea(room));
-    tasks = tasks.concat(this.handleConstructionArea(room));
-    tasks = tasks.concat(this.handleUtilityArea(room));
-    if(Memory.Keys["IsSeason"]){
-      tasks = tasks.concat(this.handleSeasonArea());
+    const harvest = this.handleHarvestArea(room);
+    const carry = this.handleCarryArea(room);
+    const upgrade = this.handleUpgradeArea(room);
+    const constructionTasks = this.handleConstructionArea(room);
+    const repairTasks = this.handleRepairArea(room);
+    const utilityTasks = this.handleUtilityArea(room);
+    let seasonTasks: SpawnTask[] = [];
+    if (Memory.Keys.IsSeason) {
+      seasonTasks = this.handleSeasonArea();
     }
+    let remoteTasks: SpawnTask[] = [];
     for (const roomToReserve of roomsToReserve) {
-      tasks = tasks.concat(this.handleRemoteArea(roomToReserve));
+      remoteTasks = remoteTasks.concat(this.handleRemoteArea(roomToReserve));
     }
-    return tasks;
+
+    // Interleave tasks in the desired spawn priority order:
+    // Harvester x2 -> Carry x1 -> Upgrader x1 -> Carry x1 -> Upgrader x1
+    // Existing creeps count as filling their pattern slot so the order stays
+    // stable across ticks regardless of which creeps have already been spawned.
+    const spawnOrder: SpawnType[] = [
+      SpawnType.Harvester,
+      SpawnType.Harvester,
+      SpawnType.Carrier,
+      SpawnType.Upgrader,
+      SpawnType.Carrier,
+      SpawnType.Upgrader
+    ];
+    const existing: Record<number, number> = {
+      [SpawnType.Harvester]: harvest.existing,
+      [SpawnType.Carrier]: carry.existing,
+      [SpawnType.Upgrader]: upgrade.existing
+    };
+    const taskBuckets: Record<number, SpawnTask[]> = {
+      [SpawnType.Harvester]: [...harvest.tasks],
+      [SpawnType.Carrier]: [...carry.tasks],
+      [SpawnType.Upgrader]: [...upgrade.tasks],
+      [SpawnType.Constructor]: [...constructionTasks],
+      [SpawnType.Repairer]: [...repairTasks]
+    };
+    const ordered: SpawnTask[] = [];
+    for (const type of spawnOrder) {
+      if ((existing[type] ?? 0) > 0) {
+        existing[type]--; // slot already filled by a live creep
+      } else {
+        const next = taskBuckets[type]?.shift();
+        if (next) {
+          ordered.push(next);
+        }
+      }
+    }
+    // Append any remaining tasks not consumed by the pattern
+    const remaining = [
+      ...(taskBuckets[SpawnType.Harvester] ?? []),
+      ...(taskBuckets[SpawnType.Carrier] ?? []),
+      ...(taskBuckets[SpawnType.Upgrader] ?? []),
+      ...(taskBuckets[SpawnType.Constructor] ?? []),
+      ...(taskBuckets[SpawnType.Repairer] ?? []),
+      ...utilityTasks,
+      ...seasonTasks,
+      ...remoteTasks
+    ];
+    return ordered.concat(remaining);
   }
 
-  private handleHarvestArea(room: Room): SpawnTask[] {
+  private handleHarvestArea(room: Room): { tasks: SpawnTask[]; existing: number } {
     if (!room.controller) {
-      return [];
+      return { tasks: [], existing: 0 };
     }
     let tasks: SpawnTask[] = [];
+    let existing = 0;
     const sources: Source[] = GetRoomObjects.getRoomSources(room);
     sources.forEach(source => {
       const sourceArea: SourceArea = new SourceArea(source, room.controller!);
       tasks = tasks.concat(sourceArea.handleSpawnTasks());
+      existing += sourceArea.creeps.length;
       sourceArea.handleThisArea();
     });
-    return tasks;
+    return { tasks, existing };
   }
 
-  private handleUpgradeArea(room: Room): SpawnTask[] {
+  private handleUpgradeArea(room: Room): { tasks: SpawnTask[]; existing: number } {
     if (!room.controller) {
-      return [];
+      return { tasks: [], existing: 0 };
     }
-    let tasks: SpawnTask[] = [];
     const upgradeArea: UpgradeArea = new UpgradeArea(room.controller);
-    tasks = tasks.concat(upgradeArea.handleSpawnTasks());
+    const tasks = upgradeArea.handleSpawnTasks();
+    const existing = upgradeArea.creeps.length;
     upgradeArea.handleThisArea();
-    return tasks;
+    return { tasks, existing };
   }
 
-  private handleCarryArea(room: Room): SpawnTask[] {
+  private handleCarryArea(room: Room): { tasks: SpawnTask[]; existing: number } {
     if (!room.controller) {
-      return [];
+      return { tasks: [], existing: 0 };
     }
-    let tasks: SpawnTask[] = [];
     const carryArea: CarryArea = new CarryArea(room.controller);
-    tasks = tasks.concat(carryArea.handleSpawnTasks());
+    const tasks = carryArea.handleSpawnTasks();
+    const existing = carryArea.creeps.length;
     carryArea.handleThisArea();
-    return tasks;
+    return { tasks, existing };
   }
 
   private handleConstructionArea(room: Room): SpawnTask[] {
@@ -87,6 +139,17 @@ export default class Overseer implements IOverseer {
     const constructionArea: ConstructionArea = new ConstructionArea(room.controller);
     tasks = tasks.concat(constructionArea.handleSpawnTasks());
     constructionArea.handleThisArea();
+    return tasks;
+  }
+
+  private handleRepairArea(room: Room): SpawnTask[] {
+    if (!room.controller) {
+      return [];
+    }
+    let tasks: SpawnTask[] = [];
+    const repairArea: RepairArea = new RepairArea(room.controller);
+    tasks = tasks.concat(repairArea.handleSpawnTasks());
+    repairArea.handleThisArea();
     return tasks;
   }
 
@@ -121,7 +184,12 @@ export default class Overseer implements IOverseer {
     if (newTasks.length > 0) {
       room.visual.text("List of spawns", 30, 25, { align: "left", opacity: 0.5, color: "#ff0000" });
       for (let i = 0; i < newTasks.length; i++) {
-        room.visual.text(`${newTasks[i].getSpawnTypeText()} - ${newTasks[i].getBodyPartAsTextAggregated()}`, 30, 26 + i, { align: "left", opacity: 0.5, color: "#ff0000" });
+        room.visual.text(
+          `${newTasks[i].getSpawnTypeText()} - ${newTasks[i].getBodyPartAsTextAggregated()}`,
+          30,
+          26 + i,
+          { align: "left", opacity: 0.5, color: "#ff0000" }
+        );
       }
     }
     if (newTasks.length > 0) {

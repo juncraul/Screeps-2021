@@ -35,6 +35,8 @@ export default class SpawnTask {
         return "Claimer";
       case SpawnType.Collector:
         return "Collector";
+      case SpawnType.Repairer:
+        return "Repairer";
     }
   }
 
@@ -55,5 +57,6 @@ export enum SpawnType {
   Carrier = 2,
   Constructor = 3,
   Claimer = 4,
-  Collector = 5
+  Collector = 5,
+  Repairer = 6
 }

@@ -69,9 +69,15 @@ export default class UpgradeArea extends BaseArea {
         } else if (this.linkNextToController && this.linkNextToController.store[RESOURCE_ENERGY] > 100) {
           this.creeps[i].addTask(new CreepTask(Activity.Collect, this.linkNextToController.pos));
         } else {
-          const structureWithEnergy = this.getGeneralStoreToCollectFrom()[0];
-          if (structureWithEnergy) {
-            this.creeps[i].addTask(new CreepTask(Activity.Collect, structureWithEnergy.pos));
+          const collectFromGeneralStoreSorted = this.getGeneralStoreToCollectFrom().sort(
+            (a, b) =>
+              a.pos.getRangeTo(this.creeps[i].pos.x, this.creeps[i].pos.y) -
+              b.pos.getRangeTo(this.creeps[i].pos.x, this.creeps[i].pos.y)
+          );
+          for (let j = 0; j < collectFromGeneralStoreSorted.length; j++) {
+            if (collectFromGeneralStoreSorted[j].store.energy < 200) continue;
+            this.creeps[i].addTask(new CreepTask(Activity.Collect, collectFromGeneralStoreSorted[j].pos));
+            break;
           }
         }
       }
@@ -151,12 +157,12 @@ export default class UpgradeArea extends BaseArea {
     } else if (segments > 20) {
       segments = 20;
     }
-    
+
     // Build body parts with ratio: 1 WORK, 1 CARRY, 1 MOVE per segment
     for (let i = 0; i < segments; i++) {
       bodyPartConstants.push(WORK, CARRY, MOVE);
     }
-    
+
     return new SpawnTask(SpawnType.Upgrader, this.areaId, "Upgrader", bodyPartConstants, this);
   }
 }

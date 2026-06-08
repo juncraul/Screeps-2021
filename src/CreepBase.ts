@@ -225,6 +225,23 @@ export class CreepBase {
         }
         break;
       }
+      case Activity.Repair: {
+        const structure3: Structure | null = CreepTask.getStructureFromTarget(this.task.targetPlace);
+        if (structure3) {
+          this.repair(structure3);
+        }
+        if (
+          this.carryCurrent === 0 ||
+          !structure3 ||
+          (structure3.structureType !== STRUCTURE_WALL &&
+            structure3.structureType !== STRUCTURE_RAMPART &&
+            structure3.hits >= structure3.hitsMax * 0.9)
+        ) {
+          this.creep.say("Rep Done");
+          this.task.taskDone = true;
+        }
+        break;
+      }
     }
   }
 
@@ -244,6 +261,14 @@ export class CreepBase {
   //   this.memory.targetId = structure.id;
   //   return result;
   // }
+
+  public repair(structure: Structure): ScreepsReturnCode {
+    const result = this.creep.repair(structure);
+    if (result === ERR_NOT_IN_RANGE) {
+      this.goTo(structure.pos);
+    }
+    return result;
+  }
 
   public harvest(source: Source | Mineral): ScreepsReturnCode {
     // Don't think will ever have the creep's internal cooldown longer than EXTRACTOR_COOLDOWN
