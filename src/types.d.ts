@@ -60,3 +60,8 @@ declare namespace NodeJS {
     log: any;
   }
 }
+
+// CPU extension for generatePixel method (Screeps World CPU)
+interface CPU {
+  generatePixel(): string;
+}

@@ -3,11 +3,13 @@ export default class CreepTask implements ICreepTask {
   targetPlace: RoomPosition;
   targetPlaceSecond: RoomPosition | null;
   taskDone: boolean;
+  targetId: string | null;
 
-  constructor(activity: number, targetPlace: RoomPosition, targetPlaceSecond: RoomPosition | null = null) {
+  constructor(activity: number, targetPlace: RoomPosition, targetPlaceSecond: RoomPosition | null = null, targetId: string | null = null) {
     this.activity = activity;
     this.targetPlace = targetPlace;
     this.taskDone = false;
+    this.targetId = targetId;
     this.targetPlaceSecond = targetPlaceSecond;
   }
 

@@ -224,7 +224,7 @@ export default class SoldierArea extends BaseArea {
         if (creep.pos.getRangeTo(target) > 1) {
           creep.addTask(new CreepTask(Activity.Move, target.pos));
         } else {
-          creep.addTask(new CreepTask(Activity.Attack, target.pos));
+          creep.addTask(new CreepTask(Activity.Attack, target.pos, null, target.id));
         }
       }
     } else if (enemyStructures.length > 0) {
@@ -233,7 +233,7 @@ export default class SoldierArea extends BaseArea {
         if (creep.pos.getRangeTo(target) > 1) {
           creep.addTask(new CreepTask(Activity.Move, target.pos));
         } else {
-          creep.addTask(new CreepTask(Activity.Attack, target.pos));
+          creep.addTask(new CreepTask(Activity.Attack, target.pos, null, target.id));
         }
       }
     }
@@ -248,7 +248,7 @@ export default class SoldierArea extends BaseArea {
         if (creep.pos.getRangeTo(target) > 1) {
           creep.addTask(new CreepTask(Activity.Move, target.pos));
         } else {
-          creep.addTask(new CreepTask(Activity.Attack, target.pos));
+          creep.addTask(new CreepTask(Activity.Attack, target.pos, null, target.id));
         }
       }
     }
@@ -263,7 +263,7 @@ export default class SoldierArea extends BaseArea {
         if (creep.pos.getRangeTo(target) > 1) {
           creep.addTask(new CreepTask(Activity.Move, target.pos));
         } else {
-          creep.addTask(new CreepTask(Activity.Attack, target.pos));
+          creep.addTask(new CreepTask(Activity.Attack, target.pos, null, target.id));
         }
       }
     }

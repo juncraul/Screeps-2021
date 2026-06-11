@@ -12,6 +12,7 @@ export default class RemoteArea extends BaseArea {
   containers: StructureContainer[];
   containerConstructionSites: ConstructionSite[];
   baseRoom: Room | null;
+  resources: Resource[];
 
   constructor(roomName: string) {
     super("RemoteArea", roomName, new RoomPosition(25, 25, roomName), Game.rooms[roomName]);
@@ -34,6 +35,7 @@ export default class RemoteArea extends BaseArea {
       this.sources = GetRoomObjects.getRoomSources(Game.rooms[roomName]);
       this.updateContainers();
     }
+    this.resources = GetRoomObjects.getRoomDroppedResources(Game.rooms[roomName]);
   }
 
   public handleSpawnTasks(): SpawnTask[] {
@@ -135,7 +137,7 @@ export default class RemoteArea extends BaseArea {
     // Find all the other harvesters from sources and map them in a list
     const harvestersBySource: { [sourceId: string]: CreepBase[] } = {};
     for (const source of this.sources) {
-      const otherHarvesters = this.creeps.filter(creep => creep.memory.task.targetPlace === source.pos && creep.memory.role === "Harvester");
+      const otherHarvesters = this.creeps.filter(cree => Helper.isSamePosition(cree.memory.task.targetPlace, source.pos) && cree.memory.role === "Harvester" && cree.id !== creep.id);
       harvestersBySource[source.id] = otherHarvesters;
     }
 
@@ -175,6 +177,8 @@ export default class RemoteArea extends BaseArea {
   }
 
   private handleCarrier(creep: CreepBase) {
+    if(!creep.isFree()) return;
+
     // If in remote room and carrying energy, return to base
     if (creep.isFull()) {
       if (!this.baseRoom) return;
@@ -194,6 +198,13 @@ export default class RemoteArea extends BaseArea {
       // If empty or part empty, collect energy from remote room
       if (creep.pos.roomName !== this.roomName) {
         creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.roomName)));
+        return;
+      }
+      
+      // Collect from resources
+      const sourceResource = this.findResourceWithEnergy(creep);
+      if (sourceResource) {
+        creep.addTask(new CreepTask(Activity.Collect, sourceResource.pos));
         return;
       }
       
@@ -270,6 +281,23 @@ export default class RemoteArea extends BaseArea {
     }
     
     return bestContainer;
+  }
+
+  private findResourceWithEnergy(creep: CreepBase): Resource | null {
+    let bestResource: Resource | null = null;
+    let bestDistance = Infinity;
+    
+    for (const resource of this.resources) {
+      if (resource.amount > 300) {
+        const distance = creep.pos.getRangeTo(resource.pos);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestResource = resource;
+        }
+      }
+    }
+    
+    return bestResource;
   }
 
   private findClosestDeposit(creep: CreepBase): Structure | null {

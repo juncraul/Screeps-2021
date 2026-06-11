@@ -116,14 +116,18 @@ export class CreepBase {
         break;
       }
       case Activity.Collect: {
-        let targetCollect: Structure | Ruin | null = CreepTask.getStructureFromTargetNoRoadNoRampart(
-          this.task.targetPlace
-        );
+        let targetCollect: Structure | Ruin | Resource | null = CreepTask.getResourceFromTarget(this.task.targetPlace);
         if (!targetCollect) {
           targetCollect = CreepTask.getRuinFromTarget(this.task.targetPlace);
+          if(!targetCollect) {
+            targetCollect = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
+          }
         }
-        if (targetCollect) {
+        if (targetCollect && !(targetCollect instanceof Resource)) {
           this.withdraw(targetCollect, RESOURCE_ENERGY);
+        }
+        if (targetCollect instanceof Resource) {
+          this.pickup(targetCollect);
         }
         if (
           targetCollect instanceof StructureContainer ||
@@ -136,14 +140,20 @@ export class CreepBase {
             this.task.taskDone = true;
           }
         }
-        if (
+        else if (
           targetCollect instanceof StructureLink ||
           targetCollect instanceof StructureExtension ||
           targetCollect instanceof StructureLab ||
           targetCollect instanceof StructureSpawn ||
           targetCollect instanceof StructureTower
         ) {
-          if (targetCollect.energy === 0) {
+          if (targetCollect.store.energy === 0) {
+            this.creep.say("Col Done");
+            this.task.taskDone = true;
+          }
+        }
+        else if (targetCollect instanceof Resource) {
+          if (targetCollect.amount === 0) {
             this.creep.say("Col Done");
             this.task.taskDone = true;
           }
@@ -233,6 +243,16 @@ export class CreepBase {
         if (this.carryCurrent === 0 || !structure3 || structure3.hits == structure3.hitsMax) {
           this.creep.say("Rep Done");
           this.task.taskDone = true;
+        }
+        break;
+      }
+      case Activity.Attack: {
+        if (!this.task.targetId) {
+          break;
+        }
+        const creepToAttack: Creep | null = Game.creeps[this.task.targetId] as Creep | null;
+        if (creepToAttack) {
+          this.attack(creepToAttack);
         }
         break;
       }
@@ -425,14 +445,13 @@ export class CreepBase {
     return result;
   }
 
-  //     attack(creep: Creep | Structure) {
-  //       let result = this.creep.attack(creep);
-  //       if (result == ERR_NOT_IN_RANGE) {
-  //         this.goTo(creep.pos);
-  //       }
-  //       this.memory.targetId = creep.id;
-  //       return result;
-  //     }
+  public attack(creep: Creep | Structure) {
+    let result = this.creep.attack(creep);
+    if (result == ERR_NOT_IN_RANGE) {
+      this.goTo(creep.pos);
+    }
+    return result;
+  }
 
   //     rangedAttack(creep: Creep | Structure) {
   //       let result = this.creep.rangedAttack(creep);

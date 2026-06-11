@@ -124,6 +124,11 @@ export class GetRoomObjects {
     return construnctionSites;
   }
 
+  public static getRoomDroppedResources(room: Room): Resource[] {
+    const resources = room.find(FIND_DROPPED_RESOURCES, { filter: res => res.amount > 100 });
+    return resources;
+  }
+
   public static getRoomDroppedResource(pos: RoomPosition): Resource | null {
     const resource = pos.findClosestByPath(FIND_DROPPED_RESOURCES, { filter: res => res.amount > 100 });
     return resource;
