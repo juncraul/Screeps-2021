@@ -10,6 +10,7 @@ import RemoteArea from "Areas/RemoteArea";
 import UtilityArea from "Areas/UtilityArea";
 import SeasonArea from "Areas/SeasonArea";
 import RepairArea from "Areas/RepairArea";
+import SoldierArea from "Areas/SoldierArea";
 
 export default class Overseer implements IOverseer {
   public refresh(): void {
@@ -35,6 +36,7 @@ export default class Overseer implements IOverseer {
     const constructionTasks = this.handleConstructionArea(room);
     const repairTasks = this.handleRepairArea(room);
     const utilityTasks = this.handleUtilityArea(room);
+    const soldierTasks = this.handleSoldierArea(room);
     let seasonTasks: SpawnTask[] = [];
     if (Memory.Keys.IsSeason) {
       seasonTasks = this.handleSeasonArea();
@@ -88,7 +90,8 @@ export default class Overseer implements IOverseer {
       ...(taskBuckets[SpawnType.Repairer] ?? []),
       ...utilityTasks,
       ...seasonTasks,
-      ...remoteTasks
+      ...remoteTasks,
+      ...soldierTasks
     ];
     return ordered.concat(remaining);
   }
@@ -173,6 +176,13 @@ export default class Overseer implements IOverseer {
     return tasks;
   }
 
+  private handleSoldierArea(room: Room): SpawnTask[] {
+    const soldierArea = new SoldierArea();
+    const tasks: SpawnTask[] = soldierArea.handleSpawnTasks();
+    soldierArea.handleThisArea();
+    return tasks;
+  }
+
   private handleSeasonArea(): SpawnTask[] {
     const seasonArea = new SeasonArea();
     const tasks: SpawnTask[] = seasonArea.handleSpawnTasks();
@@ -206,6 +216,7 @@ export default class Overseer implements IOverseer {
         const creepName = `${task.name}-${Game.time}`;
         if (spawn.spawnCreep(task.bodyPartConstant, creepName) === OK) {
           theNewCreep = Game.creeps[creepName];
+          theNewCreep.memory.role = task.name;
           task.area.handleNewCreepMemory(creepName);
         } else {
           return;

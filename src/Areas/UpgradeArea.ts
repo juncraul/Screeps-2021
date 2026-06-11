@@ -102,22 +102,11 @@ export default class UpgradeArea extends BaseArea {
     const availableUpgradeEnergy = this.getAvailableUpgradeEnergy();
     let maxWorkerCount = 1;
 
-    if (availableUpgradeEnergy >= 1200) {
+    if (availableUpgradeEnergy >= 3000) {
       maxWorkerCount = 2;
     }
-    if (availableUpgradeEnergy >= 2200) {
-      maxWorkerCount = 3;
-    }
-    if (availableUpgradeEnergy >= 3200) {
-      maxWorkerCount = 4;
-    }
-
-    // Early rooms can still scale up, but keep a safe cap so economy does not starve.
-    if (this.controllerLevel <= 2) {
-      return Math.min(maxWorkerCount, 4);
-    }
-
-    return Math.min(maxWorkerCount, 3);
+    
+    return Math.min(maxWorkerCount, 2);
   }
 
   private getAvailableUpgradeEnergy(): number {

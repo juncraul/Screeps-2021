@@ -230,13 +230,7 @@ export class CreepBase {
         if (structure3) {
           this.repair(structure3);
         }
-        if (
-          this.carryCurrent === 0 ||
-          !structure3 ||
-          (structure3.structureType !== STRUCTURE_WALL &&
-            structure3.structureType !== STRUCTURE_RAMPART &&
-            structure3.hits >= structure3.hitsMax * 0.9)
-        ) {
+        if (this.carryCurrent === 0 || !structure3 || structure3.hits == structure3.hitsMax) {
           this.creep.say("Rep Done");
           this.task.taskDone = true;
         }
@@ -252,15 +246,6 @@ export class CreepBase {
     }
     return result;
   }
-
-  // repair(structure: Structure) {
-  //   let result = this.creep.repair(structure);
-  //   if (result == ERR_NOT_IN_RANGE) {
-  //     this.goTo(structure.pos);
-  //   }
-  //   this.memory.targetId = structure.id;
-  //   return result;
-  // }
 
   public repair(structure: Structure): ScreepsReturnCode {
     const result = this.creep.repair(structure);
@@ -299,6 +284,11 @@ export class CreepBase {
 
   public say(whatToSay: string, toPublic?: boolean): ScreepsReturnCode {
     return this.creep.say(whatToSay, toPublic);
+  }
+
+  public suicide(): ScreepsReturnCode {
+    this.say("💀");
+    return this.creep.suicide();
   }
 
   public transfer(

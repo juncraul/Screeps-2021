@@ -87,7 +87,7 @@ export default class SourceArea {
 
   getNumberOfDyingCreeps(): number {
     return this.creeps.filter(function (creep) {
-      return creep.ticksToLive && creep.ticksToLive < 100;
+      return creep.ticksToLive && creep.ticksToLive < 50;
     }).length;
   }
 }

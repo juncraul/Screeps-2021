@@ -37,6 +37,12 @@ export default class SpawnTask {
         return "Collector";
       case SpawnType.Repairer:
         return "Repairer";
+      case SpawnType.Melee:
+        return "Melee";
+      case SpawnType.Ranged:
+        return "Ranged";
+      case SpawnType.Healer:
+        return "Healer";
     }
   }
 
@@ -58,5 +64,8 @@ export enum SpawnType {
   Constructor = 3,
   Claimer = 4,
   Collector = 5,
-  Repairer = 6
+  Repairer = 6,
+  Melee = 7,
+  Ranged = 8,
+  Healer = 9
 }

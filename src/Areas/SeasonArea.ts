@@ -38,7 +38,7 @@ export default class SeasonArea extends BaseArea {
 
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
-    
+
     // Always maintain at least one scout collector for exploration
     if (this.creeps.length === 0 || (Game.time % 100 === 0 && this.creeps.length < 10)) {
       const task = this.createCreepForThisArea();
@@ -80,27 +80,18 @@ export default class SeasonArea extends BaseArea {
       const closestCreep = this.creeps.reduce<CreepBase | null>((closest, creep) => {
         if (!closest) return creep;
 
-        const creepDistance = Game.map.getRoomLinearDistance(
-          creep.room.name,
-          this.flagTargetRoom!
-        );
+        const creepDistance = Game.map.getRoomLinearDistance(creep.room.name, this.flagTargetRoom!);
 
-        const closestDistance = Game.map.getRoomLinearDistance(
-          closest.room.name,
-          this.flagTargetRoom!
-        );
+        const closestDistance = Game.map.getRoomLinearDistance(closest.room.name, this.flagTargetRoom!);
 
         return creepDistance < closestDistance ? creep : closest;
       }, null);
 
       if (closestCreep && closestCreep.pos.roomName !== this.flagTargetRoom) {
-        closestCreep.addTask(
-          new CreepTask(Activity.MoveDifferentRoom, targetPos)
-        );
+        closestCreep.addTask(new CreepTask(Activity.MoveDifferentRoom, targetPos));
       }
     }
 
-    
     for (let i = this.creeps.length - 1; i >= 0; i--) {
       const creep = this.creeps[i];
       if (!creep.isFree()) {
@@ -123,7 +114,7 @@ export default class SeasonArea extends BaseArea {
       // If no scores in current room, explore intelligently
       this.exploreRoom(creep);
     }
-    
+
     // Save exploration state to memory
     this.saveExploredRoomsToMemory();
     this.saveEnemyRoomsToMemory();
@@ -132,13 +123,13 @@ export default class SeasonArea extends BaseArea {
   private expireOldExplorations(): void {
     const currentTime = Game.time;
     const expiredRooms: string[] = [];
-    
+
     for (const [roomName, exploredAt] of this.exploredRooms.entries()) {
       if (currentTime - exploredAt > EXPLORATION_EXPIRATION_TICKS) {
         expiredRooms.push(roomName);
       }
     }
-    
+
     for (const roomName of expiredRooms) {
       this.exploredRooms.delete(roomName);
     }
@@ -146,15 +137,15 @@ export default class SeasonArea extends BaseArea {
 
   private exploreRoom(creep: CreepBase): void {
     const currentRoom = creep.pos.roomName;
-    
+
     // Check if current room has enemies and mark it
     if (this.isEnemyRoom(currentRoom)) {
       this.enemyRooms.add(currentRoom);
     }
-    
+
     // Mark current room as explored with current timestamp
     this.exploredRooms.set(currentRoom, Game.time);
-    
+
     // Find next room to explore
     const nextRoom = this.findNextRoomToExplore(currentRoom);
     if (nextRoom) {
@@ -166,19 +157,17 @@ export default class SeasonArea extends BaseArea {
   private findNextRoomToExplore(currentRoom: string): string | null {
     const adjacentRooms = Game.map.describeExits(currentRoom);
     if (!adjacentRooms) return null;
-    
+
     const roomNames = Object.values(adjacentRooms).filter(room => room !== undefined) as string[];
-    
+
     // Prioritize unexplored rooms that aren't enemy rooms
-    const unexploredSafeRooms = roomNames.filter(room => 
-      !this.exploredRooms.has(room) && !this.enemyRooms.has(room)
-    );
-    
+    const unexploredSafeRooms = roomNames.filter(room => !this.exploredRooms.has(room) && !this.enemyRooms.has(room));
+
     if (unexploredSafeRooms.length > 0) {
       // Return a random unexplored safe room
       return unexploredSafeRooms[Math.floor(Math.random() * unexploredSafeRooms.length)];
     }
-    
+
     // If all adjacent rooms are explored, try to find a path to unexplored rooms
     for (const room of roomNames) {
       if (!this.enemyRooms.has(room)) {
@@ -188,33 +177,46 @@ export default class SeasonArea extends BaseArea {
         }
       }
     }
-    
-    // Fallback to any safe adjacent room
-    const safeAdjacentRooms = roomNames.filter(room => !this.enemyRooms.has(room));
-    if (safeAdjacentRooms.length > 0) {
-      return safeAdjacentRooms[Math.floor(Math.random() * safeAdjacentRooms.length)];
+
+    // Try to find any path to unexplored rooms, even through enemy rooms (last resort)
+    for (const room of roomNames) {
+      const pathToUnexplored = this.findPathToUnexplored(room);
+      if (pathToUnexplored) {
+        return pathToUnexplored;
+      }
     }
-    
-    return null;
+
+    // All reachable rooms are fully explored — pick the least-recently explored adjacent
+    // room so the creep can exit dead-ends and eventually re-explore expired rooms.
+    let oldestRoom: string | null = null;
+    let oldestTick = Infinity;
+    for (const room of roomNames) {
+      const exploredAt = this.exploredRooms.get(room) ?? 0;
+      if (exploredAt < oldestTick) {
+        oldestTick = exploredAt;
+        oldestRoom = room;
+      }
+    }
+    return oldestRoom;
   }
 
   private findPathToUnexplored(startRoom: string): string | null {
     const visited = new Set<string>();
     const queue: string[] = [startRoom];
     visited.add(startRoom);
-    
+
     while (queue.length > 0) {
       const current = queue.shift()!;
       const exits = Game.map.describeExits(current);
-      
+
       if (exits) {
         for (const direction of Object.values(exits)) {
           if (!direction) continue;
-          
+
           if (!this.exploredRooms.has(direction) && !this.enemyRooms.has(direction)) {
             return direction;
           }
-          
+
           if (!visited.has(direction) && !this.enemyRooms.has(direction)) {
             visited.add(direction);
             queue.push(direction);
@@ -222,18 +224,18 @@ export default class SeasonArea extends BaseArea {
         }
       }
     }
-    
+
     return null;
   }
 
   private isEnemyRoom(roomName: string): boolean {
     const room = Game.rooms[roomName];
     if (!room) return false;
-    
+
     // Check for enemy structures
     const enemyStructures = room.find(FIND_HOSTILE_STRUCTURES);
     if (enemyStructures.length > 0) return true;
-    
+
     return false;
   }
 
@@ -288,7 +290,7 @@ export default class SeasonArea extends BaseArea {
       Memory.seasonExploredRooms = [];
       return exploredMap;
     }
-    
+
     // Convert array to map and filter expired entries
     const currentTime = Game.time;
     for (const explored of Memory.seasonExploredRooms) {
@@ -296,7 +298,7 @@ export default class SeasonArea extends BaseArea {
         exploredMap.set(explored.roomName, explored.exploredAt);
       }
     }
-    
+
     return exploredMap;
   }
 

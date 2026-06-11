@@ -19,7 +19,7 @@ export default class CarryArea extends BaseArea {
   constructor(controller: StructureController) {
     super("CarryArea", controller.room.name, controller.pos, controller.room);
     this.controller = controller;
-    this.maxWorkerCount = 2;
+    this.maxWorkerCount = 1;
     this.controllerLevel = controller.level;
     this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 1);
     this.spawns = GetRoomObjects.getRoomSpawns(controller.room, true);

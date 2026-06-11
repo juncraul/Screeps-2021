@@ -32,17 +32,46 @@ export default class CarryArea extends BaseArea {
 
   public handleThisArea() {
     for (let i = 0; i < this.creeps.length; i++) {
-      if (this.creeps[i].isEmpty() && this.creeps[i].isFree()) {
+      if (!this.creeps[i].isFree()) continue;
+
+      if (this.creeps[i].isEmpty()) {
         if (this.link && this.link.store.energy > 100) {
           this.creeps[i].addTask(new CreepTask(Activity.Collect, this.link.pos));
+        } else {
+          if (this.storage) {
+            this.creeps[i].addTask(new CreepTask(Activity.Collect, this.storage.pos));
+          }
         }
-      }
-      if (this.creeps[i].isFull() && this.creeps[i].isFree()) {
-        if (this.storage) {
+      } else {
+        var structureToDeposit = this.getWhereToDeposit(this.creeps[i].pos);
+        if (structureToDeposit){
+          this.creeps[i].addTask(new CreepTask(Activity.Deposit, structureToDeposit.pos));
+        } else if (this.storage) {
           this.creeps[i].addTask(new CreepTask(Activity.Deposit, this.storage.pos));
         }
       }
     }
+  }
+
+  private getWhereToDeposit(currentPosition: RoomPosition): (StructureSpawn | StructureExtension | StructureTower | null) {
+
+    const extensions = this.room.find(FIND_MY_STRUCTURES, {
+      filter: (structure) => structure.structureType === STRUCTURE_EXTENSION
+    }) as StructureExtension[];
+    // Disabled spawns for now because it is too far away
+    // const spawns = this.room.find(FIND_MY_STRUCTURES, {
+    //   filter: (structure) => structure.structureType === STRUCTURE_SPAWN
+    // }) as StructureSpawn[];
+    const towers = this.room.find(FIND_MY_STRUCTURES, {
+      filter: (structure) => structure.structureType === STRUCTURE_TOWER
+    }) as StructureTower[];
+
+    const structures = [...extensions, ...towers].filter(structure => structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0);
+    if (structures.length === 0) {
+      return null;
+    }
+    const closestStructure = currentPosition.findClosestByRange(structures);
+    return closestStructure;
   }
 
   private createCreepForThisArea(): SpawnTask | null {

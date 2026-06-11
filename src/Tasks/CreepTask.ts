@@ -52,6 +52,10 @@ export default class CreepTask implements ICreepTask {
   public static getRoomPositionFromTarget(target: RoomPosition): RoomPosition {
     return new RoomPosition(target.x, target.y, target.roomName);
   }
+
+  public static getCreepFromTarget(target: RoomPosition): Creep | null {
+    return new RoomPosition(target.x, target.y, target.roomName).findInRange(FIND_CREEPS, 0)[0];
+  }
 }
 
 export enum Activity {
@@ -66,5 +70,8 @@ export enum Activity {
   MoveDifferentRoom = 8,
   Reserve = 9,
   HarvestAndDeposit = 10,
-  Repair = 11
+  Repair = 11,
+  Attack = 12,
+  RangedAttack = 13,
+  Heal = 14
 }

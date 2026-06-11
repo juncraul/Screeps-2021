@@ -60,10 +60,6 @@ export default class RepairArea extends BaseArea {
     }
 
     if (damagedNonWallCount >= 25 && this.room.energyCapacityAvailable >= 1000) {
-      return 3;
-    }
-
-    if (damagedNonWallCount >= 8 && this.room.energyCapacityAvailable >= 700) {
       return 2;
     }
 
@@ -79,10 +75,6 @@ export default class RepairArea extends BaseArea {
     structure = GetRoomObjects.getClosestStructureToRepairByRange(pos, 0.9);
     if (structure) {
       return structure;
-    }
-
-    if (Game.time % 10 < 5) {
-      return null;
     }
 
     return GetRoomObjects.getClosestStructureToRepairByRange(pos, 0.9, true);
@@ -135,7 +127,7 @@ export default class RepairArea extends BaseArea {
   }
 
   private createCreepForThisArea(): SpawnTask {
-    let bodyPartConstants: BodyPartConstant[] = [];
+    const bodyPartConstants: BodyPartConstant[] = [];
     let segments = Math.floor(this.room.energyCapacityAvailable / 200); // WORK-100; CARRY-50; MOVE-50
     if (this.creeps.length === 0) {
       segments = Math.floor(this.room.energyAvailable / 200);
