@@ -11,7 +11,7 @@ export class GetRoomObjects {
   }
 
   public static getAllRoomsToReserve(): string[] {
-    const flags = _.filter(Game.flags, flag => flag.color === COLOR_PURPLE);
+    const flags = _.filter(Game.flags, flag => flag.color === COLOR_PURPLE && flag.name.startsWith("Reserve"));
     const roomNames: string[] = [];
     flags.forEach(flag => {
       roomNames.push(flag.pos.roomName);

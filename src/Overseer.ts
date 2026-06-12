@@ -90,8 +90,8 @@ export default class Overseer implements IOverseer {
       ...(taskBuckets[SpawnType.Repairer] ?? []),
       ...utilityTasks,
       ...seasonTasks,
-      ...remoteTasks,
-      ...soldierTasks
+      ...soldierTasks,
+      ...remoteTasks
     ];
     return ordered.concat(remaining);
   }

@@ -250,9 +250,9 @@ export class CreepBase {
         if (!this.task.targetId) {
           break;
         }
-        const creepToAttack: Creep | null = Game.creeps[this.task.targetId] as Creep | null;
-        if (creepToAttack) {
-          this.attack(creepToAttack);
+        const entityToAttack: Creep | Structure | null = Game.getObjectById(this.task.targetId as Id<Creep | Structure>);
+        if (entityToAttack) {
+          this.attack(entityToAttack);
         }
         break;
       }

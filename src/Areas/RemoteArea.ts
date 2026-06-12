@@ -18,29 +18,30 @@ export default class RemoteArea extends BaseArea {
     super("RemoteArea", roomName, new RoomPosition(25, 25, roomName), Game.rooms[roomName]);
     this.roomName = roomName;
     this.baseRoom = this.findBaseRoom();
-    
+
     if (Game.rooms[roomName] && Game.rooms[roomName].controller) {
       this.controller = Game.rooms[roomName].controller!;
     } else {
       // We have no visiblity to this room.
       this.controller = null;
     }
-    
+
     // Initialize sources and containers
     this.sources = [];
     this.containers = [];
     this.containerConstructionSites = [];
-    
+    this.resources = [];
+
     if (Game.rooms[roomName]) {
       this.sources = GetRoomObjects.getRoomSources(Game.rooms[roomName]);
+      this.resources = GetRoomObjects.getRoomDroppedResources(Game.rooms[roomName]);
       this.updateContainers();
     }
-    this.resources = GetRoomObjects.getRoomDroppedResources(Game.rooms[roomName]);
   }
 
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
-    
+
     // Handle Claimer spawning
     if (
       this.controller &&
@@ -55,39 +56,39 @@ export default class RemoteArea extends BaseArea {
         tasksForThisArea.push(this.createClaimer());
       }
     }
-    
+
     // Handle Harvester spawning (one per source)
     const harvesterCount = this.getCreepCountByType("Harvester");
     if (this.sources.length > 0 && harvesterCount < this.sources.length) {
       console.log("RemoteArea: Creating harvester for room " + this.roomName);
       tasksForThisArea.push(this.createHarvester());
     }
-    
+
     // Handle Carrier spawning
     const carrierCount = this.getCreepCountByType("Carrier");
     if (this.sources.length > 0 && carrierCount < 1) {
       console.log("RemoteArea: Creating carrier for room " + this.roomName);
       tasksForThisArea.push(this.createCarrier());
     }
-    
+
     return tasksForThisArea;
   }
 
   public handleThisArea() {
     this.updateContainers();
     this.setup();
-    
+
     for (let i = 0; i < this.creeps.length; i++) {
       if (!this.creeps[i].isFree()) continue;
-      
+
       const creepType = this.getCreepType(this.creeps[i]);
-      
+
       // Move to the remote room if not there (except for carriers who need to go to base)
       if (this.creeps[i].pos.roomName !== this.roomName && creepType !== "Carrier") {
         this.creeps[i].addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.roomName)));
         continue;
       }
-      
+
       // Handle based on creep type
       switch (creepType) {
         case "Claimer":
@@ -113,11 +114,11 @@ export default class RemoteArea extends BaseArea {
     for (const source of this.sources) {
       const container = GetRoomObjects.getWithinRangeContainer(source.pos, 2);
       const constructionSite = GetRoomObjects.getWithinRangeConstructionSite(source.pos, 1, STRUCTURE_CONTAINER);
-      
+
       if (!container && !constructionSite) {
-        const positionForContainer = Helper.getFreeAdjacentPositions(source.pos, this.room!)[0];
+        const positionForContainer = Helper.getFreeAdjacentPositions(source.pos, this.room)[0];
         if (positionForContainer) {
-          this.room!.createConstructionSite(positionForContainer, STRUCTURE_CONTAINER);
+          this.room.createConstructionSite(positionForContainer, STRUCTURE_CONTAINER);
         }
       }
     }
@@ -131,13 +132,18 @@ export default class RemoteArea extends BaseArea {
     }
   }
 
-  private handleHarvester(creep: CreepBase) {    
-    if(!creep.isFree()) return;
+  private handleHarvester(creep: CreepBase) {
+    if (!creep.isFree()) return;
 
     // Find all the other harvesters from sources and map them in a list
     const harvestersBySource: { [sourceId: string]: CreepBase[] } = {};
     for (const source of this.sources) {
-      const otherHarvesters = this.creeps.filter(cree => Helper.isSamePosition(cree.memory.task.targetPlace, source.pos) && cree.memory.role === "Harvester" && cree.id !== creep.id);
+      const otherHarvesters = this.creeps.filter(
+        cree =>
+          Helper.isSamePosition(cree.memory.task.targetPlace, source.pos) &&
+          cree.memory.role === "Harvester" &&
+          cree.id !== creep.id
+      );
       harvestersBySource[source.id] = otherHarvesters;
     }
 
@@ -150,22 +156,20 @@ export default class RemoteArea extends BaseArea {
         targetSourceId = sourceId;
       }
     }
-    let targetSource = this.sources.find(source => source.id === targetSourceId) || null;
+    const targetSource = this.sources.find(source => source.id === targetSourceId) || null;
 
     const container = GetRoomObjects.getWithinRangeContainer(targetSource!.pos, 2);
     const constructionSite = GetRoomObjects.getWithinRangeConstructionSite(targetSource!.pos, 1, STRUCTURE_CONTAINER);
-    
-    if(constructionSite){
-      if(creep.isFull()){
+
+    if (constructionSite) {
+      if (creep.isFull()) {
         // Build construction site
         creep.addTask(new CreepTask(Activity.Construct, constructionSite.pos));
-      }
-      else{
+      } else {
         // Harvest the source
-        creep.addTask(new CreepTask(Activity.Harvest, targetSource!.pos));  
+        creep.addTask(new CreepTask(Activity.Harvest, targetSource!.pos));
       }
-    }
-    else if (container){
+    } else if (container) {
       if (!Helper.isSamePosition(container.pos, creep.pos)) {
         creep.addTask(new CreepTask(Activity.Move, container.pos));
       } else {
@@ -173,22 +177,21 @@ export default class RemoteArea extends BaseArea {
         creep.addTask(new CreepTask(Activity.HarvestAndDeposit, targetSource!.pos));
       }
     }
-    
   }
 
   private handleCarrier(creep: CreepBase) {
-    if(!creep.isFree()) return;
+    if (!creep.isFree()) return;
 
     // If in remote room and carrying energy, return to base
     if (creep.isFull()) {
       if (!this.baseRoom) return;
-      
+
       // Move to base room
       if (creep.pos.roomName !== this.baseRoom.name) {
         creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.baseRoom.name)));
         return;
       }
-      
+
       // Find closest deposit location in base room
       const depositLocation = this.findClosestDeposit(creep);
       if (depositLocation) {
@@ -200,21 +203,21 @@ export default class RemoteArea extends BaseArea {
         creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.roomName)));
         return;
       }
-      
+
       // Collect from resources
       const sourceResource = this.findResourceWithEnergy(creep);
       if (sourceResource) {
         creep.addTask(new CreepTask(Activity.Collect, sourceResource.pos));
         return;
       }
-      
+
       // Collect from containers
       const sourceContainer = this.findContainerWithEnergy(creep);
       if (sourceContainer) {
         creep.addTask(new CreepTask(Activity.Collect, sourceContainer.pos));
         return;
       }
-      
+
       // If no containers, harvest directly from sources (fallback)
       // if (this.sources.length > 0) {
       //   const source = this.sources[0];
@@ -238,7 +241,7 @@ export default class RemoteArea extends BaseArea {
       const room = Game.rooms[roomName];
       if (room.controller && room.controller.my) {
         const spawns = GetRoomObjects.getRoomSpawns(room, true);
-        
+
         if (spawns.length > 0) {
           return room;
         }
@@ -249,27 +252,27 @@ export default class RemoteArea extends BaseArea {
 
   private updateContainers() {
     if (!this.room) return;
-    
+
     this.containers = [];
     this.containerConstructionSites = [];
-    
+
     // Find all containers in the room
     const structures = this.room.find(FIND_STRUCTURES, {
-      filter: (structure) => structure.structureType === STRUCTURE_CONTAINER
+      filter: structure => structure.structureType === STRUCTURE_CONTAINER
     });
     this.containers = structures as StructureContainer[];
-    
+
     // Find all container construction sites
     const constructionSites = this.room.find(FIND_CONSTRUCTION_SITES, {
-      filter: (site) => site.structureType === STRUCTURE_CONTAINER
+      filter: site => site.structureType === STRUCTURE_CONTAINER
     });
-    this.containerConstructionSites = constructionSites as ConstructionSite[];
+    this.containerConstructionSites = constructionSites;
   }
 
   private findContainerWithEnergy(creep: CreepBase): StructureContainer | null {
     let bestContainer: StructureContainer | null = null;
     let bestDistance = Infinity;
-    
+
     for (const container of this.containers) {
       if (container.store.energy > 0) {
         const distance = creep.pos.getRangeTo(container.pos);
@@ -279,14 +282,14 @@ export default class RemoteArea extends BaseArea {
         }
       }
     }
-    
+
     return bestContainer;
   }
 
   private findResourceWithEnergy(creep: CreepBase): Resource | null {
     let bestResource: Resource | null = null;
     let bestDistance = Infinity;
-    
+
     for (const resource of this.resources) {
       if (resource.amount > 300) {
         const distance = creep.pos.getRangeTo(resource.pos);
@@ -296,23 +299,22 @@ export default class RemoteArea extends BaseArea {
         }
       }
     }
-    
+
     return bestResource;
   }
 
   private findClosestDeposit(creep: CreepBase): Structure | null {
     if (!this.baseRoom) return null;
-    
+
     let bestStructure: Structure | null = null;
     let bestDistance = Infinity;
-    
+
     // Check links
     const links = this.baseRoom.find(FIND_STRUCTURES, {
-      filter: (structure) => 
-        structure.structureType === STRUCTURE_LINK && 
-        (structure as StructureLink).store.getFreeCapacity(RESOURCE_ENERGY) > 0
+      filter: structure =>
+        structure.structureType === STRUCTURE_LINK && structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0
     }) as StructureLink[];
-    
+
     for (const link of links) {
       const distance = creep.pos.getRangeTo(link.pos);
       if (distance < bestDistance) {
@@ -320,7 +322,7 @@ export default class RemoteArea extends BaseArea {
         bestStructure = link;
       }
     }
-    
+
     // Check storage
     const storage = GetRoomObjects.getRoomStorage(this.baseRoom);
     if (storage && storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
@@ -330,14 +332,13 @@ export default class RemoteArea extends BaseArea {
         bestStructure = storage;
       }
     }
-    
+
     // Check containers
     const containers = this.baseRoom.find(FIND_STRUCTURES, {
-      filter: (structure) => 
-        structure.structureType === STRUCTURE_CONTAINER && 
-        (structure as StructureContainer).store.getFreeCapacity(RESOURCE_ENERGY) > 0
+      filter: structure =>
+        structure.structureType === STRUCTURE_CONTAINER && structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0
     }) as StructureContainer[];
-    
+
     for (const container of containers) {
       const distance = creep.pos.getRangeTo(container.pos);
       if (distance < bestDistance) {
@@ -345,7 +346,7 @@ export default class RemoteArea extends BaseArea {
         bestStructure = container;
       }
     }
-    
+
     return bestStructure;
   }
 
@@ -369,15 +370,34 @@ export default class RemoteArea extends BaseArea {
     return new SpawnTask(SpawnType.Claimer, this.areaId, "Claimer", bodyPartConstants, this);
   }
 
-  private createHarvester(): SpawnTask { // plain=2,2  road=1,1  swamp=9,10  
+  private createHarvester(): SpawnTask {
+    // plain=2,2  road=1,1  swamp=9,10
     const bodyPartConstants: BodyPartConstant[] = [WORK, WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE, MOVE];
     return new SpawnTask(SpawnType.Harvester, this.areaId, "Harvester", bodyPartConstants, this);
   }
 
   private createCarrier(): SpawnTask {
     const bodyPartConstants: BodyPartConstant[] = [
-      CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY,
-      MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE
+      CARRY,
+      CARRY,
+      CARRY,
+      CARRY,
+      CARRY,
+      CARRY,
+      CARRY,
+      CARRY,
+      CARRY,
+      CARRY,
+      MOVE,
+      MOVE,
+      MOVE,
+      MOVE,
+      MOVE,
+      MOVE,
+      MOVE,
+      MOVE,
+      MOVE,
+      MOVE
     ];
     return new SpawnTask(SpawnType.Carrier, this.areaId, "Carrier", bodyPartConstants, this);
   }

@@ -4,7 +4,16 @@ interface CreepMemory {
   room: string;
   working: boolean;
   task: any;
+  soldierFlag?: string | null;
 }
+interface SoldierFlagState {
+  x: number;
+  y: number;
+  roomName: string;
+  color: number;
+  secondaryColor: number;
+}
+
 interface Memory {
   uuid: number;
   log: any;
@@ -13,6 +22,8 @@ interface Memory {
   scoreHistory: ScoreCollectionRecord[];
   seasonExploredRooms?: ExploredRoom[];
   seasonEnemyRooms?: string[];
+  soldierFlagState?: SoldierFlagState;
+  soldierFlagStates?: Record<string, SoldierFlagState>;
 }
 
 interface ScoreCollectionRecord {

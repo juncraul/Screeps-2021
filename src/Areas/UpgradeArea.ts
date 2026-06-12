@@ -105,7 +105,7 @@ export default class UpgradeArea extends BaseArea {
     if (availableUpgradeEnergy >= 3000) {
       maxWorkerCount = 2;
     }
-    
+
     return Math.min(maxWorkerCount, 2);
   }
 
@@ -129,7 +129,7 @@ export default class UpgradeArea extends BaseArea {
   }
 
   private createCreepForThisArea(): SpawnTask {
-    let bodyPartConstants: BodyPartConstant[] = [];
+    const bodyPartConstants: BodyPartConstant[] = [];
     let segments = Math.floor(this.room.energyCapacityAvailable / 200); // WORK-100; CARRY-50; MOVE-50
     if (this.creeps.length === 0) {
       // Use energyAvailable for the first creep to ensure it can spawn sooner
