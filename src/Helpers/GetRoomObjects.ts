@@ -19,6 +19,15 @@ export class GetRoomObjects {
     return roomNames;
   }
 
+  public static getAllRoomsToClaim(): string[] {
+    const flags = _.filter(Game.flags, flag => flag.color === COLOR_BLUE && flag.name.startsWith("Reserve"));
+    const roomNames: string[] = [];
+    flags.forEach(flag => {
+      roomNames.push(flag.pos.roomName);
+    });
+    return roomNames;
+  }
+
   public static getAllRoomsWithSpawns(): Room[] {
     const mySpawns = Object.getOwnPropertyNames(Game.spawns);
     const roomsWithSpawns: Room[] = [];

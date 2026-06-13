@@ -3,22 +3,25 @@ import BaseArea from "Areas/BaseArea";
 export default class SpawnTask {
   spawnType: SpawnType;
   areaId: string;
-  name: string;
+  roleName: string;
   bodyPartConstant: BodyPartConstant[];
   area: BaseArea;
+  namePrefix: string | null = null;
 
   constructor(
     spawnType: SpawnType,
     areaId: string,
-    name: string,
+    roleName: string,
     bodyPartConstant: BodyPartConstant[],
-    area: BaseArea
+    area: BaseArea,
+    namePrefix: string | null = null
   ) {
     this.spawnType = spawnType;
     this.areaId = areaId;
-    this.name = name;
+    this.roleName = roleName;
     this.bodyPartConstant = bodyPartConstant;
     this.area = area;
+    this.namePrefix = namePrefix;
   }
 
   public getSpawnTypeText(): string {

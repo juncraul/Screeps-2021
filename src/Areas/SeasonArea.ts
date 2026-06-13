@@ -41,7 +41,7 @@ export default class SeasonArea extends BaseArea {
 
     // Always maintain at least one scout collector for exploration
     if (this.creeps.length < 30) {
-    //if (this.creeps.length === 0 || (Game.time % 100 === 0 && this.creeps.length < 10)) {
+      // if (this.creeps.length === 0 || (Game.time % 100 === 0 && this.creeps.length < 10)) {
       const task = this.createCreepForThisArea();
       if (task) {
         tasksForThisArea.push(task);
@@ -96,7 +96,7 @@ export default class SeasonArea extends BaseArea {
     for (let i = this.creeps.length - 1; i >= 0; i--) {
       const creep = this.creeps[i];
       if (!creep.isFree()) {
-        creep.say("Go " + creep.task?.targetPlace.roomName)
+        creep.say("Go " + creep.task?.targetPlace.roomName);
         continue;
       }
 
@@ -163,8 +163,9 @@ export default class SeasonArea extends BaseArea {
     const roomNames = Object.values(adjacentRooms).filter(room => room !== undefined) as string[];
 
     // Prioritize unexplored rooms that aren't enemy rooms
-    const unexploredSafeRooms = roomNames.filter(room => !this.exploredRooms.has(room) //&& !this.enemyRooms.has(room)
-  );
+    const unexploredSafeRooms = roomNames.filter(
+      room => !this.exploredRooms.has(room) // && !this.enemyRooms.has(room)
+    );
 
     if (unexploredSafeRooms.length > 0) {
       // Return a random unexplored safe room

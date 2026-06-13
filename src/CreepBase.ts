@@ -119,7 +119,7 @@ export class CreepBase {
         let targetCollect: Structure | Ruin | Resource | null = CreepTask.getResourceFromTarget(this.task.targetPlace);
         if (!targetCollect) {
           targetCollect = CreepTask.getRuinFromTarget(this.task.targetPlace);
-          if(!targetCollect) {
+          if (!targetCollect) {
             targetCollect = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
           }
         }
@@ -139,8 +139,7 @@ export class CreepBase {
             this.creep.say("Col Done");
             this.task.taskDone = true;
           }
-        }
-        else if (
+        } else if (
           targetCollect instanceof StructureLink ||
           targetCollect instanceof StructureExtension ||
           targetCollect instanceof StructureLab ||
@@ -151,8 +150,7 @@ export class CreepBase {
             this.creep.say("Col Done");
             this.task.taskDone = true;
           }
-        }
-        else if (targetCollect instanceof Resource) {
+        } else if (targetCollect instanceof Resource) {
           if (targetCollect.amount === 0) {
             this.creep.say("Col Done");
             this.task.taskDone = true;
@@ -189,7 +187,11 @@ export class CreepBase {
       case Activity.Claim: {
         const controller2: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
         if (controller2) {
-          if (this.claim(controller2) === OK) {
+          const result = this.claim(controller2);
+          console.log(
+            `Claiming controller in room ${controller2.room.name} with creep ${this.name}, result: ${result}`
+          );
+          if (result === OK) {
             this.creep.say("Claim Done");
             this.task.taskDone = true;
           }
@@ -250,7 +252,9 @@ export class CreepBase {
         if (!this.task.targetId) {
           break;
         }
-        const entityToAttack: Creep | Structure | null = Game.getObjectById(this.task.targetId as Id<Creep | Structure>);
+        const entityToAttack: Creep | Structure | null = Game.getObjectById(
+          this.task.targetId as Id<Creep | Structure>
+        );
         // If enemy flee in another room, remove task
         if (entityToAttack) {
           if (entityToAttack.pos.roomName !== this.room.name) {
@@ -260,7 +264,7 @@ export class CreepBase {
           }
           this.attack(entityToAttack);
         }
-        if (!entityToAttack || entityToAttack.hits === 0){
+        if (!entityToAttack || entityToAttack.hits === 0) {
           this.task.taskDone = true;
           this.creep.say("Enemy dead");
         }
@@ -457,7 +461,7 @@ export class CreepBase {
 
   public attack(creep: Creep | Structure) {
     let result = this.creep.attack(creep);
-    if (result == ERR_NO_BODYPART){
+    if (result == ERR_NO_BODYPART) {
       result = this.creep.rangedAttack(creep);
     }
     if (result == ERR_NOT_IN_RANGE) {

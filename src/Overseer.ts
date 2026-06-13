@@ -30,6 +30,7 @@ export default class Overseer implements IOverseer {
 
   private overseeRoom(room: Room): SpawnTask[] {
     const roomsToReserve = GetRoomObjects.getAllRoomsToReserve();
+    const roomsToClaim = GetRoomObjects.getAllRoomsToClaim();
     const harvest = this.handleHarvestArea(room);
     const carry = this.handleCarryArea(room);
     const upgrade = this.handleUpgradeArea(room);
@@ -44,6 +45,9 @@ export default class Overseer implements IOverseer {
     let remoteTasks: SpawnTask[] = [];
     for (const roomToReserve of roomsToReserve) {
       remoteTasks = remoteTasks.concat(this.handleRemoteArea(roomToReserve));
+    }
+    for (const roomToClaim of roomsToClaim) {
+      remoteTasks = remoteTasks.concat(this.handleRemoteArea(roomToClaim, true));
     }
 
     // Interleave tasks in the desired spawn priority order:
@@ -89,9 +93,9 @@ export default class Overseer implements IOverseer {
       ...(taskBuckets[SpawnType.Constructor] ?? []),
       ...(taskBuckets[SpawnType.Repairer] ?? []),
       ...utilityTasks,
-      ...seasonTasks,
       ...soldierTasks,
-      ...remoteTasks
+      ...remoteTasks,
+      ...seasonTasks
     ];
     return ordered.concat(remaining);
   }
@@ -156,9 +160,9 @@ export default class Overseer implements IOverseer {
     return tasks;
   }
 
-  private handleRemoteArea(roomName: string): SpawnTask[] {
+  private handleRemoteArea(roomName: string, claimThisRoom = false): SpawnTask[] {
     let tasks: SpawnTask[] = [];
-    const remoteArea: RemoteArea = new RemoteArea(roomName);
+    const remoteArea: RemoteArea = new RemoteArea(roomName, claimThisRoom);
     tasks = tasks.concat(remoteArea.handleSpawnTasks());
     remoteArea.handleThisArea();
     return tasks;
@@ -213,10 +217,10 @@ export default class Overseer implements IOverseer {
     let theNewCreep: Creep | null = null;
     spawns.forEach(spawn => {
       if (spawn.spawning == null) {
-        const creepName = `${task.name}-${Game.time}`;
+        const creepName = task.namePrefix ? `${task.namePrefix}-${Game.time}` : `${task.roleName}-${Game.time}`;
         if (spawn.spawnCreep(task.bodyPartConstant, creepName) === OK) {
           theNewCreep = Game.creeps[creepName];
-          theNewCreep.memory.role = task.name;
+          theNewCreep.memory.role = task.roleName;
           task.area.handleNewCreepMemory(creepName);
         } else {
           return;

@@ -327,23 +327,23 @@ export default class SoldierArea extends BaseArea {
   private createMeleeBody(segments: number): BodyPartConstant[] {
     const body: BodyPartConstant[] = [];
     for (let i = 0; i < segments; i++) {
-      body.push(ATTACK, MOVE);// ATTACK-80; MOVE-50 plain=1  road=1  swamp=5  
+      body.push(ATTACK, MOVE); // ATTACK-80; MOVE-50 plain=1  road=1  swamp=5
     }
     return body;
   }
 
   private createRangedBody(forcedSegments: number): BodyPartConstant[] {
-      const body: BodyPartConstant[] = [];
-      for (let i = 0; i < forcedSegments; i++) {
-        body.push(RANGED_ATTACK, MOVE, MOVE, MOVE); // RANGED_ATTACK-150; Move x3-150 plain=1  road=1  swamp=2  
-      }
-      return body;
+    const body: BodyPartConstant[] = [];
+    for (let i = 0; i < forcedSegments; i++) {
+      body.push(RANGED_ATTACK, MOVE, MOVE, MOVE); // RANGED_ATTACK-150; Move x3-150 plain=1  road=1  swamp=2
+    }
+    return body;
   }
 
   private createHealerBody(forcedSegments: number): BodyPartConstant[] {
     const body: BodyPartConstant[] = [];
     for (let i = 0; i < forcedSegments; i++) {
-      body.push(HEAL, MOVE);// HEAL-200; MOVE-50  plain=1  road=1  swamp=5  
+      body.push(HEAL, MOVE); // HEAL-200; MOVE-50  plain=1  road=1  swamp=5
     }
     return body;
   }
