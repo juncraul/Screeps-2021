@@ -77,7 +77,7 @@ export class Cannon {
     }
 
     // Do wall repairs very rarely
-    if (Game.time % 100 < 5) return;
+    if (Game.time % 100 > 5) return;
     structure = GetRoomObjects.getClosestStructureToRepairByRange(this.pos, 0.8, true);
     if (structure) {
       this.repair(structure);

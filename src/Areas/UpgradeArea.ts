@@ -62,8 +62,12 @@ export default class UpgradeArea extends BaseArea {
 
   private handleCreeps() {
     for (let i: number = this.creeps.length - 1; i >= 0; i--) {
+      if (!this.creeps[i].isFree()) {
+        continue;
+      }
+
       // Find some resources
-      if (this.creeps[i].store.energy === 0 && this.creeps[i].isFree()) {
+      if (!this.creeps[i].isFull()) {
         if (this.containerNextToController && this.containerNextToController.store[RESOURCE_ENERGY] > 100) {
           this.creeps[i].addTask(new CreepTask(Activity.Collect, this.containerNextToController.pos));
         } else if (this.linkNextToController && this.linkNextToController.store[RESOURCE_ENERGY] > 100) {
@@ -83,7 +87,7 @@ export default class UpgradeArea extends BaseArea {
       }
 
       // Build the construction site(Container) or do the main job, which is upgrade the controller.
-      if (this.creeps[i].isFull() && this.creeps[i].isFree()) {
+      if (this.creeps[i].isFull()) {
         if (this.containerConstructionSiteNextToController) {
           this.creeps[i].addTask(new CreepTask(Activity.Construct, this.containerConstructionSiteNextToController.pos));
         } else {

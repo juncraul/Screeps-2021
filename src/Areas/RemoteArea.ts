@@ -11,7 +11,7 @@ export default class RemoteArea extends BaseArea {
   sources: Source[];
   containers: StructureContainer[];
   containerConstructionSites: ConstructionSite[];
-  baseRoom: Room | null;
+  baseRoom: Room;
   resources: Resource[];
 
   constructor(roomName: string) {
@@ -182,60 +182,44 @@ export default class RemoteArea extends BaseArea {
   private handleCarrier(creep: CreepBase) {
     if (!creep.isFree()) return;
 
-    // If in remote room and carrying energy, return to base
-    if (creep.isFull()) {
-      if (!this.baseRoom) return;
-
-      // Move to base room
-      if (creep.pos.roomName !== this.baseRoom.name) {
-        creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.baseRoom.name)));
-        return;
-      }
-
-      // Find closest deposit location in base room
-      const depositLocation = this.findClosestDeposit(creep);
-      if (depositLocation) {
-        creep.addTask(new CreepTask(Activity.Deposit, depositLocation.pos));
-      }
-    } else {
-      // If empty or part empty, collect energy from remote room
-      if (creep.pos.roomName !== this.roomName) {
+    if (creep.pos.roomName === this.baseRoom.name) {
+      //We are at the base
+      if(creep.isEmpty()) {
         creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.roomName)));
-        return;
       }
-
-      // Collect from resources
-      const sourceResource = this.findResourceWithEnergy(creep);
-      if (sourceResource) {
-        creep.addTask(new CreepTask(Activity.Collect, sourceResource.pos));
-        return;
+      else {
+        // Find closest deposit location in base room
+        const depositLocation = this.findClosestDeposit(creep);
+        if (depositLocation) {
+          creep.addTask(new CreepTask(Activity.Deposit, depositLocation.pos));
+        }
       }
-
-      // Collect from containers
-      const sourceContainer = this.findContainerWithEnergy(creep);
-      if (sourceContainer) {
-        creep.addTask(new CreepTask(Activity.Collect, sourceContainer.pos));
-        return;
+    }
+    else if(creep.pos.roomName === this.roomName) {
+      //We are in the remote room
+      if(creep.isFull()){
+        // Move to base room
+        creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.baseRoom.name)));
       }
+      else {
+        // Collect from resources
+        const sourceResource = this.findResourceWithEnergy(creep);
+        if (sourceResource) {
+          creep.addTask(new CreepTask(Activity.Collect, sourceResource.pos));
+          return;
+        }
 
-      // If no containers, harvest directly from sources (fallback)
-      // if (this.sources.length > 0) {
-      //   const source = this.sources[0];
-      //   const container = GetRoomObjects.getWithinRangeContainer(source.pos, 2);
-      //   if (container) {
-      //     if (!Helper.isSamePosition(container.pos, creep.pos)) {
-      //       creep.addTask(new CreepTask(Activity.Move, container.pos));
-      //     } else {
-      //       creep.addTask(new CreepTask(Activity.Harvest, source.pos));
-      //     }
-      //   } else {
-      //     creep.addTask(new CreepTask(Activity.Harvest, source.pos));
-      //   }
-      // }
+        // Collect from containers
+        const sourceContainer = this.findContainerWithEnergy(creep);
+        if (sourceContainer) {
+          creep.addTask(new CreepTask(Activity.Collect, sourceContainer.pos));
+          return;
+        }
+      }
     }
   }
 
-  private findBaseRoom(): Room | null {
+  private findBaseRoom(): Room {
     // Find a room that has a spawn or storage - this is likely our base
     for (const roomName in Game.rooms) {
       const room = Game.rooms[roomName];
@@ -247,7 +231,7 @@ export default class RemoteArea extends BaseArea {
         }
       }
     }
-    return null;
+    throw new Error("No base room found");
   }
 
   private updateContainers() {

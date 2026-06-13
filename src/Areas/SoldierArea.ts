@@ -305,17 +305,17 @@ export default class SoldierArea extends BaseArea {
       case "Melee":
         spawnType = SpawnType.Melee;
         name = "Melee";
-        bodyPartConstants = this.createMeleeBody(energyAvailable, energyCapacityAvailable, flag.bodySegments);
+        bodyPartConstants = this.createMeleeBody(flag.bodySegments ?? 1);
         break;
       case "Ranged":
         spawnType = SpawnType.Ranged;
         name = "Ranged";
-        bodyPartConstants = this.createRangedBody(energyAvailable, energyCapacityAvailable, flag.bodySegments);
+        bodyPartConstants = this.createRangedBody(flag.bodySegments ?? 1);
         break;
       case "Healer":
         spawnType = SpawnType.Healer;
         name = "Healer";
-        bodyPartConstants = this.createHealerBody(energyAvailable, energyCapacityAvailable, flag.bodySegments);
+        bodyPartConstants = this.createHealerBody(flag.bodySegments ?? 1);
         break;
       default:
         return null;
@@ -324,97 +324,28 @@ export default class SoldierArea extends BaseArea {
     return new SpawnTask(spawnType, this.areaId, name, bodyPartConstants, this);
   }
 
-  private createMeleeBody(
-    energyAvailable: number,
-    energyCapacityAvailable: number,
-    forcedSegments: number | null
-  ): BodyPartConstant[] {
-    if (forcedSegments !== null) {
-      const body: BodyPartConstant[] = [];
-      for (let i = 0; i < forcedSegments; i++) {
-        body.push(ATTACK, MOVE);
-      }
-      return body;
+  private createMeleeBody(segments: number): BodyPartConstant[] {
+    const body: BodyPartConstant[] = [];
+    for (let i = 0; i < segments; i++) {
+      body.push(ATTACK, MOVE);// ATTACK-80; MOVE-50 plain=1  road=1  swamp=5  
     }
-
-    const segments = Math.floor(energyCapacityAvailable / 130); // ATTACK-80; MOVE-50
-    const actualSegments = this.creeps.length === 0 ? Math.floor(energyAvailable / 130) : segments;
-
-    if (actualSegments < 1) {
-      return [ATTACK, MOVE];
-    } else if (actualSegments === 1) {
-      return [ATTACK, MOVE];
-    } else if (actualSegments === 2) {
-      return [ATTACK, ATTACK, MOVE, MOVE];
-    } else if (actualSegments === 3) {
-      return [ATTACK, ATTACK, ATTACK, MOVE, MOVE, MOVE];
-    } else if (actualSegments >= 4) {
-      return [ATTACK, ATTACK, ATTACK, ATTACK, MOVE, MOVE, MOVE, MOVE];
-    }
-
-    return [ATTACK, MOVE];
+    return body;
   }
 
-  private createRangedBody(
-    energyAvailable: number,
-    energyCapacityAvailable: number,
-    forcedSegments: number | null
-  ): BodyPartConstant[] {
-    if (forcedSegments !== null) {
+  private createRangedBody(forcedSegments: number): BodyPartConstant[] {
       const body: BodyPartConstant[] = [];
       for (let i = 0; i < forcedSegments; i++) {
-        body.push(RANGED_ATTACK, MOVE);
+        body.push(RANGED_ATTACK, MOVE, MOVE, MOVE); // RANGED_ATTACK-150; Move x3-150 plain=1  road=1  swamp=2  
       }
       return body;
-    }
-
-    const segments = Math.floor(energyCapacityAvailable / 200); // RANGED_ATTACK-150; MOVE-50
-    const actualSegments = this.creeps.length === 0 ? Math.floor(energyAvailable / 200) : segments;
-
-    if (actualSegments < 1) {
-      return [RANGED_ATTACK, MOVE];
-    } else if (actualSegments === 1) {
-      return [RANGED_ATTACK, MOVE];
-    } else if (actualSegments === 2) {
-      return [RANGED_ATTACK, RANGED_ATTACK, MOVE, MOVE];
-    } else if (actualSegments === 3) {
-      return [RANGED_ATTACK, RANGED_ATTACK, RANGED_ATTACK, MOVE, MOVE, MOVE];
-    } else if (actualSegments >= 4) {
-      return [RANGED_ATTACK, RANGED_ATTACK, RANGED_ATTACK, RANGED_ATTACK, MOVE, MOVE, MOVE, MOVE];
-    }
-
-    return [RANGED_ATTACK, MOVE];
   }
 
-  private createHealerBody(
-    energyAvailable: number,
-    energyCapacityAvailable: number,
-    forcedSegments: number | null
-  ): BodyPartConstant[] {
-    if (forcedSegments !== null) {
-      const body: BodyPartConstant[] = [];
-      for (let i = 0; i < forcedSegments; i++) {
-        body.push(HEAL, MOVE);
-      }
-      return body;
+  private createHealerBody(forcedSegments: number): BodyPartConstant[] {
+    const body: BodyPartConstant[] = [];
+    for (let i = 0; i < forcedSegments; i++) {
+      body.push(HEAL, MOVE);// HEAL-200; MOVE-50  plain=1  road=1  swamp=5  
     }
-
-    const segments = Math.floor(energyCapacityAvailable / 250); // HEAL-200; MOVE-50
-    const actualSegments = this.creeps.length === 0 ? Math.floor(energyAvailable / 250) : segments;
-
-    if (actualSegments < 1) {
-      return [HEAL, MOVE];
-    } else if (actualSegments === 1) {
-      return [HEAL, MOVE];
-    } else if (actualSegments === 2) {
-      return [HEAL, HEAL, MOVE, MOVE];
-    } else if (actualSegments === 3) {
-      return [HEAL, HEAL, HEAL, MOVE, MOVE, MOVE];
-    } else if (actualSegments >= 4) {
-      return [HEAL, HEAL, HEAL, HEAL, MOVE, MOVE, MOVE, MOVE];
-    }
-
-    return [HEAL, MOVE];
+    return body;
   }
 
   private assignCombatTask(creep: CreepBase, secondaryColor: number): boolean {

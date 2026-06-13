@@ -251,8 +251,18 @@ export class CreepBase {
           break;
         }
         const entityToAttack: Creep | Structure | null = Game.getObjectById(this.task.targetId as Id<Creep | Structure>);
+        // If enemy flee in another room, remove task
         if (entityToAttack) {
+          if (entityToAttack.pos.roomName !== this.room.name) {
+            this.task.taskDone = true;
+            this.creep.say("Enemy fled");
+            break;
+          }
           this.attack(entityToAttack);
+        }
+        if (!entityToAttack || entityToAttack.hits === 0){
+          this.task.taskDone = true;
+          this.creep.say("Enemy dead");
         }
         break;
       }
@@ -447,6 +457,9 @@ export class CreepBase {
 
   public attack(creep: Creep | Structure) {
     let result = this.creep.attack(creep);
+    if (result == ERR_NO_BODYPART){
+      result = this.creep.rangedAttack(creep);
+    }
     if (result == ERR_NOT_IN_RANGE) {
       this.goTo(creep.pos);
     }
