@@ -29,9 +29,10 @@ export default class UpgradeArea extends BaseArea {
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
     if (this.creeps.length < this.maxWorkerCount) {
-      if (!this.containerNextToController) {
-        return tasksForThisArea; // There is no container next to the controller.
-      }
+      // Diabled this logic, not sure why we don't create an upgrader if there is no container next to the controller, we should still create one and let it upgrade the controller until we have a container built.
+      // if (!this.containerNextToController) {
+      //   return tasksForThisArea; // There is no container next to the controller.
+      // }
       const task: SpawnTask | null = this.createCreepForThisArea();
       if (task) {
         tasksForThisArea.push(task);

@@ -56,8 +56,8 @@ export default class Overseer implements IOverseer {
     // stable across ticks regardless of which creeps have already been spawned.
     const spawnOrder: SpawnType[] = [
       SpawnType.Harvester,
-      SpawnType.Harvester,
       SpawnType.Carrier,
+      SpawnType.Harvester,
       SpawnType.Upgrader,
       SpawnType.Carrier,
       SpawnType.Upgrader

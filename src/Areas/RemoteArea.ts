@@ -36,10 +36,12 @@ export default class RemoteArea extends BaseArea {
     this.containers = [];
     this.containerConstructionSites = [];
     this.resources = [];
-    this.claimersPerRoom = 1; // Default value, can be adjusted based on strategy
-    this.harvestersPerSource = 1; // Default value, can be adjusted based on strategy
-    this.carriersPerRoom = 1; // Default value, can be adjusted based on strategy
-    this.repairersPerRoom = 1; // Default value, can be adjusted based on strategy
+    // TODO: We still need to create a claimer even if we need to claim this room, if the room is not ours yet
+    this.claimersPerRoom = claimThisRoom ? 0 : 1; // Default value, can be adjusted based on strategy
+    // TODO: Find a proper way to increase harvester per source, we've incresed for this room because it is too far away from our base and we need more harvesters to make it work (creeps die too quickly)
+    this.harvestersPerSource = roomName === "E32S25" ? 0 : 1; // Default value, can be adjusted based on strategy
+    this.carriersPerRoom = claimThisRoom ? 0 : 1; // Default value, can be adjusted based on strategy
+    this.repairersPerRoom = roomName === "E32S25" ? 4 : 1; // Default value, can be adjusted based on strategy
     this.claimThisRoom = claimThisRoom;
 
     if (Game.rooms[roomName]) {
@@ -62,7 +64,7 @@ export default class RemoteArea extends BaseArea {
       // Skip creating a claimer if already reserved by me and has plenty of ticks left.
     } else {
       const claimerCount = this.getCreepCountByType("Claimer");
-      if (claimerCount < 1) {
+      if (claimerCount < this.claimersPerRoom) {
         tasksForThisArea.push(this.createClaimer());
       }
     }
@@ -90,9 +92,9 @@ export default class RemoteArea extends BaseArea {
   }
 
   public handleThisArea() {
-    this.checkIfWeNeedToClaimThisRoom();
     this.updateContainers();
     this.setup();
+    this.drawLegend();
 
     for (let i = 0; i < this.creeps.length; i++) {
       if (!this.creeps[i].isFree()) continue;
@@ -129,17 +131,27 @@ export default class RemoteArea extends BaseArea {
     }
   }
 
-  private checkIfWeNeedToClaimThisRoom() {
-    // if (this.claimThisRoom && this.controller && !this.controller.my) {
-    //   for (const creep of this.creeps) {
-    //     // Force a change of task so that we claim this area.
-    //     if (this.getCreepType(creep) === "Claimer") {
-    //       creep.task = new CreepTask(Activity.Claim, this.controller.pos);
-    //     }
-    //   }
-    //   this.claimersPerRoom = 0; // We only need one claimer, so set this to 0 to prevent Overseer from spawning more.
-    //   this.carriersPerRoom = 0; // No need for carriers if we are claiming, as we won't be transporting resources back to base.
-    // }
+  private drawLegend(): void {
+    const visual = this.room.visual;
+    const x = 1;
+    let y = 3;
+    const title: TextStyle = { align: "left", opacity: 1, font: 0.6, color: "#ffffff" };
+    const plain: TextStyle = { align: "left", opacity: 0.85, font: 0.5 };
+
+    visual.text("=== Remote Room ===", x, y, title);
+    y += 0.7;
+    visual.text("Claimers " + this.getCreepCountByType("Claimer") + "/" + this.claimersPerRoom, x, y, plain);
+    y += 0.7;
+    visual.text(
+      "Harvesters " + this.getCreepCountByType("Harvester") + "/" + this.harvestersPerSource * this.sources.length,
+      x,
+      y,
+      plain
+    );
+    y += 0.7;
+    visual.text("Carriers " + this.getCreepCountByType("Carrier") + "/" + this.carriersPerRoom, x, y, plain);
+    y += 0.7;
+    visual.text("Repairers " + this.getCreepCountByType("Repairer") + "/" + this.repairersPerRoom, x, y, plain);
   }
 
   private setup() {
@@ -501,8 +513,8 @@ export default class RemoteArea extends BaseArea {
   }
 
   private createHarvester(): SpawnTask {
-    // plain=2,2  road=1,1  swamp=9,10
-    const bodyPartConstants: BodyPartConstant[] = [WORK, WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE, MOVE];
+    // plain=1,2  road=1,1  swamp=5,6
+    const bodyPartConstants: BodyPartConstant[] = [WORK, WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE];
     return new SpawnTask(
       SpawnType.Harvester,
       this.areaId,

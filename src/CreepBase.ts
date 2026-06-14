@@ -99,6 +99,20 @@ export class CreepBase {
             this.creep.say("Str Full");
             this.task.taskDone = true;
           }
+        } else if (
+          structure instanceof StructureContainer ||
+          structure instanceof StructureStorage ||
+          structure instanceof StructureTerminal
+        ) {
+          if (structure.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+            this.creep.say("Str Full");
+            this.task.taskDone = true;
+          }
+        } else if (structure instanceof StructureLab) {
+          if (structure.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+            this.creep.say("Str Full");
+            this.task.taskDone = true;
+          }
         }
         if (this.carryCurrent === 0) {
           this.creep.say("Dep Done");

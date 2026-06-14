@@ -132,10 +132,17 @@ export default class CarryArea extends BaseArea {
     if (this.creeps.length === 0) {
       // Note: In this situation, there is no way to fill extensions
       // Use energyAvailable to setup the segments with 3 as a cap. A.k.a. wait till Spawn has 300 energy.
-      segments = Math.floor(this.room.energyAvailable / 100) > 3 ? Math.floor(this.room.energyAvailable / 100) : 3;
+      segments = Math.floor(this.room.energyAvailable / 100) < 3 ? Math.floor(this.room.energyAvailable / 100) : 3;
     }
-    if (segments < 3) {
-      console.log("CarryArea: Something wrong with room capacity");
+    if (segments < 1) {
+      console.log(`Error: Trying to spawn a carrier with segments ${segments} less than 1`);
+      return null;
+    } else if (segments === 1) {
+      // 100 energy - 50 Store
+      bodyPartConstants = [CARRY, CARRY, MOVE, MOVE];
+    } else if (segments === 2) {
+      // 200 energy - 100 Store
+      bodyPartConstants = [CARRY, CARRY, MOVE, MOVE];
     } else if (segments === 3) {
       // 300 energy - 150 Store
       bodyPartConstants = [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
