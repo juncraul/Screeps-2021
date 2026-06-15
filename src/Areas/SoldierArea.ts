@@ -298,10 +298,6 @@ export default class SoldierArea extends BaseArea {
     let spawnType: SpawnType;
     let name: string;
 
-    const room = this.room;
-    const energyAvailable = room.energyAvailable;
-    const energyCapacityAvailable = room.energyCapacityAvailable;
-
     const creepsForFlag = this.getCreepsForFlag(flag.name).length;
     const role = this.getRoleNameFromColor(flag.primaryColor, creepsForFlag, flag.squadSize);
 

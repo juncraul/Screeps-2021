@@ -131,6 +131,9 @@ export class CreepBase {
       }
       case Activity.Collect: {
         let targetCollect: Structure | Ruin | Resource | null = CreepTask.getResourceFromTarget(this.task.targetPlace);
+        if (targetCollect instanceof Resource && targetCollect.amount < 20) {
+          targetCollect = null; // If the resource is almost gone, just consider it gone to avoid creeps getting stuck trying to collect from it. Harvester will keep dropping resource.
+        }
         if (!targetCollect) {
           targetCollect = CreepTask.getRuinFromTarget(this.task.targetPlace);
           if (!targetCollect) {

@@ -6,6 +6,7 @@ import { CreepBase } from "../CreepBase";
 
 const SEASON_AREA_ID = "SeasonArea-Global";
 const EXPLORATION_EXPIRATION_TICKS = 2500;
+const SEASON_FLAG_PATTERN = /^Season-(\d+)(?:-.+)?$/;
 
 /**
  * A score object that appears randomly in rooms during Season 10. Move a creep onto the same tile to automatically collect it
@@ -18,12 +19,16 @@ const EXPLORATION_EXPIRATION_TICKS = 2500;
  */
 
 export default class SeasonArea extends BaseArea {
+  private static handledTick: number | null = null;
+
   scores: Score[];
   exploredRooms: Map<string, number>; // roomName -> timestamp
   enemyRooms: Set<string>;
   flagTargetRoom: string | null;
+  spawnRoomName: string;
+  spawnLimit: number;
 
-  constructor() {
+  constructor(spawnRoomName: string) {
     super(
       "SeasonArea",
       SEASON_AREA_ID,
@@ -34,13 +39,20 @@ export default class SeasonArea extends BaseArea {
     this.exploredRooms = this.getExploredRoomsFromMemory();
     this.enemyRooms = new Set(this.getEnemyRoomsFromMemory());
     this.flagTargetRoom = this.detectFlag();
+    this.spawnRoomName = spawnRoomName;
+    this.spawnLimit = this.getSpawnLimitForRoom(spawnRoomName);
   }
 
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
+    const creepsForThisSpawnRoom = this.getSeasonCreepCountForSpawnRoom();
+
+    if (this.spawnLimit <= creepsForThisSpawnRoom) {
+      return tasksForThisArea;
+    }
 
     // Always maintain at least one scout collector for exploration
-    if (this.creeps.length < 30) {
+    if (creepsForThisSpawnRoom < this.spawnLimit) {
       // if (this.creeps.length === 0 || (Game.time % 100 === 0 && this.creeps.length < 10)) {
       const task = this.createCreepForThisArea();
       if (task) {
@@ -70,6 +82,12 @@ export default class SeasonArea extends BaseArea {
   }
 
   public handleThisArea(): void {
+    // Making sure we only handle one tick per area to avoid duplicate handling from multiple rooms with season.
+    if (SeasonArea.handledTick === Game.time) {
+      return;
+    }
+    SeasonArea.handledTick = Game.time;
+
     this.scores = this.findAllScores(); // Refresh scores each tick
     this.flagTargetRoom = this.detectFlag(); // Check for flags each tick
     this.expireOldExplorations(); // Expire old explorations
@@ -253,6 +271,31 @@ export default class SeasonArea extends BaseArea {
     return roomNames[0] || null;
   }
 
+  private getSpawnLimitForRoom(roomName: string): number {
+    const matchingFlag = _.find(
+      Game.flags,
+      flag => flag.pos.roomName === roomName && this.isSeasonSpawnFlag(flag.name)
+    );
+    if (!matchingFlag) {
+      return 0;
+    }
+
+    const parsed = SEASON_FLAG_PATTERN.exec(matchingFlag.name);
+    if (!parsed) {
+      return 0;
+    }
+
+    return Number(parsed[1]);
+  }
+
+  private isSeasonSpawnFlag(flagName: string): boolean {
+    return SEASON_FLAG_PATTERN.test(flagName);
+  }
+
+  private getSeasonCreepCountForSpawnRoom(): number {
+    return this.creeps.filter(creep => creep.memory.seasonSpawnRoom === this.spawnRoomName).length;
+  }
+
   private findAllScores(): Score[] {
     const scores: Score[] = [];
     for (const roomName in Game.rooms) {
@@ -329,6 +372,6 @@ export default class SeasonArea extends BaseArea {
 
   private createCreepForThisArea(): SpawnTask | null {
     const bodyParts: BodyPartConstant[] = [MOVE];
-    return new SpawnTask(SpawnType.Collector, this.areaId, "Collector", bodyParts, this);
+    return new SpawnTask(SpawnType.Collector, this.areaId, "Collector", bodyParts, this, null, this.spawnRoomName);
   }
 }

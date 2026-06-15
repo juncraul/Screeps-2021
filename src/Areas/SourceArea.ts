@@ -161,7 +161,6 @@ export default class SourceArea extends BaseArea {
   private createCreepForThisArea(): SpawnTask | null {
     let bodyPartConstants: BodyPartConstant[] = [];
     const buildCheapestCreep = this.creeps.length === 0 || !this.hasCarryCreepsInRoom(); // We might get in a deadend where resources will never be more available.
-    const amountOfEnergyUnused = this.room.energyCapacityAvailable > 500 ? 300 : 0;
     if (this.linkNextToSource) {
       if (buildCheapestCreep && this.room.energyAvailable < 700) {
         bodyPartConstants = [WORK, MOVE, CARRY];
@@ -170,7 +169,7 @@ export default class SourceArea extends BaseArea {
         bodyPartConstants = [WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, CARRY];
       }
     } else if (this.containerNextToSource) {
-      let segments = Math.floor((this.room.energyCapacityAvailable - amountOfEnergyUnused) / 150); // Work-100; Move-50
+      let segments = Math.floor(this.room.energyCapacityAvailable / 150); // Work-100; Move-50
       segments = buildCheapestCreep ? Math.floor(this.room.energyAvailable / 150) : segments;
       if (segments < 2) {
         console.log("SourceArea, containerNextToSource: Something wrong with room capacity");
@@ -188,7 +187,7 @@ export default class SourceArea extends BaseArea {
         bodyPartConstants = [WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE, MOVE];
       }
     } else {
-      let segments = Math.floor((this.room.energyCapacityAvailable - amountOfEnergyUnused) / 200); // Work-100; Move-50; Carry-50
+      let segments = Math.floor(this.room.energyCapacityAvailable / 200); // Work-100; Move-50; Carry-50
       segments = buildCheapestCreep ? Math.floor(this.room.energyAvailable / 200) : segments;
       if (segments === 1) {
         // 200 energy
@@ -212,7 +211,8 @@ export default class SourceArea extends BaseArea {
       return false; // We might need to create a weak one instead if there 0, or we replace a dead one if there are more than 1
     }
     const creep = this.creeps[0];
-    if (creep.body.length < 5) {
+    if (creep.body.length < 5 && this.room.energyCapacityAvailable >= 450) {
+      // We want to replace weak creeps when we have the capacity to spawn stronger ones, otherwise we might get in a deadend where resources will never be more available.
       return true;
     }
     return false;

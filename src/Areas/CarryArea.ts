@@ -2,6 +2,7 @@ import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
+import { CreepBase } from "CreepBase";
 
 export default class CarryArea extends BaseArea {
   controller: StructureController;
@@ -44,60 +45,60 @@ export default class CarryArea extends BaseArea {
 
   public handleThisArea() {
     for (let i = 0; i < this.creeps.length; i++) {
-      if (this.creeps[i].isEmpty() && this.creeps[i].isFree()) {
-        let foundSomewhereToCollectFrom = false;
-        for (let j = 0; j < this.collectFromLimitedStore.length && !foundSomewhereToCollectFrom; j++) {
-          if (this.collectFromLimitedStore[j].store.energy < 100) continue;
-          this.creeps[i].addTask(new CreepTask(Activity.Collect, this.collectFromLimitedStore[j].pos));
-          foundSomewhereToCollectFrom = true;
-          break;
-        }
-        const collectFromGeneralStoreSorted = this.collectFromGeneralStore.sort(
-          (a, b) =>
-            a.pos.getRangeTo(this.creeps[i].pos.x, this.creeps[i].pos.y) -
-            b.pos.getRangeTo(this.creeps[i].pos.x, this.creeps[i].pos.y)
-        );
-        for (let j = 0; j < collectFromGeneralStoreSorted.length; j++) {
-          if (collectFromGeneralStoreSorted[j].store.energy < 200) continue;
-          this.creeps[i].addTask(new CreepTask(Activity.Collect, collectFromGeneralStoreSorted[j].pos));
-          foundSomewhereToCollectFrom = true;
-          break;
-        }
-        for (let j = 0; j < this.droppedResourcesToCollectFrom.length && !foundSomewhereToCollectFrom; j++) {
-          if (this.droppedResourcesToCollectFrom[j].amount < 200) continue;
-          this.creeps[i].addTask(new CreepTask(Activity.Pickup, this.droppedResourcesToCollectFrom[j].pos));
-          foundSomewhereToCollectFrom = true;
-          break;
-        }
-      }
-      let foundSomewhereToDeposit = false;
-      const depositToLimitedStoreSorted = this.depositToLimitedStore.sort((a, b) => {
-        const aIsTower = a.structureType === STRUCTURE_TOWER;
-        const bIsTower = b.structureType === STRUCTURE_TOWER;
+      if (!this.creeps[i].isFree()) continue;
 
-        if (aIsTower && !bIsTower) return 1;
-        if (!aIsTower && bIsTower) return -1;
+      if (this.creeps[i].isEmpty()) {
+        this.findSomewhereToCollectFrom(this.creeps[i]);
+      }
+      if (this.creeps[i].isFull()) {
+        this.findSomewhereToDeposit(this.creeps[i]);
+      }
+    }
+  }
 
-        return (
-          a.pos.getRangeTo(this.creeps[i].pos.x, this.creeps[i].pos.y) -
-          b.pos.getRangeTo(this.creeps[i].pos.x, this.creeps[i].pos.y)
-        );
-      });
-      if (!this.creeps[i].isEmpty() && this.creeps[i].isFree()) {
-        for (let j = 0; j < depositToLimitedStoreSorted.length; j++) {
-          if (depositToLimitedStoreSorted[j].store.getFreeCapacity(RESOURCE_ENERGY) === 0) continue;
-          this.creeps[i].addTask(new CreepTask(Activity.Deposit, depositToLimitedStoreSorted[j].pos));
-          foundSomewhereToDeposit = true;
-          break;
-        }
-      }
-      if (!this.creeps[i].isEmpty() && this.creeps[i].isFree() && !foundSomewhereToDeposit) {
-        for (let j = 0; j < this.depositToGeneralStore.length; j++) {
-          if (this.depositToGeneralStore[j].store.getFreeCapacity(RESOURCE_ENERGY) === 0) continue;
-          this.creeps[i].addTask(new CreepTask(Activity.Deposit, this.depositToGeneralStore[j].pos));
-          break;
-        }
-      }
+  // ─── Private helpers ────────────────────────────────────────────────────────
+
+  private findSomewhereToCollectFrom(creep: CreepBase): void {
+    for (let j = 0; j < this.collectFromLimitedStore.length; j++) {
+      if (this.collectFromLimitedStore[j].store.energy < 100) continue;
+      creep.addTask(new CreepTask(Activity.Collect, this.collectFromLimitedStore[j].pos));
+      return;
+    }
+    const collectFromGeneralStoreSorted = this.collectFromGeneralStore.sort(
+      (a, b) => a.pos.getRangeTo(creep.pos.x, creep.pos.y) - b.pos.getRangeTo(creep.pos.x, creep.pos.y)
+    );
+    for (let j = 0; j < collectFromGeneralStoreSorted.length; j++) {
+      if (collectFromGeneralStoreSorted[j].store.energy < 200) continue;
+      creep.addTask(new CreepTask(Activity.Collect, collectFromGeneralStoreSorted[j].pos));
+      return;
+    }
+    for (let j = 0; j < this.droppedResourcesToCollectFrom.length; j++) {
+      if (this.droppedResourcesToCollectFrom[j].amount < 200) continue;
+      creep.addTask(new CreepTask(Activity.Pickup, this.droppedResourcesToCollectFrom[j].pos));
+      return;
+    }
+  }
+
+  private findSomewhereToDeposit(creep: CreepBase): void {
+    const depositToLimitedStoreSorted = this.depositToLimitedStore.sort((a, b) => {
+      const aIsTower = a.structureType === STRUCTURE_TOWER;
+      const bIsTower = b.structureType === STRUCTURE_TOWER;
+
+      if (aIsTower && !bIsTower) return 1;
+      if (!aIsTower && bIsTower) return -1;
+
+      return a.pos.getRangeTo(creep.pos.x, creep.pos.y) - b.pos.getRangeTo(creep.pos.x, creep.pos.y);
+    });
+    for (let j = 0; j < depositToLimitedStoreSorted.length; j++) {
+      if (depositToLimitedStoreSorted[j].store.getFreeCapacity(RESOURCE_ENERGY) === 0) continue;
+      creep.addTask(new CreepTask(Activity.Deposit, depositToLimitedStoreSorted[j].pos));
+      return;
+    }
+
+    for (let j = 0; j < this.depositToGeneralStore.length; j++) {
+      if (this.depositToGeneralStore[j].store.getFreeCapacity(RESOURCE_ENERGY) === 0) continue;
+      creep.addTask(new CreepTask(Activity.Deposit, this.depositToGeneralStore[j].pos));
+      return;
     }
   }
 
@@ -127,7 +128,7 @@ export default class CarryArea extends BaseArea {
   }
 
   private createCreepForThisArea(): SpawnTask | null {
-    let bodyPartConstants: BodyPartConstant[] = [];
+    const bodyPartConstants: BodyPartConstant[] = [];
     let segments = Math.floor(this.room.energyCapacityAvailable / 100); // Carry-50; Move-50
     if (this.creeps.length === 0) {
       // Note: In this situation, there is no way to fill extensions
@@ -137,210 +138,11 @@ export default class CarryArea extends BaseArea {
     if (segments < 1) {
       console.log(`Error: Trying to spawn a carrier with segments ${segments} less than 1`);
       return null;
-    } else if (segments === 1) {
-      // 100 energy - 50 Store
-      bodyPartConstants = [CARRY, MOVE];
-    } else if (segments === 2) {
-      // 200 energy - 100 Store
-      bodyPartConstants = [CARRY, CARRY, MOVE, MOVE];
-    } else if (segments === 3) {
-      // 300 energy - 150 Store
-      bodyPartConstants = [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
-    } else if (segments === 4) {
-      // 400 energy - 200 Store
-      bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE];
-    } else if (segments === 5) {
-      // 500 energy - 250 Store
-      bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE];
-    } else if (segments === 6) {
-      // 600 energy - 300 Store
-      bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE];
-    } else if (segments === 7) {
-      // 700 energy - 350 Store
-      bodyPartConstants = [CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE];
-    } else if (segments === 8) {
-      // 800 energy - 400 Store
-      bodyPartConstants = [
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE
-      ];
-    } else if (segments === 9) {
-      // 900 energy - 450 Store
-      bodyPartConstants = [
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE
-      ];
-    } else if (segments === 10) {
-      // 1000 energy - 500 Store
-      bodyPartConstants = [
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE
-      ];
-    } else if (segments === 11) {
-      // 1100 energy - 550 Store
-      bodyPartConstants = [
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE
-      ];
-    } else if (segments === 12) {
-      // 1200 energy - 600 Store
-      bodyPartConstants = [
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE
-      ];
-    } else if (segments === 13) {
-      // 1300 energy - 650 Store
-      bodyPartConstants = [
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE
-      ];
-    } else if (segments >= 14) {
-      // 1400 energy - 700 Store
-      bodyPartConstants = [
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        CARRY,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE,
-        MOVE
-      ];
+    } else {
+      for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
+      for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
     }
+
     return new SpawnTask(SpawnType.Carrier, this.areaId, "Carrier", bodyPartConstants, this);
   }
 }

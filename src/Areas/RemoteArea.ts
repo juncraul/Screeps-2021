@@ -6,6 +6,8 @@ import BaseArea from "./BaseArea";
 import { CreepBase } from "CreepBase";
 
 export default class RemoteArea extends BaseArea {
+  private static readonly ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
+
   controller: StructureController | null;
   roomName: string;
   sources: Source[];
@@ -19,10 +21,10 @@ export default class RemoteArea extends BaseArea {
   repairersPerRoom: number;
   claimThisRoom: boolean;
 
-  constructor(roomName: string, claimThisRoom: boolean) {
+  constructor(roomName: string, claimThisRoom: boolean, baseRoomName?: string) {
     super("RemoteArea", roomName, new RoomPosition(25, 25, roomName), Game.rooms[roomName]);
     this.roomName = roomName;
-    this.baseRoom = this.findBaseRoom();
+    this.baseRoom = this.findBaseRoom(baseRoomName);
 
     if (Game.rooms[roomName] && Game.rooms[roomName].controller) {
       this.controller = Game.rooms[roomName].controller!;
@@ -39,9 +41,9 @@ export default class RemoteArea extends BaseArea {
     // TODO: We still need to create a claimer even if we need to claim this room, if the room is not ours yet
     this.claimersPerRoom = claimThisRoom ? 0 : 1; // Default value, can be adjusted based on strategy
     // TODO: Find a proper way to increase harvester per source, we've incresed for this room because it is too far away from our base and we need more harvesters to make it work (creeps die too quickly)
-    this.harvestersPerSource = roomName === "E32S25" ? 0 : 1; // Default value, can be adjusted based on strategy
+    this.harvestersPerSource = 1; // Default value, can be adjusted based on strategy
     this.carriersPerRoom = claimThisRoom ? 0 : 1; // Default value, can be adjusted based on strategy
-    this.repairersPerRoom = roomName === "E32S25" ? 4 : 1; // Default value, can be adjusted based on strategy
+    this.repairersPerRoom = 1; // Default value, can be adjusted based on strategy
     this.claimThisRoom = claimThisRoom;
 
     if (Game.rooms[roomName]) {
@@ -157,6 +159,8 @@ export default class RemoteArea extends BaseArea {
     visual.text("Carriers " + this.getCreepCountByType("Carrier") + "/" + this.carriersPerRoom, x, y, plain);
     y += 0.7;
     visual.text("Repairers " + this.getCreepCountByType("Repairer") + "/" + this.repairersPerRoom, x, y, plain);
+    y += 0.7;
+    visual.text("The base room is " + this.baseRoom.name, x, y, plain);
   }
 
   private setup() {
@@ -366,7 +370,17 @@ export default class RemoteArea extends BaseArea {
     return targetSource;
   }
 
-  private findBaseRoom(): Room {
+  private findBaseRoom(baseRoomName?: string): Room {
+    if (baseRoomName && RemoteArea.ROOM_NAME_PATTERN.test(baseRoomName)) {
+      const requestedRoom = Game.rooms[baseRoomName];
+      if (requestedRoom && requestedRoom.controller && requestedRoom.controller.my) {
+        const requestedRoomSpawns = GetRoomObjects.getRoomSpawns(requestedRoom, true);
+        if (requestedRoomSpawns.length > 0) {
+          return requestedRoom;
+        }
+      }
+    }
+
     // Find a room that has a spawn or storage - this is likely our base
     for (const roomName in Game.rooms) {
       const room = Game.rooms[roomName];
@@ -531,7 +545,11 @@ export default class RemoteArea extends BaseArea {
   }
 
   private createClaimer(): SpawnTask {
-    const bodyPartConstants: BodyPartConstant[] = [CLAIM, CLAIM, MOVE, MOVE];
+    const bodyPartConstants: BodyPartConstant[] = [];
+    const segments = Math.max(3, Math.floor(this.baseRoom.energyCapacityAvailable / 650));
+    for (let i = 0; i < segments; i++) bodyPartConstants.push(CLAIM);
+    for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
+
     return new SpawnTask(
       SpawnType.Claimer,
       this.areaId,
@@ -544,7 +562,12 @@ export default class RemoteArea extends BaseArea {
 
   private createHarvester(): SpawnTask {
     // plain=1,2  road=1,1  swamp=5,6
-    const bodyPartConstants: BodyPartConstant[] = [WORK, WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE];
+    const bodyPartConstants: BodyPartConstant[] = [];
+    const segments = Math.max(5, Math.floor((this.baseRoom.energyCapacityAvailable - 50) / 150));
+    for (let i = 0; i < segments; i++) bodyPartConstants.push(WORK);
+    bodyPartConstants.push(CARRY);
+    for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
+
     return new SpawnTask(
       SpawnType.Harvester,
       this.areaId,
@@ -556,28 +579,10 @@ export default class RemoteArea extends BaseArea {
   }
 
   private createCarrier(): SpawnTask {
-    const bodyPartConstants: BodyPartConstant[] = [
-      CARRY,
-      CARRY,
-      CARRY,
-      CARRY,
-      CARRY,
-      CARRY,
-      CARRY,
-      CARRY,
-      CARRY,
-      CARRY,
-      MOVE,
-      MOVE,
-      MOVE,
-      MOVE,
-      MOVE,
-      MOVE,
-      MOVE,
-      MOVE,
-      MOVE,
-      MOVE
-    ];
+    const bodyPartConstants: BodyPartConstant[] = [];
+    const segments = Math.max(12, Math.floor(this.baseRoom.energyCapacityAvailable / 100));
+    for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
+    for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
     return new SpawnTask(
       SpawnType.Carrier,
       this.areaId,
@@ -589,7 +594,11 @@ export default class RemoteArea extends BaseArea {
   }
 
   private createRepairer(): SpawnTask {
-    const bodyPartConstants: BodyPartConstant[] = [WORK, WORK, CARRY, CARRY, MOVE, MOVE];
+    const bodyPartConstants: BodyPartConstant[] = [];
+    const segments = Math.max(4, Math.floor(this.baseRoom.energyCapacityAvailable / 200));
+    for (let i = 0; i < segments; i++) bodyPartConstants.push(WORK);
+    for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
+    for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
     return new SpawnTask(
       SpawnType.Repairer,
       this.areaId,

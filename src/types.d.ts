@@ -4,6 +4,7 @@ interface CreepMemory {
   room: string;
   working: boolean;
   task: any;
+  seasonSpawnRoom?: string;
   soldierFlag?: string | null;
 }
 interface SoldierFlagState {

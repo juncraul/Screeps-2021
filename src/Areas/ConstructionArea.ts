@@ -58,29 +58,14 @@ export default class ConstructionArea extends BaseArea {
         }
       }
     }
-    //this.creepReset();
   }
 
-  // private creepReset(){
-  //   for (let i = 0; i < this.creeps.length; i++) {
-  //     //In case when the construction site disappeared, the task should be removed from creeps memory
-  //     if (this.creeps[i].memory.task && this.creeps[i].memory.task.type === Activity.Construct) {
-  //       const constructionArea = this.getConstructionClosestByPoint(this.creeps[i].memory.task.pos);
-  //       if (!constructionArea) {
-  //         delete this.creeps[i].memory.task;
-  //       }
-  //     }
-  //     //In case when the container disappeared, the task should be removed from creeps memory
-  //     if (this.creeps[i].memory.task && this.creeps[i].memory.task.type === Activity.Collect) {
-  //       const container = this.getContainerClosestByPoint(this.creeps[i].memory.task.pos);
-  //       if (!container) {
-  //         delete this.creeps[i].memory.task;
-  //       }
-  //     }
-  //   }
-  // }
-
   private getConstructionClosestByPoint(position: RoomPosition) {
+    // Pick non-road construction sites first, then road construction sites. This is because we want to prioritize non-road construction sites first.
+    const nonRoadConstructionSites = position.findClosestByRange(FIND_MY_CONSTRUCTION_SITES, {
+      filter: (constructionSite: ConstructionSite) => constructionSite.structureType !== STRUCTURE_ROAD
+    });
+    if (nonRoadConstructionSites) return nonRoadConstructionSites;
     return position.findClosestByRange(FIND_MY_CONSTRUCTION_SITES);
   }
 
@@ -98,6 +83,20 @@ export default class ConstructionArea extends BaseArea {
   }
 
   private createCreepForThisArea(): SpawnTask {
-    return new SpawnTask(SpawnType.Constructor, this.areaId, "Constructor", [WORK, CARRY, MOVE], this);
+    const segments = Math.floor(this.room.energyCapacityAvailable / 200); // Work-100; Carry-50; Move-50
+    let bodyPartConstants: BodyPartConstant[] = [];
+    if (segments < 1) {
+      console.log("ConstructionArea: Something wrong with room capacity");
+    } else if (segments === 1) {
+      // 200 energy
+      bodyPartConstants = [WORK, CARRY, MOVE];
+    } else if (segments === 2) {
+      // 400 energy
+      bodyPartConstants = [WORK, WORK, CARRY, CARRY, MOVE, MOVE];
+    } else {
+      // 600 energy
+      bodyPartConstants = [WORK, WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
+    }
+    return new SpawnTask(SpawnType.Constructor, this.areaId, "Constructor", bodyPartConstants, this);
   }
 }

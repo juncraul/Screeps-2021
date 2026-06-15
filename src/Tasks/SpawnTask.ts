@@ -7,6 +7,7 @@ export default class SpawnTask {
   bodyPartConstant: BodyPartConstant[];
   area: BaseArea;
   namePrefix: string | null = null;
+  spawnRoomName?: string;
 
   constructor(
     spawnType: SpawnType,
@@ -14,7 +15,8 @@ export default class SpawnTask {
     roleName: string,
     bodyPartConstant: BodyPartConstant[],
     area: BaseArea,
-    namePrefix: string | null = null
+    namePrefix: string | null = null,
+    spawnRoomName?: string
   ) {
     this.spawnType = spawnType;
     this.areaId = areaId;
@@ -22,6 +24,7 @@ export default class SpawnTask {
     this.bodyPartConstant = bodyPartConstant;
     this.area = area;
     this.namePrefix = namePrefix;
+    this.spawnRoomName = spawnRoomName;
   }
 
   public getSpawnTypeText(): string {

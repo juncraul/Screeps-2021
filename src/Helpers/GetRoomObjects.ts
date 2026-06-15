@@ -2,6 +2,8 @@
 // PURPLE - PURPLE Reserve this room
 
 export class GetRoomObjects {
+  public static readonly ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
+
   // --------------------------
   // Get All Functions
   // Functions to return all objects in the game
@@ -10,22 +12,54 @@ export class GetRoomObjects {
     return _.filter(Game.creeps, creep => creep.spawning === includingSpawning);
   }
 
-  public static getAllRoomsToReserve(): string[] {
+  public static getAllRoomsToReserve(): { roomName: string; baseRoomName?: string }[] {
     const flags = _.filter(Game.flags, flag => flag.color === COLOR_PURPLE && flag.name.startsWith("Reserve"));
-    const roomNames: string[] = [];
+    const roomNames: { roomName: string; baseRoomName?: string }[] = [];
     flags.forEach(flag => {
-      roomNames.push(flag.pos.roomName);
+      roomNames.push({
+        roomName: flag.pos.roomName,
+        baseRoomName: this.getBaseRoomNameFromReserveFlag(flag.name)
+      });
     });
     return roomNames;
   }
 
-  public static getAllRoomsToClaim(): string[] {
+  public static getAllRoomsToClaim(): { roomName: string; baseRoomName?: string }[] {
     const flags = _.filter(Game.flags, flag => flag.color === COLOR_BLUE && flag.name.startsWith("Reserve"));
-    const roomNames: string[] = [];
+    const roomNames: { roomName: string; baseRoomName?: string }[] = [];
     flags.forEach(flag => {
-      roomNames.push(flag.pos.roomName);
+      roomNames.push({
+        roomName: flag.pos.roomName,
+        baseRoomName: this.getBaseRoomNameFromReserveFlag(flag.name)
+      });
     });
     return roomNames;
+  }
+
+  private static getBaseRoomNameFromReserveFlag(flagName: string): string | undefined {
+    const splitName = flagName.split("-");
+    if (splitName.length < 2) {
+      return undefined;
+    }
+
+    const candidateBaseRoomName = splitName[1];
+    if (!this.ROOM_NAME_PATTERN.test(candidateBaseRoomName)) {
+      return undefined;
+    }
+
+    return candidateBaseRoomName;
+  }
+
+  public static getAllRemoteRebuildTargets(): { remoteRoomName: string; baseRoomName: string }[] {
+    const pattern = /^RemoteRebuild-([WE]\d+[NS]\d+)(?:-.+)?$/;
+    const targets: { remoteRoomName: string; baseRoomName: string }[] = [];
+    _.filter(Game.flags, flag => flag.name.startsWith("RemoteRebuild-")).forEach(flag => {
+      const match = pattern.exec(flag.name);
+      if (match) {
+        targets.push({ remoteRoomName: flag.pos.roomName, baseRoomName: match[1] });
+      }
+    });
+    return targets;
   }
 
   public static getAllRoomsWithSpawns(): Room[] {

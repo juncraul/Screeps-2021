@@ -7,6 +7,7 @@ import { Cannon } from "Cannon";
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { BaseBuilder } from "BaseBuilder/BaseBuilder";
 import RemoteArea from "Areas/RemoteArea";
+import RemoteRebuildArea from "Areas/RemoteRebuildArea";
 import UtilityArea from "Areas/UtilityArea";
 import SeasonArea from "Areas/SeasonArea";
 import RepairArea from "Areas/RepairArea";
@@ -40,14 +41,24 @@ export default class Overseer implements IOverseer {
     const soldierTasks = this.handleSoldierArea(room);
     let seasonTasks: SpawnTask[] = [];
     if (Memory.Keys.IsSeason) {
-      seasonTasks = this.handleSeasonArea();
+      seasonTasks = this.handleSeasonArea(room);
     }
     let remoteTasks: SpawnTask[] = [];
     for (const roomToReserve of roomsToReserve) {
-      remoteTasks = remoteTasks.concat(this.handleRemoteArea(roomToReserve));
+      remoteTasks = remoteTasks.concat(
+        this.handleRemoteArea(roomToReserve.roomName, false, roomToReserve.baseRoomName)
+      );
     }
     for (const roomToClaim of roomsToClaim) {
-      remoteTasks = remoteTasks.concat(this.handleRemoteArea(roomToClaim, true));
+      remoteTasks = remoteTasks.concat(this.handleRemoteArea(roomToClaim.roomName, true, roomToClaim.baseRoomName));
+    }
+
+    const remoteRebuildTasks: SpawnTask[] = [];
+    for (const target of GetRoomObjects.getAllRemoteRebuildTargets().filter(t => t.baseRoomName === room.name)) {
+      const rebuildArea = new RemoteRebuildArea(target.remoteRoomName, target.baseRoomName);
+      remoteRebuildTasks.push(...rebuildArea.handleSpawnTasks());
+      rebuildArea.handleThisArea();
+      this.handleRemoteRebuildRoomAreas(target.remoteRoomName);
     }
 
     // Interleave tasks in the desired spawn priority order:
@@ -95,6 +106,7 @@ export default class Overseer implements IOverseer {
       ...utilityTasks,
       ...soldierTasks,
       ...remoteTasks,
+      ...remoteRebuildTasks,
       ...seasonTasks
     ];
     return ordered.concat(remaining);
@@ -160,9 +172,21 @@ export default class Overseer implements IOverseer {
     return tasks;
   }
 
-  private handleRemoteArea(roomName: string, claimThisRoom = false): SpawnTask[] {
+  private handleRemoteRebuildRoomAreas(remoteRoomName: string): void {
+    const remoteRoom = Game.rooms[remoteRoomName];
+    if (!remoteRoom || !remoteRoom.controller) return;
+
+    new ConstructionArea(remoteRoom.controller).handleThisArea();
+    new CarryArea(remoteRoom.controller).handleThisArea();
+    new UpgradeArea(remoteRoom.controller).handleThisArea();
+    GetRoomObjects.getRoomSources(remoteRoom).forEach(source => {
+      new SourceArea(source, remoteRoom.controller!).handleThisArea();
+    });
+  }
+
+  private handleRemoteArea(roomName: string, claimThisRoom = false, baseRoomName?: string): SpawnTask[] {
     let tasks: SpawnTask[] = [];
-    const remoteArea: RemoteArea = new RemoteArea(roomName, claimThisRoom);
+    const remoteArea: RemoteArea = new RemoteArea(roomName, claimThisRoom, baseRoomName);
     tasks = tasks.concat(remoteArea.handleSpawnTasks());
     remoteArea.handleThisArea();
     return tasks;
@@ -187,8 +211,8 @@ export default class Overseer implements IOverseer {
     return tasks;
   }
 
-  private handleSeasonArea(): SpawnTask[] {
-    const seasonArea = new SeasonArea();
+  private handleSeasonArea(room: Room): SpawnTask[] {
+    const seasonArea = new SeasonArea(room.name);
     const tasks: SpawnTask[] = seasonArea.handleSpawnTasks();
     seasonArea.handleThisArea();
     return tasks;
@@ -221,6 +245,9 @@ export default class Overseer implements IOverseer {
         if (spawn.spawnCreep(task.bodyPartConstant, creepName) === OK) {
           theNewCreep = Game.creeps[creepName];
           theNewCreep.memory.role = task.roleName;
+          if (task.spawnRoomName) {
+            theNewCreep.memory.seasonSpawnRoom = task.spawnRoomName;
+          }
           task.area.handleNewCreepMemory(creepName);
         } else {
           return;
