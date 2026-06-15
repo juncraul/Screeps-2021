@@ -114,35 +114,6 @@ export default class SourceArea extends BaseArea {
           }
         }
       }
-
-      // Old code
-      // if (this.containerConstructionSiteNextToSource) {
-      //   if (this.creeps[i].store.energy === 0 && this.creeps[i].isFree())
-      //     this.creeps[i].addTask(new CreepTask(Activity.Harvest, this.source.pos));
-      //   if (this.creeps[i].isFull() && this.creeps[i].isFree())
-      //     this.creeps[i].addTask(new CreepTask(Activity.Construct, this.containerConstructionSiteNextToSource.pos));
-      // }
-      // if (this.linkNextToSource && this.containerNextToSource) {
-      // if (this.creeps[i].store.energy === 0 && this.creeps[i].isFree()) {
-      //   if (!Helper.isSamePosition(this.containerNextToSource.pos, this.creeps[i].pos)) {
-      //     this.creeps[i].addTask(new CreepTask(Activity.Move, this.containerNextToSource.pos));
-      //   } else {
-      //     this.creeps[i].addTask(
-      //       new CreepTask(Activity.HarvestAndDeposit, this.source.pos, this.linkNextToSource.pos)
-      //     );
-      //   }
-      // }
-      // } else if (this.containerNextToSource) {
-      //   if (!this.creeps[i].isFull() && this.creeps[i].isFree()) {
-      //     if (!Helper.isSamePosition(this.containerNextToSource.pos, this.creeps[i].pos)) {
-      //       this.creeps[i].addTask(new CreepTask(Activity.Move, this.containerNextToSource.pos));
-      //     } else {
-      //       this.creeps[i].addTask(new CreepTask(Activity.Harvest, this.source.pos));
-      //     }
-      //   }
-      //   if (this.creeps[i].isFull() && this.creeps[i].isFree())
-      //     this.creeps[i].addTask(new CreepTask(Activity.Deposit, this.containerNextToSource.pos));
-      // }
     }
   }
 
@@ -193,7 +164,7 @@ export default class SourceArea extends BaseArea {
     const amountOfEnergyUnused = this.room.energyCapacityAvailable > 500 ? 300 : 0;
     if (this.linkNextToSource) {
       if (buildCheapestCreep && this.room.energyAvailable < 700) {
-        bodyPartConstants = [WORK, WORK, MOVE, CARRY];
+        bodyPartConstants = [WORK, MOVE, CARRY];
       } else {
         // 5 X Work; 3 X Move; 1 X Carry. 700 Ene. Walk time empty/full: plain=2/2 road=1/1 swamp=9/10
         bodyPartConstants = [WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, CARRY];

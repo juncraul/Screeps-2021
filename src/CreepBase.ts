@@ -135,6 +135,10 @@ export class CreepBase {
           targetCollect = CreepTask.getRuinFromTarget(this.task.targetPlace);
           if (!targetCollect) {
             targetCollect = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
+            if (!targetCollect) {
+              this.creep.say("Col Done");
+              this.task.taskDone = true;
+            }
           }
         }
         if (targetCollect && !(targetCollect instanceof Resource)) {

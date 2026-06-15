@@ -231,6 +231,10 @@ export default class SoldierArea extends BaseArea {
   }
 
   private drawLegend(): void {
+    if (!this.room) {
+      return;
+    }
+
     const visual = this.room.visual;
     const x = 1;
     let y = 3;

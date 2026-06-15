@@ -139,7 +139,7 @@ export default class CarryArea extends BaseArea {
       return null;
     } else if (segments === 1) {
       // 100 energy - 50 Store
-      bodyPartConstants = [CARRY, CARRY, MOVE, MOVE];
+      bodyPartConstants = [CARRY, MOVE];
     } else if (segments === 2) {
       // 200 energy - 100 Store
       bodyPartConstants = [CARRY, CARRY, MOVE, MOVE];

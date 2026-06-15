@@ -89,7 +89,7 @@ export default class UpgradeArea extends BaseArea {
 
       // Build the construction site(Container) or do the main job, which is upgrade the controller.
       if (this.creeps[i].isFull()) {
-        if (this.containerConstructionSiteNextToController) {
+        if (this.containerConstructionSiteNextToController && this.controller.ticksToDowngrade > 8000) {
           this.creeps[i].addTask(new CreepTask(Activity.Construct, this.containerConstructionSiteNextToController.pos));
         } else {
           this.creeps[i].addTask(new CreepTask(Activity.Upgrade, this.controller.pos));

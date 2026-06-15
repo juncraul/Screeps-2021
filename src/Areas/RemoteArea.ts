@@ -94,6 +94,7 @@ export default class RemoteArea extends BaseArea {
   public handleThisArea() {
     this.updateContainers();
     this.setup();
+    this.handleInvaderDefenseFlag();
     this.drawLegend();
 
     for (let i = 0; i < this.creeps.length; i++) {
@@ -132,6 +133,10 @@ export default class RemoteArea extends BaseArea {
   }
 
   private drawLegend(): void {
+    if (!this.room) {
+      return;
+    }
+
     const visual = this.room.visual;
     const x = 1;
     let y = 3;
@@ -165,6 +170,31 @@ export default class RemoteArea extends BaseArea {
           this.room.createConstructionSite(positionForContainer, STRUCTURE_CONTAINER);
         }
       }
+    }
+  }
+
+  private handleInvaderDefenseFlag() {
+    if (!this.room) {
+      return;
+    }
+
+    const hostileInvaders = this.room.find(FIND_HOSTILE_CREEPS, {
+      filter: creep => creep.owner && creep.owner.username === "Invader"
+    });
+    const invaderFlag = Game.flags["Attack-1-6-Invader-" + this.roomName];
+    if (hostileInvaders.length === 0) {
+      // Threat gone: remove managed invader-defense flag.
+      if (invaderFlag) {
+        invaderFlag.remove();
+      }
+      return;
+    }
+
+    // Create a managed invader-defense flag.
+    if (!invaderFlag) {
+      const targetPos = hostileInvaders[0].pos;
+      const flagName = `Attack-1-6-Invader-${this.roomName}`;
+      targetPos.createFlag(flagName, COLOR_RED, COLOR_BLUE);
     }
   }
 

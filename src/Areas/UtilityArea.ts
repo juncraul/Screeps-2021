@@ -43,8 +43,8 @@ export default class CarryArea extends BaseArea {
           }
         }
       } else {
-        var structureToDeposit = this.getWhereToDeposit(this.creeps[i].pos);
-        if (structureToDeposit){
+        const structureToDeposit = this.getWhereToDeposit(this.creeps[i].pos);
+        if (structureToDeposit) {
           this.creeps[i].addTask(new CreepTask(Activity.Deposit, structureToDeposit.pos));
         } else if (this.storage) {
           this.creeps[i].addTask(new CreepTask(Activity.Deposit, this.storage.pos));
@@ -53,20 +53,23 @@ export default class CarryArea extends BaseArea {
     }
   }
 
-  private getWhereToDeposit(currentPosition: RoomPosition): (StructureSpawn | StructureExtension | StructureTower | null) {
-
+  private getWhereToDeposit(
+    currentPosition: RoomPosition
+  ): StructureSpawn | StructureExtension | StructureTower | null {
     const extensions = this.room.find(FIND_MY_STRUCTURES, {
-      filter: (structure) => structure.structureType === STRUCTURE_EXTENSION
+      filter: structure => structure.structureType === STRUCTURE_EXTENSION
     }) as StructureExtension[];
     // Disabled spawns for now because it is too far away
     // const spawns = this.room.find(FIND_MY_STRUCTURES, {
     //   filter: (structure) => structure.structureType === STRUCTURE_SPAWN
     // }) as StructureSpawn[];
     const towers = this.room.find(FIND_MY_STRUCTURES, {
-      filter: (structure) => structure.structureType === STRUCTURE_TOWER
+      filter: structure => structure.structureType === STRUCTURE_TOWER
     }) as StructureTower[];
 
-    const structures = [...extensions, ...towers].filter(structure => structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0);
+    const structures = [...extensions, ...towers].filter(
+      structure => structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+    );
     if (structures.length === 0) {
       return null;
     }
