@@ -61,7 +61,7 @@ export default class RemoteArea extends BaseArea {
       this.controller &&
       this.controller.reservation &&
       this.controller.reservation.username === Helper.getUserName() &&
-      this.controller.reservation.ticksToEnd < 1000
+      this.controller.reservation.ticksToEnd < 2000
     ) {
       // Skip creating a claimer if already reserved by me and has plenty of ticks left.
     } else {
@@ -546,7 +546,7 @@ export default class RemoteArea extends BaseArea {
 
   private createClaimer(): SpawnTask {
     const bodyPartConstants: BodyPartConstant[] = [];
-    const segments = Math.max(3, Math.floor(this.baseRoom.energyCapacityAvailable / 650));
+    const segments = Math.min(3, Math.floor(this.baseRoom.energyCapacityAvailable / 650));
     for (let i = 0; i < segments; i++) bodyPartConstants.push(CLAIM);
     for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
 
@@ -563,7 +563,7 @@ export default class RemoteArea extends BaseArea {
   private createHarvester(): SpawnTask {
     // plain=1,2  road=1,1  swamp=5,6
     const bodyPartConstants: BodyPartConstant[] = [];
-    const segments = Math.max(5, Math.floor((this.baseRoom.energyCapacityAvailable - 50) / 150));
+    const segments = Math.min(5, Math.floor((this.baseRoom.energyCapacityAvailable - 50) / 150));
     for (let i = 0; i < segments; i++) bodyPartConstants.push(WORK);
     bodyPartConstants.push(CARRY);
     for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
@@ -580,7 +580,7 @@ export default class RemoteArea extends BaseArea {
 
   private createCarrier(): SpawnTask {
     const bodyPartConstants: BodyPartConstant[] = [];
-    const segments = Math.max(12, Math.floor(this.baseRoom.energyCapacityAvailable / 100));
+    const segments = Math.min(12, Math.floor(this.baseRoom.energyCapacityAvailable / 100));
     for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
     for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
     return new SpawnTask(
@@ -595,7 +595,7 @@ export default class RemoteArea extends BaseArea {
 
   private createRepairer(): SpawnTask {
     const bodyPartConstants: BodyPartConstant[] = [];
-    const segments = Math.max(4, Math.floor(this.baseRoom.energyCapacityAvailable / 200));
+    const segments = Math.min(4, Math.floor(this.baseRoom.energyCapacityAvailable / 200));
     for (let i = 0; i < segments; i++) bodyPartConstants.push(WORK);
     for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
     for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);

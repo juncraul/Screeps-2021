@@ -33,7 +33,7 @@ export const loop = () => {
   });
 
   // We can generate a pixel when the bucket is full
-  if(!Memory.Keys.IsSeason && Game.cpu.bucket == 10000){
+  if (!Memory.Keys.IsSeason && Game.cpu.bucket === 10000) {
     Game.cpu.generatePixel();
   }
 };

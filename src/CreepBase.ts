@@ -87,33 +87,40 @@ export class CreepBase {
       case Activity.Deposit: {
         const structure: Structure | null = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
         if (structure) {
-          this.transfer(structure, RESOURCE_ENERGY);
-        }
-        if (
-          structure instanceof StructureSpawn ||
-          structure instanceof StructureExtension ||
-          structure instanceof StructureTower ||
-          structure instanceof StructureLink
-        ) {
-          if (structure.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
-            this.creep.say("Str Full");
+          const result = this.transfer(structure, RESOURCE_ENERGY);
+          if (result === OK) {
+            this.creep.say("Transf Done");
             this.task.taskDone = true;
-          }
-        } else if (
-          structure instanceof StructureContainer ||
-          structure instanceof StructureStorage ||
-          structure instanceof StructureTerminal
-        ) {
-          if (structure.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
-            this.creep.say("Str Full");
-            this.task.taskDone = true;
-          }
-        } else if (structure instanceof StructureLab) {
-          if (structure.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+          } else if (result === ERR_FULL) {
             this.creep.say("Str Full");
             this.task.taskDone = true;
           }
         }
+        // if (
+        //   structure instanceof StructureSpawn ||
+        //   structure instanceof StructureExtension ||
+        //   structure instanceof StructureTower ||
+        //   structure instanceof StructureLink
+        // ) {
+        //   if (structure.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+        //     this.creep.say("Str Full");
+        //     this.task.taskDone = true;
+        //   }
+        // } else if (
+        //   structure instanceof StructureContainer ||
+        //   structure instanceof StructureStorage ||
+        //   structure instanceof StructureTerminal
+        // ) {
+        //   if (structure.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+        //     this.creep.say("Str Full");
+        //     this.task.taskDone = true;
+        //   }
+        // } else if (structure instanceof StructureLab) {
+        //   if (structure.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+        //     this.creep.say("Str Full");
+        //     this.task.taskDone = true;
+        //   }
+        // }
         if (this.carryCurrent === 0) {
           this.creep.say("Dep Done");
           this.task.taskDone = true;
@@ -199,7 +206,7 @@ export class CreepBase {
         if (targetPickup) {
           this.pickup(targetPickup);
         }
-        if (this.carryCurrent === this.carryCapacity) {
+        if (!targetPickup || this.carryCurrent === this.carryCapacity) {
           this.creep.say("Pick Done");
           this.task.taskDone = true;
         }
@@ -482,12 +489,11 @@ export class CreepBase {
 
   public attack(creep: Creep | Structure) {
     let result = this.creep.attack(creep);
-    if (result == ERR_NO_BODYPART) {
+    if (result === ERR_NO_BODYPART) {
       result = this.creep.rangedAttack(creep);
     }
-    if (result == ERR_NOT_IN_RANGE) {
-      this.goTo(creep.pos);
-    }
+    // Always move towards the target.
+    this.goTo(creep.pos);
     return result;
   }
 

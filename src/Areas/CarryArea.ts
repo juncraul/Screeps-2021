@@ -49,8 +49,7 @@ export default class CarryArea extends BaseArea {
 
       if (this.creeps[i].isEmpty()) {
         this.findSomewhereToCollectFrom(this.creeps[i]);
-      }
-      if (this.creeps[i].isFull()) {
+      } else {
         this.findSomewhereToDeposit(this.creeps[i]);
       }
     }

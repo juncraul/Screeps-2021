@@ -40,13 +40,13 @@ export default class RemoteRebuildArea extends BaseArea {
     // Only request a new spawn when both are 0.
     const constructorInTransit = this.creeps.filter(c => c.memory.role === "Constructor").length;
     const constructorInRemote = this.getRemoteAreaCount("ConstructionArea", this.remoteRoomName);
-    if (constructorInTransit + constructorInRemote < 2) {
+    if (constructorInTransit + constructorInRemote < 3) {
       tasks.push(this.createConstructor(cap));
     }
 
     const carrierInTransit = this.creeps.filter(c => c.memory.role === "Carrier").length;
     const carrierInRemote = this.getRemoteAreaCount("CarryArea", this.remoteRoomName);
-    if (carrierInTransit + carrierInRemote < 2) {
+    if (carrierInTransit + carrierInRemote < 3) {
       tasks.push(this.createCarrier(cap));
     }
 

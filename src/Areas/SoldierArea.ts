@@ -1,25 +1,26 @@
+import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
 import { CreepBase } from "../CreepBase";
 
-const SOLDIER_AREA_ID = "SoldierArea-Global";
 const SQUAD_SIZE = 5;
 
 enum PrimaryColor {
-  RED = COLOR_RED,
-  GREEN = COLOR_GREEN,
-  BLUE = COLOR_BLUE,
-  PURPLE = COLOR_PURPLE
+  RED = COLOR_RED, // Melee
+  GREEN = COLOR_GREEN, // Ranged
+  BLUE = COLOR_BLUE, // Healer
+  PURPLE = COLOR_PURPLE // Split (half Melee, half Ranged)
 }
 
 enum SecondaryColor {
-  RED = COLOR_RED,
-  GRAY = COLOR_GREY,
-  BLUE = COLOR_BLUE
+  RED = COLOR_RED, // Attack everything
+  GRAY = COLOR_GREY, // Attack structures only
+  BLUE = COLOR_BLUE, // Attack creeps only
+  WHITE = COLOR_WHITE // No attack (just move to flag)
 }
 
-interface AttackFlagConfig {
+export interface AttackFlagConfig {
   name: string;
   position: RoomPosition;
   targetRoom: string;
@@ -29,87 +30,39 @@ interface AttackFlagConfig {
   bodySegments: number | null;
 }
 
+/**
+ * One SoldierArea instance per Attack flag.
+ * areaId = flag.name, so BaseArea memory tracks this flag's creeps independently.
+ * Overseer calls SoldierArea.detectAllFlags() once, then creates one instance per flag.
+ */
 export default class SoldierArea extends BaseArea {
-  attackFlags: AttackFlagConfig[];
+  flag: AttackFlagConfig;
 
-  constructor() {
-    super(
-      "SoldierArea",
-      SOLDIER_AREA_ID,
-      new RoomPosition(25, 25, Object.keys(Game.rooms)[0]),
-      Game.rooms[Object.keys(Game.rooms)[0]]
-    );
-    this.attackFlags = this.detectFlags();
+  // ─── Static tick-guard so flag detection & task-clearing run only once ─────
+  private static detectedFlagsTick: number | null = null;
+  private static cachedFlags: AttackFlagConfig[] = [];
+
+  constructor(flag: AttackFlagConfig) {
+    super("SoldierArea", flag.name, flag.position, Game.rooms[flag.targetRoom]);
+    this.flag = flag;
+    this.migrateLegacySoldierFlag(flag.name);
   }
 
-  public handleSpawnTasks(): SpawnTask[] {
-    this.attackFlags = this.detectFlags();
+  // ─── Static: detect all Attack flags (cached per tick) ───────────────────
 
-    const tasksForThisArea: SpawnTask[] = [];
-    if (this.attackFlags.length === 0) {
-      return tasksForThisArea;
+  public static detectAllFlags(): AttackFlagConfig[] {
+    if (SoldierArea.detectedFlagsTick === Game.time) {
+      return SoldierArea.cachedFlags;
     }
+    SoldierArea.detectedFlagsTick = Game.time;
 
-    this.ensureSquadAssignments(this.attackFlags);
-
-    const deficits = this.attackFlags
-      .map(flag => ({
-        flag,
-        deficit: Math.max(0, flag.squadSize - this.getCreepsForFlag(flag.name).length)
-      }))
-      .filter(item => item.deficit > 0)
-      .sort((a, b) => b.deficit - a.deficit);
-
-    for (const item of deficits) {
-      const task = this.createCreepForFlag(item.flag);
-      if (task) {
-        tasksForThisArea.push(task);
-      }
-    }
-
-    return tasksForThisArea;
-  }
-
-  public handleThisArea(): void {
-    this.attackFlags = this.detectFlags();
-
-    if (this.attackFlags.length === 0) {
-      return;
-    }
-
-    this.drawLegend();
-
-    this.ensureSquadAssignments(this.attackFlags);
-
-    for (const flag of this.attackFlags) {
-      const squadCreeps = this.getCreepsForFlag(flag.name);
-      for (const creep of squadCreeps) {
-        if (!creep.isFree()) {
-          continue;
-        }
-
-        if (creep.pos.roomName !== flag.targetRoom) {
-          creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, flag.targetRoom)));
-          continue;
-        }
-
-        const combatAssigned = this.assignCombatTask(creep, flag.secondaryColor);
-        if (!combatAssigned) {
-          creep.addTask(new CreepTask(Activity.Move, flag.position));
-        }
-      }
-    }
-  }
-
-  private detectFlags(): AttackFlagConfig[] {
     const flags = _.filter(Game.flags, flag => flag.name === "Attack" || flag.name.startsWith("Attack-"));
-
     const currentStates: Record<string, SoldierFlagState> = {};
     const configs: AttackFlagConfig[] = [];
 
     for (const flag of flags) {
-      const parsed = this.parseAttackFlagName(flag.name);
-      const config: AttackFlagConfig = {
+      const parsed = SoldierArea.parseAttackFlagName(flag.name);
+      configs.push({
         name: flag.name,
         position: flag.pos,
         targetRoom: flag.pos.roomName,
@@ -117,8 +70,7 @@ export default class SoldierArea extends BaseArea {
         secondaryColor: flag.secondaryColor,
         squadSize: parsed.squadSize,
         bodySegments: parsed.bodySegments
-      };
-      configs.push(config);
+      });
       currentStates[flag.name] = {
         x: flag.pos.x,
         y: flag.pos.y,
@@ -129,113 +81,42 @@ export default class SoldierArea extends BaseArea {
     }
 
     const previousStates = Memory.soldierFlagStates ?? {};
+
     for (const flagName of Object.keys(currentStates)) {
       const prev = previousStates[flagName];
       const curr = currentStates[flagName];
-      if (!prev) {
-        continue;
-      }
-
+      if (!prev) continue;
       const changed =
         prev.color !== curr.color ||
         prev.secondaryColor !== curr.secondaryColor ||
         prev.x !== curr.x ||
         prev.y !== curr.y ||
         prev.roomName !== curr.roomName;
-
       if (changed) {
-        this.clearTasksForFlag(flagName);
+        SoldierArea.clearTasksForFlag(flagName);
       }
     }
 
     for (const flagName of Object.keys(previousStates)) {
       if (!currentStates[flagName]) {
-        this.clearTasksForFlag(flagName);
+        SoldierArea.clearTasksForFlag(flagName);
       }
     }
 
     Memory.soldierFlagStates = currentStates;
 
-    const validFlags = configs.filter(flag => flag.squadSize > 0);
+    const validFlags = configs.filter(c => c.squadSize > 0);
     validFlags.sort((a, b) => a.name.localeCompare(b.name));
+    SoldierArea.cachedFlags = validFlags;
     return validFlags;
   }
 
-  private parseAttackFlagName(name: string): { squadSize: number; bodySegments: number | null } {
-    if (name === "Attack") {
-      return { squadSize: SQUAD_SIZE, bodySegments: null };
-    }
+  // ─── Static: draw combined legend for all active flags ───────────────────
 
-    const parts = name.split("-");
-    const parsedSquad = parts[1];
-    const parsedSegments = parts[2];
-    const squadSize = /^\d+$/.test(parsedSquad) ? parseInt(parsedSquad, 10) : SQUAD_SIZE;
-    const bodySegments = /^\d+$/.test(parsedSegments) ? parseInt(parsedSegments, 10) : null;
-    return { squadSize, bodySegments };
-  }
+  public static drawLegend(soldierAreas: SoldierArea[], room: Room): void {
+    if (!room) return;
 
-  private clearTasksForFlag(flagName: string): void {
-    for (const creep of this.creeps) {
-      if (creep.memory.soldierFlag === flagName) {
-        creep.memory.task = null;
-        creep.task = undefined;
-      }
-    }
-  }
-
-  private ensureSquadAssignments(flags: AttackFlagConfig[]): void {
-    const activeNames = new Set(flags.map(flag => flag.name));
-
-    for (const creep of this.creeps) {
-      if (creep.memory.soldierFlag && !activeNames.has(creep.memory.soldierFlag)) {
-        creep.memory.soldierFlag = null;
-      }
-    }
-
-    const unassigned = this.creeps.filter(creep => !creep.memory.soldierFlag);
-    if (unassigned.length === 0) {
-      return;
-    }
-
-    for (const flag of flags) {
-      let missing = flag.squadSize - this.getCreepsForFlag(flag.name).length;
-      if (missing <= 0) {
-        continue;
-      }
-
-      for (let i = 0; i < unassigned.length && missing > 0; i++) {
-        if (unassigned[i].memory.soldierFlag) {
-          continue;
-        }
-        unassigned[i].memory.soldierFlag = flag.name;
-        missing--;
-      }
-    }
-  }
-
-  private getCreepsForFlag(flagName: string): CreepBase[] {
-    return this.creeps.filter(creep => creep.memory.soldierFlag === flagName);
-  }
-
-  private getRoleNameFromColor(primaryColor: number, existingCountInFlag: number, squadSize: number): string {
-    if (primaryColor === PrimaryColor.GREEN) {
-      return "Ranged";
-    }
-    if (primaryColor === PrimaryColor.BLUE) {
-      return "Healer";
-    }
-    if (primaryColor === PrimaryColor.PURPLE) {
-      return existingCountInFlag < Math.ceil(squadSize / 2) ? "Melee" : "Ranged";
-    }
-    return "Melee";
-  }
-
-  private drawLegend(): void {
-    if (!this.room) {
-      return;
-    }
-
-    const visual = this.room.visual;
+    const visual = room.visual;
     const x = 1;
     let y = 3;
     const plain: TextStyle = { align: "left", opacity: 0.85, font: 0.5 };
@@ -272,20 +153,18 @@ export default class SoldierArea extends BaseArea {
     visual.text("  BLUE -> Attack creeps only", x, y, plain);
     y += 0.9;
 
-    visual.text(`Active flags: ${this.attackFlags.length}`, x, y, header);
+    visual.text(`Active flags: ${soldierAreas.length}`, x, y, header);
     y += 0.7;
-    for (const flag of this.attackFlags) {
-      const role = this.getRoleNameFromColor(flag.primaryColor, 0, flag.squadSize);
+    for (const area of soldierAreas) {
+      const flag = area.flag;
+      const role = SoldierArea.getRoleNameFromColor(flag.primaryColor, 0, flag.squadSize);
       let targetType = "Everything";
-      if (flag.secondaryColor === SecondaryColor.GRAY) {
-        targetType = "Structures";
-      } else if (flag.secondaryColor === SecondaryColor.BLUE) {
-        targetType = "Creeps";
-      }
-      const assigned = this.getCreepsForFlag(flag.name).length;
+      if (flag.secondaryColor === SecondaryColor.GRAY) targetType = "Structures";
+      else if (flag.secondaryColor === SecondaryColor.BLUE) targetType = "Creeps";
+      else if (flag.secondaryColor === SecondaryColor.WHITE) targetType = "None";
       const segmentText = flag.bodySegments === null ? "default" : `${flag.bodySegments}`;
       visual.text(
-        `${flag.name}: squad ${assigned}/${flag.squadSize}, segments ${segmentText}, role ${role}, target ${targetType}, room ${flag.targetRoom}`,
+        `${flag.name}: squad ${area.creeps.length}/${flag.squadSize}, segments ${segmentText}, role ${role}, target ${targetType}, room ${flag.targetRoom}`,
         x,
         y,
         active
@@ -293,29 +172,117 @@ export default class SoldierArea extends BaseArea {
       y += 0.62;
     }
   }
-  private createCreepForFlag(flag: AttackFlagConfig): SpawnTask | null {
-    let bodyPartConstants: BodyPartConstant[] = [];
+
+  // ─── Instance: per-flag spawn tasks ──────────────────────────────────────
+
+  public handleSpawnTasks(): SpawnTask[] {
+    const dying = this.creeps.filter(c => c.ticksToLive && c.ticksToLive < 150).length;
+    const deficit = Math.max(0, this.flag.squadSize - this.creeps.length + dying);
+    const tasks: SpawnTask[] = [];
+    if (deficit > 0) {
+      const task = this.createCreepForFlag();
+      if (task) tasks.push(task);
+    }
+    return tasks;
+  }
+
+  // ─── Instance: per-flag creep handling ───────────────────────────────────
+
+  public handleThisArea(): void {
+    for (const creep of this.creeps) {
+      if (!creep.isFree()) continue;
+
+      if (creep.pos.roomName !== this.flag.targetRoom) {
+        creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.flag.targetRoom)));
+        continue;
+      }
+
+      const combatAssigned = this.assignCombatTask(creep, this.flag.secondaryColor);
+      if (!combatAssigned) {
+        creep.addTask(new CreepTask(Activity.Move, this.flag.position));
+      }
+    }
+  }
+
+  // ─── Private static helpers ───────────────────────────────────────────────
+
+  private static parseAttackFlagName(name: string): { squadSize: number; bodySegments: number | null } {
+    if (name === "Attack") {
+      return { squadSize: SQUAD_SIZE, bodySegments: null };
+    }
+    const parts = name.split("-");
+    const parsedSquad = parts[1];
+    const parsedSegments = parts[2];
+    const squadSize = /^\d+$/.test(parsedSquad) ? parseInt(parsedSquad, 10) : SQUAD_SIZE;
+    const bodySegments = /^\d+$/.test(parsedSegments) ? parseInt(parsedSegments, 10) : null;
+    return { squadSize, bodySegments };
+  }
+
+  private static clearTasksForFlag(flagName: string): void {
+    const key = `SoldierArea-${flagName}`;
+    const creepNames: string[] = Helper.getCashedMemory(key, []);
+    for (const name of creepNames) {
+      const creep = Game.creeps[name];
+      if (creep) {
+        creep.memory.task = null;
+      }
+    }
+  }
+
+  private static getRoleNameFromColor(primaryColor: number, existingCountInFlag: number, squadSize: number): string {
+    if (primaryColor === PrimaryColor.GREEN) return "Ranged";
+    if (primaryColor === PrimaryColor.BLUE) return "Healer";
+    if (primaryColor === PrimaryColor.PURPLE) {
+      return existingCountInFlag < Math.ceil(squadSize / 2) ? "Melee" : "Ranged";
+    }
+    return "Melee";
+  }
+
+  // ─── Private instance helpers ─────────────────────────────────────────────
+
+  /**
+   * Migrate existing creeps that carry memory.soldierFlag from the old global
+   * SoldierArea into this flag's BaseArea memory list. Safe to call every tick;
+   * the check is idempotent.
+   */
+  private migrateLegacySoldierFlag(flagName: string): void {
+    const key = `SoldierArea-${flagName}`;
+    const registeredNames: string[] = Helper.getCashedMemory(key, []);
+    let changed = false;
+    for (const name in Game.creeps) {
+      const creep = Game.creeps[name];
+      if (creep.memory.soldierFlag === flagName && !registeredNames.includes(name)) {
+        registeredNames.push(name);
+        changed = true;
+      }
+    }
+    if (changed) {
+      Helper.setCashedMemory(key, registeredNames);
+      this.creeps = this.getCreepsAssignedToThisArea();
+    }
+  }
+
+  private createCreepForFlag(): SpawnTask | null {
+    const role = SoldierArea.getRoleNameFromColor(this.flag.primaryColor, this.creeps.length, this.flag.squadSize);
+    let bodyPartConstants: BodyPartConstant[];
     let spawnType: SpawnType;
     let name: string;
-
-    const creepsForFlag = this.getCreepsForFlag(flag.name).length;
-    const role = this.getRoleNameFromColor(flag.primaryColor, creepsForFlag, flag.squadSize);
 
     switch (role) {
       case "Melee":
         spawnType = SpawnType.Melee;
         name = "Melee";
-        bodyPartConstants = this.createMeleeBody(flag.bodySegments ?? 1);
+        bodyPartConstants = this.createMeleeBody(this.flag.bodySegments ?? 1);
         break;
       case "Ranged":
         spawnType = SpawnType.Ranged;
         name = "Ranged";
-        bodyPartConstants = this.createRangedBody(flag.bodySegments ?? 1);
+        bodyPartConstants = this.createRangedBody(this.flag.bodySegments ?? 1);
         break;
       case "Healer":
         spawnType = SpawnType.Healer;
         name = "Healer";
-        bodyPartConstants = this.createHealerBody(flag.bodySegments ?? 1);
+        bodyPartConstants = this.createHealerBody(this.flag.bodySegments ?? 1);
         break;
       default:
         return null;
@@ -326,31 +293,24 @@ export default class SoldierArea extends BaseArea {
 
   private createMeleeBody(segments: number): BodyPartConstant[] {
     const body: BodyPartConstant[] = [];
-    for (let i = 0; i < segments; i++) {
-      body.push(ATTACK, MOVE); // ATTACK-80; MOVE-50 plain=1  road=1  swamp=5
-    }
+    for (let i = 0; i < segments; i++) body.push(ATTACK, MOVE); // ATTACK-80; MOVE-50 plain=1  road=1  swamp=5
     return body;
   }
 
-  private createRangedBody(forcedSegments: number): BodyPartConstant[] {
+  private createRangedBody(segments: number): BodyPartConstant[] {
     const body: BodyPartConstant[] = [];
-    for (let i = 0; i < forcedSegments; i++) {
-      body.push(RANGED_ATTACK, MOVE, MOVE, MOVE); // RANGED_ATTACK-150; Move x3-150 plain=1  road=1  swamp=2
-    }
+    for (let i = 0; i < segments; i++) body.push(RANGED_ATTACK, MOVE, MOVE, MOVE); // RANGED_ATTACK-150; Move x3-150 plain=1  road=1  swamp=2
     return body;
   }
 
-  private createHealerBody(forcedSegments: number): BodyPartConstant[] {
+  private createHealerBody(segments: number): BodyPartConstant[] {
     const body: BodyPartConstant[] = [];
-    for (let i = 0; i < forcedSegments; i++) {
-      body.push(HEAL, MOVE); // HEAL-200; MOVE-50  plain=1  road=1  swamp=5
-    }
+    for (let i = 0; i < segments; i++) body.push(HEAL, MOVE); // HEAL-200; MOVE-50  plain=1  road=1  swamp=5
     return body;
   }
 
   private assignCombatTask(creep: CreepBase, secondaryColor: number): boolean {
     const room = creep.room;
-
     switch (secondaryColor) {
       case SecondaryColor.RED:
         return this.attackEverything(creep, room);
@@ -358,6 +318,8 @@ export default class SoldierArea extends BaseArea {
         return this.attackStructures(creep, room);
       case SecondaryColor.BLUE:
         return this.attackCreeps(creep, room);
+      case SecondaryColor.WHITE:
+        return false; // No attack, just move to flag
       default:
         return this.attackEverything(creep, room);
     }
@@ -366,7 +328,6 @@ export default class SoldierArea extends BaseArea {
   private attackEverything(creep: CreepBase, room: Room): boolean {
     const enemyCreeps = room.find(FIND_HOSTILE_CREEPS);
     const enemyStructures = room.find(FIND_HOSTILE_STRUCTURES);
-
     if (enemyCreeps.length > 0) {
       const target = creep.pos.findClosestByRange(enemyCreeps);
       if (target) {
@@ -380,13 +341,11 @@ export default class SoldierArea extends BaseArea {
         return true;
       }
     }
-
     return false;
   }
 
   private attackStructures(creep: CreepBase, room: Room): boolean {
     const enemyStructures = room.find(FIND_HOSTILE_STRUCTURES);
-
     if (enemyStructures.length > 0) {
       const target = creep.pos.findClosestByRange(enemyStructures);
       if (target) {
@@ -394,13 +353,11 @@ export default class SoldierArea extends BaseArea {
         return true;
       }
     }
-
     return false;
   }
 
   private attackCreeps(creep: CreepBase, room: Room): boolean {
     const enemyCreeps = room.find(FIND_HOSTILE_CREEPS);
-
     if (enemyCreeps.length > 0) {
       const target = creep.pos.findClosestByRange(enemyCreeps);
       if (target) {
@@ -408,7 +365,6 @@ export default class SoldierArea extends BaseArea {
         return true;
       }
     }
-
     return false;
   }
 }
