@@ -270,7 +270,7 @@ export class CreepBase {
         if (structure3) {
           this.repair(structure3);
         }
-        if (this.carryCurrent === 0 || !structure3 || structure3.hits == structure3.hitsMax) {
+        if (this.carryCurrent === 0 || !structure3 || structure3.hits === structure3.hitsMax) {
           this.creep.say("Rep Done");
           this.task.taskDone = true;
         }
@@ -295,6 +295,65 @@ export class CreepBase {
         if (!entityToAttack || entityToAttack.hits === 0) {
           this.task.taskDone = true;
           this.creep.say("Enemy dead");
+        }
+        break;
+      }
+      case Activity.HarvestMineral: {
+        // targetPlace points at the mineral tile; targetPlaceSecond points at the container to deposit into.
+        const mineralAtPos = this.task.targetPlace.findInRange(FIND_MINERALS, 0)[0] as Mineral | undefined;
+        if (mineralAtPos && mineralAtPos.mineralAmount > 0) {
+          this.harvest(mineralAtPos);
+        }
+        if (this.task.targetPlaceSecond) {
+          const container = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlaceSecond);
+          if (container instanceof StructureContainer && this.store.getUsedCapacity() > 0) {
+            // Deposit any mineral into the container next to the mineral.
+            for (const resourceType in this.store) {
+              if ((this.store[resourceType as ResourceConstant] ?? 0) > 0) {
+                this.transfer(container, resourceType as ResourceConstant);
+                break;
+              }
+            }
+          }
+        }
+        // Task done when mineral is exhausted or container is full.
+        if (!mineralAtPos || mineralAtPos.mineralAmount === 0) {
+          this.creep.say("Min Done");
+          this.task.taskDone = true;
+        }
+        break;
+      }
+      case Activity.DepositMineral: {
+        // Move minerals from carry to storage; targetPlaceSecond carries the resource type name via targetId.
+        const storageStruct = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
+        if (storageStruct) {
+          const resourceType = (this.task.targetId ?? RESOURCE_ENERGY) as ResourceConstant;
+          const result = this.transfer(storageStruct, resourceType);
+          if (result === OK || result === ERR_FULL) {
+            this.creep.say("Min Dep Done");
+            this.task.taskDone = true;
+          }
+        }
+        if (this.store.getUsedCapacity() === 0) {
+          this.creep.say("Min Dep Done");
+          this.task.taskDone = true;
+        }
+        break;
+      }
+      case Activity.CollectMineral: {
+        // Withdraw a specific mineral type from a container at targetPlace; resource type in targetId.
+        const mineralContainer = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
+        const resourceType = (this.task.targetId ?? RESOURCE_ENERGY) as ResourceConstant;
+        if (mineralContainer) {
+          this.withdraw(mineralContainer, resourceType);
+        }
+        const amountLeft =
+          mineralContainer instanceof StructureContainer
+            ? mineralContainer.store.getUsedCapacity(resourceType) ?? 0
+            : 0;
+        if (this.store.getFreeCapacity() === 0 || !mineralContainer || amountLeft === 0) {
+          this.creep.say("Min Col Done");
+          this.task.taskDone = true;
         }
         break;
       }

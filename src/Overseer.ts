@@ -1,4 +1,5 @@
 import SourceArea from "Areas/SourceArea";
+import MineralArea from "Areas/MineralArea";
 import UpgradeArea from "Areas/UpgradeArea";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import CarryArea from "Areas/CarryArea";
@@ -46,7 +47,7 @@ export default class Overseer implements IOverseer {
     let remoteTasks: SpawnTask[] = [];
     for (const roomToReserve of roomsToReserve) {
       remoteTasks = remoteTasks.concat(
-        this.handleRemoteArea(roomToReserve.roomName, false, roomToReserve.baseRoomName)
+        this.handleRemoteArea(roomToReserve.roomName, false, roomToReserve.baseRoomName, roomToReserve.mineralOnly)
       );
     }
     for (const roomToClaim of roomsToClaim) {
@@ -125,6 +126,15 @@ export default class Overseer implements IOverseer {
       existing += sourceArea.creeps.length;
       sourceArea.handleThisArea();
     });
+
+    const mineral = GetRoomObjects.getRoomMineral(room, false);
+    if (mineral) {
+      const mineralArea = new MineralArea(mineral, room.controller);
+      tasks = tasks.concat(mineralArea.handleSpawnTasks());
+      existing += mineralArea.creeps.length;
+      mineralArea.handleThisArea();
+    }
+
     return { tasks, existing };
   }
 
@@ -184,9 +194,14 @@ export default class Overseer implements IOverseer {
     });
   }
 
-  private handleRemoteArea(roomName: string, claimThisRoom = false, baseRoomName?: string): SpawnTask[] {
+  private handleRemoteArea(
+    roomName: string,
+    claimThisRoom = false,
+    baseRoomName?: string,
+    mineralOnly = false
+  ): SpawnTask[] {
     let tasks: SpawnTask[] = [];
-    const remoteArea: RemoteArea = new RemoteArea(roomName, claimThisRoom, baseRoomName);
+    const remoteArea: RemoteArea = new RemoteArea(roomName, claimThisRoom, baseRoomName, mineralOnly);
     tasks = tasks.concat(remoteArea.handleSpawnTasks());
     remoteArea.handleThisArea();
     return tasks;

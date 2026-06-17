@@ -20,8 +20,12 @@ export default class RemoteArea extends BaseArea {
   carriersPerRoom: number;
   repairersPerRoom: number;
   claimThisRoom: boolean;
+  mineralOnly: boolean;
+  mineral: Mineral | null;
+  mineralContainer: StructureContainer | null;
+  mineralType: ResourceConstant | null;
 
-  constructor(roomName: string, claimThisRoom: boolean, baseRoomName?: string) {
+  constructor(roomName: string, claimThisRoom: boolean, baseRoomName?: string, mineralOnly = false) {
     super("RemoteArea", roomName, new RoomPosition(25, 25, roomName), Game.rooms[roomName]);
     this.roomName = roomName;
     this.baseRoom = this.findBaseRoom(baseRoomName);
@@ -45,16 +49,43 @@ export default class RemoteArea extends BaseArea {
     this.carriersPerRoom = claimThisRoom ? 0 : 1; // Default value, can be adjusted based on strategy
     this.repairersPerRoom = 1; // Default value, can be adjusted based on strategy
     this.claimThisRoom = claimThisRoom;
+    this.mineralOnly = mineralOnly;
+    this.mineral = null;
+    this.mineralContainer = null;
+    this.mineralType = null;
+
+    if (mineralOnly) {
+      this.claimersPerRoom = 0;
+      this.harvestersPerSource = 0;
+      this.carriersPerRoom = 0;
+      this.repairersPerRoom = 0;
+    }
 
     if (Game.rooms[roomName]) {
       this.sources = GetRoomObjects.getRoomSources(Game.rooms[roomName]);
       this.resources = GetRoomObjects.getRoomDroppedResources(Game.rooms[roomName]);
       this.updateContainers();
+      if (mineralOnly) {
+        this.mineral = GetRoomObjects.getRoomMineral(Game.rooms[roomName], false);
+        this.mineralContainer = this.mineral ? GetRoomObjects.getWithinRangeContainer(this.mineral.pos, 2) : null;
+        this.mineralType = this.mineral ? (this.mineral.mineralType as ResourceConstant) : null;
+      }
     }
   }
 
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
+
+    if (this.mineralOnly) {
+      if (this.getCreepCountByType("MineralHarvester") < 1) {
+        const task = this.createMineralHarvester();
+        if (task) tasksForThisArea.push(task);
+      }
+      if (this.getCreepCountByType("MineralCarrier") < 1) {
+        tasksForThisArea.push(this.createMineralCarrier());
+      }
+      return tasksForThisArea;
+    }
 
     // Handle Claimer spawning
     if (
@@ -105,7 +136,7 @@ export default class RemoteArea extends BaseArea {
       const creepType = this.getCreepType(this.creeps[i]);
 
       // Move to the remote room if not there (except for carriers who need to go to base)
-      if (this.creeps[i].pos.roomName !== this.roomName && creepType !== "Carrier") {
+      if (this.creeps[i].pos.roomName !== this.roomName && creepType !== "Carrier" && creepType !== "MineralCarrier") {
         this.creeps[i].addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.roomName)));
         continue;
       }
@@ -123,6 +154,12 @@ export default class RemoteArea extends BaseArea {
           break;
         case "Repairer":
           this.handleRepairer(this.creeps[i]);
+          break;
+        case "MineralHarvester":
+          this.handleMineralHarvester(this.creeps[i]);
+          break;
+        case "MineralCarrier":
+          this.handleMineralCarrier(this.creeps[i]);
           break;
         default:
           // Handle unknown creep type - default to claimer behavior
@@ -147,23 +184,45 @@ export default class RemoteArea extends BaseArea {
 
     visual.text("=== Remote Room ===", x, y, title);
     y += 0.7;
-    visual.text("Claimers " + this.getCreepCountByType("Claimer") + "/" + this.claimersPerRoom, x, y, plain);
-    y += 0.7;
-    visual.text(
-      "Harvesters " + this.getCreepCountByType("Harvester") + "/" + this.harvestersPerSource * this.sources.length,
-      x,
-      y,
-      plain
-    );
-    y += 0.7;
-    visual.text("Carriers " + this.getCreepCountByType("Carrier") + "/" + this.carriersPerRoom, x, y, plain);
-    y += 0.7;
-    visual.text("Repairers " + this.getCreepCountByType("Repairer") + "/" + this.repairersPerRoom, x, y, plain);
+    if (this.mineralOnly) {
+      visual.text("Mode: Mineral Only", x, y, plain);
+      y += 0.7;
+      visual.text("MineralHarvesters " + this.getCreepCountByType("MineralHarvester") + "/1", x, y, plain);
+      y += 0.7;
+      visual.text("MineralCarriers " + this.getCreepCountByType("MineralCarrier") + "/1", x, y, plain);
+      y += 0.7;
+      visual.text("Mineral: " + (this.mineralType ?? "unknown"), x, y, plain);
+    } else {
+      visual.text("Claimers " + this.getCreepCountByType("Claimer") + "/" + this.claimersPerRoom, x, y, plain);
+      y += 0.7;
+      visual.text(
+        "Harvesters " + this.getCreepCountByType("Harvester") + "/" + this.harvestersPerSource * this.sources.length,
+        x,
+        y,
+        plain
+      );
+      y += 0.7;
+      visual.text("Carriers " + this.getCreepCountByType("Carrier") + "/" + this.carriersPerRoom, x, y, plain);
+      y += 0.7;
+      visual.text("Repairers " + this.getCreepCountByType("Repairer") + "/" + this.repairersPerRoom, x, y, plain);
+    }
     y += 0.7;
     visual.text("The base room is " + this.baseRoom.name, x, y, plain);
   }
 
   private setup() {
+    if (this.mineralOnly) {
+      // In mineral mode, ensure a container exists next to the mineral deposit.
+      if (this.room && this.mineral && !this.mineralContainer) {
+        const site = GetRoomObjects.getWithinRangeConstructionSite(this.mineral.pos, 2, STRUCTURE_CONTAINER);
+        if (!site) {
+          const pos = Helper.getFreeAdjacentPositions(this.mineral.pos, this.room)[0];
+          if (pos) this.room.createConstructionSite(pos, STRUCTURE_CONTAINER);
+        }
+      }
+      return;
+    }
+
     for (const source of this.sources) {
       const container = GetRoomObjects.getWithinRangeContainer(source.pos, 2);
       const constructionSite = GetRoomObjects.getWithinRangeConstructionSite(source.pos, 1, STRUCTURE_CONTAINER);
@@ -200,6 +259,78 @@ export default class RemoteArea extends BaseArea {
       const flagName = `Attack-1-6-Invader-${this.roomName}`;
       targetPos.createFlag(flagName, COLOR_RED, COLOR_BLUE);
     }
+  }
+
+  private handleMineralHarvester(creep: CreepBase) {
+    if (!creep.isFree()) return;
+    if (creep.pos.roomName !== this.roomName) {
+      creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.roomName)));
+      return;
+    }
+    if (!this.mineral || !this.mineralContainer) return;
+    if (this.mineralContainer.store.getFreeCapacity() < 20) return;
+    creep.addTask(new CreepTask(Activity.HarvestMineral, this.mineral.pos, this.mineralContainer.pos));
+  }
+
+  private handleMineralCarrier(creep: CreepBase) {
+    if (!creep.isFree()) return;
+    const mineralType = this.mineralType;
+    if (!mineralType) return;
+
+    if (creep.pos.roomName === this.baseRoom.name) {
+      if (creep.store.getUsedCapacity() === 0) {
+        creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.roomName)));
+      } else {
+        const storage = GetRoomObjects.getRoomStorage(this.baseRoom);
+        if (storage && storage.store.getFreeCapacity() > 0) {
+          creep.addTask(new CreepTask(Activity.DepositMineral, storage.pos, null, mineralType));
+        }
+      }
+    } else if (creep.pos.roomName === this.roomName) {
+      if (creep.store.getUsedCapacity() > 0) {
+        creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.baseRoom.name)));
+      } else if (this.mineralContainer) {
+        const available = this.mineralContainer.store.getUsedCapacity(mineralType) ?? 0;
+        if (available > 0) {
+          creep.addTask(new CreepTask(Activity.CollectMineral, this.mineralContainer.pos, null, mineralType));
+        }
+      }
+    } else {
+      creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.roomName)));
+    }
+  }
+
+  private createMineralHarvester(): SpawnTask | null {
+    // Don't spawn if room is visible but lacks mineral or extractor.
+    if (this.room) {
+      if (!this.mineral) return null;
+      const extractor = this.mineral.pos.lookFor(LOOK_STRUCTURES).find(s => s.structureType === STRUCTURE_EXTRACTOR);
+      if (!extractor) return null;
+    }
+    const bodyPartConstants: BodyPartConstant[] = [WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE, MOVE];
+    return new SpawnTask(
+      SpawnType.Harvester,
+      this.areaId,
+      "MineralHarvester",
+      bodyPartConstants,
+      this,
+      "MinHarvester-" + this.roomName
+    );
+  }
+
+  private createMineralCarrier(): SpawnTask {
+    const segments = Math.min(12, Math.floor(this.baseRoom.energyCapacityAvailable / 100));
+    const bodyPartConstants: BodyPartConstant[] = [];
+    for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
+    for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
+    return new SpawnTask(
+      SpawnType.Carrier,
+      this.areaId,
+      "MineralCarrier",
+      bodyPartConstants,
+      this,
+      "MinCarrier-" + this.roomName
+    );
   }
 
   private handleClaimer(creep: CreepBase) {

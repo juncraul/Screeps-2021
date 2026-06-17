@@ -75,5 +75,8 @@ export enum Activity {
   Repair = 11,
   Attack = 12,
   RangedAttack = 13,
-  Heal = 14
+  Heal = 14,
+  HarvestMineral = 15,
+  DepositMineral = 16,
+  CollectMineral = 17
 }

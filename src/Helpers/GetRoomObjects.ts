@@ -12,13 +12,14 @@ export class GetRoomObjects {
     return _.filter(Game.creeps, creep => creep.spawning === includingSpawning);
   }
 
-  public static getAllRoomsToReserve(): { roomName: string; baseRoomName?: string }[] {
+  public static getAllRoomsToReserve(): { roomName: string; baseRoomName?: string; mineralOnly: boolean }[] {
     const flags = _.filter(Game.flags, flag => flag.color === COLOR_PURPLE && flag.name.startsWith("Reserve"));
-    const roomNames: { roomName: string; baseRoomName?: string }[] = [];
+    const roomNames: { roomName: string; baseRoomName?: string; mineralOnly: boolean }[] = [];
     flags.forEach(flag => {
       roomNames.push({
         roomName: flag.pos.roomName,
-        baseRoomName: this.getBaseRoomNameFromReserveFlag(flag.name)
+        baseRoomName: this.getBaseRoomNameFromReserveFlag(flag.name),
+        mineralOnly: flag.secondaryColor === COLOR_BLUE
       });
     });
     return roomNames;

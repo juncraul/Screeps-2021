@@ -16,6 +16,7 @@ export default class CarryArea extends BaseArea {
   collectFromGeneralStore: (StructureContainer | Ruin)[];
   collectFromLimitedStore: StructureLink[];
   droppedResourcesToCollectFrom: Resource[];
+  mineralContainersByType: { container: StructureContainer; resourceType: ResourceConstant }[];
 
   constructor(controller: StructureController) {
     super("CarryArea", controller.room.name, controller.pos, controller.room);
@@ -30,6 +31,7 @@ export default class CarryArea extends BaseArea {
     this.collectFromGeneralStore = this.getGeneralStoreToCollectFrom();
     this.collectFromLimitedStore = this.getLimitedStoreToCollectFrom();
     this.droppedResourcesToCollectFrom = this.getDroppedResourcesToCollectFrom(RESOURCE_ENERGY);
+    this.mineralContainersByType = this.getMineralContainers();
   }
 
   public handleSpawnTasks(): SpawnTask[] {
@@ -47,15 +49,74 @@ export default class CarryArea extends BaseArea {
     for (let i = 0; i < this.creeps.length; i++) {
       if (!this.creeps[i].isFree()) continue;
 
-      if (this.creeps[i].isEmpty()) {
-        this.findSomewhereToCollectFrom(this.creeps[i]);
+      const creep = this.creeps[i];
+
+      if (creep.isEmpty()) {
+        // If the creep was last carrying minerals, try to refill with minerals first.
+        if (this.tryCollectMineral(creep)) return;
+        this.findSomewhereToCollectFrom(creep);
       } else {
-        this.findSomewhereToDeposit(this.creeps[i]);
+        // Creep has something — decide which deposit logic to use based on what it's carrying.
+        const mineralResource = this.getCarriedMineralType(creep);
+        if (mineralResource) {
+          this.depositMineralToStorage(creep, mineralResource);
+        } else {
+          this.findSomewhereToDeposit(creep);
+        }
       }
     }
   }
 
   // ─── Private helpers ────────────────────────────────────────────────────────
+
+  private getCarriedMineralType(creep: CreepBase): ResourceConstant | null {
+    for (const resourceType in creep.store) {
+      if (resourceType !== RESOURCE_ENERGY && (creep.store[resourceType as ResourceConstant] ?? 0) > 0) {
+        return resourceType as ResourceConstant;
+      }
+    }
+    return null;
+  }
+
+  private tryCollectMineral(creep: CreepBase): boolean {
+    const storage = GetRoomObjects.getRoomStorage(this.room);
+    if (!storage) return false;
+
+    for (const { container, resourceType } of this.mineralContainersByType) {
+      const available = container.store.getUsedCapacity(resourceType);
+      if (available === null || available < creep.carryCapacity) {
+        // Not enough to fill the creep completely — skip mineral collection this trip.
+        continue;
+      }
+      if (storage.store.getFreeCapacity() === 0) continue;
+      creep.addTask(new CreepTask(Activity.Collect, container.pos));
+      // Store the mineral type in a memory slot so DepositMineral knows what to transfer.
+      creep.memory.currentMineralType = resourceType;
+      return true;
+    }
+    return false;
+  }
+
+  private depositMineralToStorage(creep: CreepBase, resourceType: ResourceConstant): void {
+    const storage = GetRoomObjects.getRoomStorage(this.room);
+    if (storage && storage.store.getFreeCapacity() > 0) {
+      creep.addTask(new CreepTask(Activity.DepositMineral, storage.pos, null, resourceType));
+    }
+  }
+
+  private getMineralContainers(): { container: StructureContainer; resourceType: ResourceConstant }[] {
+    const result: { container: StructureContainer; resourceType: ResourceConstant }[] = [];
+    if (this.controllerLevel < 6) return result;
+    const mineral = GetRoomObjects.getRoomMineral(this.room, false);
+    if (!mineral) return result;
+    const container = GetRoomObjects.getWithinRangeContainer(mineral.pos, 2);
+    if (!container) return result;
+    const mineralType = mineral.mineralType as ResourceConstant;
+    if (container.store.getUsedCapacity(mineralType)! > 0) {
+      result.push({ container, resourceType: mineralType });
+    }
+    return result;
+  }
 
   private findSomewhereToCollectFrom(creep: CreepBase): void {
     for (let j = 0; j < this.collectFromLimitedStore.length; j++) {

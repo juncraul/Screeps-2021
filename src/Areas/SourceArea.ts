@@ -2,30 +2,17 @@ import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
-import BaseArea from "./BaseArea";
+import HarvestArea from "./HarvestArea";
 
-export default class SourceArea extends BaseArea {
+export default class SourceArea extends HarvestArea {
   source: Source;
-  maxWorkerCount: number;
-  controllerLevel: number;
-  containerNextToSource: StructureContainer | null;
-  containerConstructionSiteNextToSource: ConstructionSite | null;
   linkNextToSource: StructureLink | null;
   linkConstructionSiteNextToSource: ConstructionSite | null;
   linksForDeposits: StructureLink[];
-  maxEmptySpaceAroundSource: number;
 
   constructor(source: Source, controller: StructureController) {
-    super("SourceArea", source.id, source.pos, source.room);
+    super("SourceArea", source.id, source.pos, controller);
     this.source = source;
-    this.maxWorkerCount = 1;
-    this.controllerLevel = controller.level;
-    this.containerNextToSource = GetRoomObjects.getWithinRangeContainer(source.pos, 2);
-    this.containerConstructionSiteNextToSource = GetRoomObjects.getWithinRangeConstructionSite(
-      source.pos,
-      1,
-      STRUCTURE_CONTAINER
-    );
     this.linkConstructionSiteNextToSource = GetRoomObjects.getWithinRangeConstructionSite(
       source.pos,
       1,
@@ -33,47 +20,20 @@ export default class SourceArea extends BaseArea {
     );
     this.linkNextToSource = GetRoomObjects.getWithinRangeLink(source.pos, 2);
     this.linksForDeposits = this.populateLinksForDeposits();
-    this.maxEmptySpaceAroundSource = Helper.getFreeAdjacentPositions(this.source.pos, this.room).length;
-  }
-
-  public handleSpawnTasks(): SpawnTask[] {
-    const tasksForThisArea: SpawnTask[] = [];
-    let allowedWorkerCount =
-      this.maxWorkerCount + this.getNumberOfDyingCreeps() + (this.doWeNeedToReplaceWeakCreep() ? 1 : 0);
-    allowedWorkerCount = this.containerConstructionSiteNextToSource
-      ? allowedWorkerCount + this.maxEmptySpaceAroundSource - 1 // We can have more creeps if there is a construction site for a container, because they can stand around the source and build it at the same time.
-      : allowedWorkerCount; // If there is a construction site for a container, we want to spawn an extra creep to help build it.
-    if (this.creeps.length < allowedWorkerCount) {
-      const task: SpawnTask | null = this.createCreepForThisArea();
-      if (task) {
-        tasksForThisArea.push(task);
-      }
-    }
-    return tasksForThisArea;
   }
 
   public handleThisArea() {
-    this.handleSetup();
-    this.handleCreeps();
+    super.handleThisArea();
     this.handleLinks();
-    this.checkForSuicide();
   }
 
-  private handleSetup() {
-    // Make sure we have a container next to the source
-    if (!this.containerNextToSource && !this.containerConstructionSiteNextToSource) {
-      const positionForContainer = Helper.getFreeAdjacentPositions(this.source.pos, this.room)[0];
-      if (positionForContainer) {
-        this.room.createConstructionSite(positionForContainer, STRUCTURE_CONTAINER);
-      } else {
-        console.log("SourceArea: No position for container next to source");
-      }
-    }
+  protected handleSetup() {
+    super.handleSetup();
 
     // After controller level 5, we want to build links next to the source
     if (this.controllerLevel >= 5) {
-      if (!this.linkNextToSource && !this.linkConstructionSiteNextToSource && this.containerNextToSource) {
-        const positionForLink = Helper.getFreeAdjacentPositions(this.containerNextToSource.pos, this.room)[0];
+      if (!this.linkNextToSource && !this.linkConstructionSiteNextToSource && this.containerNextToHarvestArea) {
+        const positionForLink = Helper.getFreeAdjacentPositions(this.containerNextToHarvestArea.pos, this.room)[0];
         if (positionForLink) {
           this.room.createConstructionSite(positionForLink, STRUCTURE_LINK);
         } else {
@@ -83,32 +43,34 @@ export default class SourceArea extends BaseArea {
     }
   }
 
-  private handleCreeps() {
+  protected handleCreeps() {
     for (let i = 0; i < this.creeps.length; i++) {
       if (!this.creeps[i].isFree()) continue;
 
       if (this.creeps[i].isFull()) {
-        if (this.containerConstructionSiteNextToSource) {
-          this.creeps[i].addTask(new CreepTask(Activity.Construct, this.containerConstructionSiteNextToSource.pos));
+        if (this.containerConstructionSiteNextToHarvestArea) {
+          this.creeps[i].addTask(
+            new CreepTask(Activity.Construct, this.containerConstructionSiteNextToHarvestArea.pos)
+          );
         }
-        if (this.containerNextToSource) {
-          this.creeps[i].addTask(new CreepTask(Activity.Deposit, this.containerNextToSource.pos));
+        if (this.containerNextToHarvestArea) {
+          this.creeps[i].addTask(new CreepTask(Activity.Deposit, this.containerNextToHarvestArea.pos));
         }
       } else {
         // When we are not full or partial full
-        if (this.containerConstructionSiteNextToSource) {
+        if (this.containerConstructionSiteNextToHarvestArea) {
           this.creeps[i].addTask(new CreepTask(Activity.Harvest, this.source.pos));
-        } else if (this.linkNextToSource && this.containerNextToSource) {
-          if (!Helper.isSamePosition(this.containerNextToSource.pos, this.creeps[i].pos)) {
-            this.creeps[i].addTask(new CreepTask(Activity.Move, this.containerNextToSource.pos));
+        } else if (this.linkNextToSource && this.containerNextToHarvestArea) {
+          if (!Helper.isSamePosition(this.containerNextToHarvestArea.pos, this.creeps[i].pos)) {
+            this.creeps[i].addTask(new CreepTask(Activity.Move, this.containerNextToHarvestArea.pos));
           } else {
             this.creeps[i].addTask(
               new CreepTask(Activity.HarvestAndDeposit, this.source.pos, this.linkNextToSource.pos)
             );
           }
-        } else if (this.containerNextToSource) {
-          if (!Helper.isSamePosition(this.containerNextToSource.pos, this.creeps[i].pos)) {
-            this.creeps[i].addTask(new CreepTask(Activity.Move, this.containerNextToSource.pos));
+        } else if (this.containerNextToHarvestArea) {
+          if (!Helper.isSamePosition(this.containerNextToHarvestArea.pos, this.creeps[i].pos)) {
+            this.creeps[i].addTask(new CreepTask(Activity.Move, this.containerNextToHarvestArea.pos));
           } else {
             this.creeps[i].addTask(new CreepTask(Activity.Harvest, this.source.pos));
           }
@@ -124,12 +86,6 @@ export default class SourceArea extends BaseArea {
       this.linkNextToSource.transferEnergy(this.linksForDeposits[i]);
       break;
     }
-  }
-
-  private hasCarryCreepsInRoom(): boolean {
-    const carryAreaMemoryKey = `CarryArea-${this.room.name}`;
-    const carryCreepNames = Helper.getCashedMemory(carryAreaMemoryKey, []);
-    return carryCreepNames.length > 0;
   }
 
   private populateLinksForDeposits(): StructureLink[] {
@@ -158,7 +114,7 @@ export default class SourceArea extends BaseArea {
     return links;
   }
 
-  private createCreepForThisArea(): SpawnTask | null {
+  protected createCreepForThisArea(): SpawnTask | null {
     let bodyPartConstants: BodyPartConstant[] = [];
     const buildCheapestCreep = this.creeps.length === 0 || !this.hasCarryCreepsInRoom(); // We might get in a deadend where resources will never be more available.
     if (this.linkNextToSource) {
@@ -168,7 +124,7 @@ export default class SourceArea extends BaseArea {
         // 5 X Work; 3 X Move; 1 X Carry. 700 Ene. Walk time empty/full: plain=2/2 road=1/1 swamp=9/10
         bodyPartConstants = [WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, CARRY];
       }
-    } else if (this.containerNextToSource) {
+    } else if (this.containerNextToHarvestArea) {
       let segments = Math.floor(this.room.energyCapacityAvailable / 150); // Work-100; Move-50
       segments = buildCheapestCreep ? Math.floor(this.room.energyAvailable / 150) : segments;
       if (segments < 2) {
@@ -206,31 +162,7 @@ export default class SourceArea extends BaseArea {
     return new SpawnTask(SpawnType.Harvester, this.source.id, "Harvester", bodyPartConstants, this);
   }
 
-  private doWeNeedToReplaceWeakCreep(): boolean {
-    if (this.creeps.length !== 1) {
-      return false; // We might need to create a weak one instead if there 0, or we replace a dead one if there are more than 1
-    }
-    const creep = this.creeps[0];
-    if (creep.body.length < 5 && this.room.energyCapacityAvailable >= 450) {
-      // We want to replace weak creeps when we have the capacity to spawn stronger ones, otherwise we might get in a deadend where resources will never be more available.
-      return true;
-    }
-    return false;
-  }
-
-  private checkForSuicide() {
-    // If a fresh creep arrived at the source and we need to replace the old one, we should suicide the old one
-    if (this.creeps.length <= 1) return;
-    const mostFreshCreep = this.creeps.reduce((prev, current) =>
-      prev.ticksToLive! > current.ticksToLive! ? prev : current
-    );
-    const finalStageCreep = mostFreshCreep.body.length >= 5;
-    const isTheReplacementCreepCloseToSource = mostFreshCreep.pos.getRangeTo(this.source) <= 2;
-    for (const creep of this.creeps) {
-      if (creep.id !== mostFreshCreep.id && finalStageCreep && isTheReplacementCreepCloseToSource) {
-        creep.suicide();
-        continue;
-      }
-    }
+  protected doWeNeedToReplaceWeakCreep(): boolean {
+    return super.doWeNeedToReplaceWeakCreep();
   }
 }

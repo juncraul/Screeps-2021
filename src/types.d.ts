@@ -7,6 +7,7 @@ interface CreepMemory {
   seasonSpawnRoom?: string;
   soldierFlag?: string | null;
   formationOrder?: number | null;
+  currentMineralType?: string | null;
 }
 interface SoldierFlagState {
   x: number;
