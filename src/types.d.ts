@@ -6,6 +6,7 @@ interface CreepMemory {
   task: any;
   seasonSpawnRoom?: string;
   soldierFlag?: string | null;
+  formationOrder?: number | null;
 }
 interface SoldierFlagState {
   x: number;

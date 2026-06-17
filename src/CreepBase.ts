@@ -610,4 +610,29 @@ export class CreepBase {
   //     }
   //     return bodyParts;
   //   }
+
+  public transferCreepToArea(areaIdFrom: string, areaIdTo: string): void {
+    this.registerCreepToArea(areaIdTo);
+    this.removeCreepFromThisArea(areaIdFrom);
+  }
+
+  /** Add a creep to an area's memory list (idempotent). */
+  private registerCreepToArea(areaId: string): void {
+    const creepNames: string[] = Helper.getCashedMemory(areaId, []);
+    if (!creepNames.includes(this.creep.name)) {
+      creepNames.push(this.creep.name);
+      Helper.setCashedMemory(areaId, creepNames);
+    }
+  }
+
+  /** Remove a creep name from this area's memory list. */
+  private removeCreepFromThisArea(areaId: string): void {
+    const key = `RemoteRebuildArea-${areaId}`;
+    const creepNames: string[] = Helper.getCashedMemory(key, []);
+    const idx = creepNames.indexOf(this.creep.name);
+    if (idx !== -1) {
+      creepNames.splice(idx, 1);
+      Helper.setCashedMemory(key, creepNames);
+    }
+  }
 }

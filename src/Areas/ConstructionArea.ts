@@ -55,6 +55,9 @@ export default class ConstructionArea extends BaseArea {
         const constructionArea = this.getConstructionClosestByPoint(this.creeps[i].pos);
         if (constructionArea) {
           this.creeps[i].addTask(new CreepTask(Activity.Construct, constructionArea.pos));
+        } else {
+          // If there are no construction sites, then we should change this creep's role to repairer.
+          this.creeps[i].transferCreepToArea(this.areaId, "RepairArea-" + this.room.name);
         }
       }
     }

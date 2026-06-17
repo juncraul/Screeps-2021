@@ -373,7 +373,7 @@ export default class RemoteArea extends BaseArea {
   private findBaseRoom(baseRoomName?: string): Room {
     if (baseRoomName && RemoteArea.ROOM_NAME_PATTERN.test(baseRoomName)) {
       const requestedRoom = Game.rooms[baseRoomName];
-      if (requestedRoom && requestedRoom.controller && requestedRoom.controller.my) {
+      if (requestedRoom) {
         const requestedRoomSpawns = GetRoomObjects.getRoomSpawns(requestedRoom, true);
         if (requestedRoomSpawns.length > 0) {
           return requestedRoom;

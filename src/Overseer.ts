@@ -208,7 +208,14 @@ export default class Overseer implements IOverseer {
     const flags = SoldierArea.detectAllFlags();
     if (flags.length === 0) return [];
 
-    const soldierAreas = flags.map(flag => new SoldierArea(flag));
+    const soldierAreas = flags
+      .filter(flag => !flag.baseRoomName || flag.baseRoomName === room.name)
+      .map(flag => new SoldierArea(flag));
+
+    if (soldierAreas.length === 0) {
+      return [];
+    }
+
     const tasks: SpawnTask[] = [];
 
     for (const area of soldierAreas) {

@@ -85,49 +85,19 @@ export default class RemoteRebuildArea extends BaseArea {
     if (!remoteRoom) return;
 
     const role = creep.memory.role;
-    let transferred = false;
 
     if (role === "Constructor") {
-      this.registerCreepToArea("ConstructionArea", this.remoteRoomName, creep.name);
-      transferred = true;
+      creep.transferCreepToArea(this.areaId, "ConstructionArea-" + this.remoteRoomName);
     } else if (role === "Carrier") {
-      this.registerCreepToArea("CarryArea", this.remoteRoomName, creep.name);
-      transferred = true;
+      creep.transferCreepToArea(this.areaId, "CarryArea-" + this.remoteRoomName);
     } else if (role === "Harvester") {
       const sources = GetRoomObjects.getRoomSources(remoteRoom);
       const targetSource = this.findSourceWithFewestHarvesters(sources);
       if (targetSource) {
-        this.registerCreepToArea("SourceArea", targetSource.id, creep.name);
-        transferred = true;
+        creep.transferCreepToArea(this.areaId, "SourceArea-" + targetSource.id);
       }
     } else if (role === "Upgrader" && remoteRoom.controller) {
-      this.registerCreepToArea("UpgradeArea", remoteRoom.controller.id, creep.name);
-      transferred = true;
-    }
-
-    if (transferred) {
-      this.removeCreepFromThisArea(creep.name);
-    }
-  }
-
-  /** Add a creep name to an area's memory list (idempotent). */
-  private registerCreepToArea(memoryType: string, areaId: string, creepName: string): void {
-    const key = `${memoryType}-${areaId}`;
-    const creepNames: string[] = Helper.getCashedMemory(key, []);
-    if (!creepNames.includes(creepName)) {
-      creepNames.push(creepName);
-      Helper.setCashedMemory(key, creepNames);
-    }
-  }
-
-  /** Remove a creep name from this area's memory list. */
-  private removeCreepFromThisArea(creepName: string): void {
-    const key = `RemoteRebuildArea-${this.areaId}`;
-    const creepNames: string[] = Helper.getCashedMemory(key, []);
-    const idx = creepNames.indexOf(creepName);
-    if (idx !== -1) {
-      creepNames.splice(idx, 1);
-      Helper.setCashedMemory(key, creepNames);
+      creep.transferCreepToArea(this.areaId, "UpgradeArea-" + remoteRoom.controller.id);
     }
   }
 
