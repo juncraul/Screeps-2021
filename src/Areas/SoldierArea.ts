@@ -40,7 +40,7 @@ export interface AttackFlagConfig {
 export default class SoldierArea extends BaseArea {
   flag: AttackFlagConfig;
 
-  // ─── Static tick-guard so flag detection & task-clearing run only once ─────
+  // Static tick-guard so flag detection & task-clearing run only once
   private static detectedFlagsTick: number | null = null;
   private static cachedFlags: AttackFlagConfig[] = [];
 
@@ -50,7 +50,7 @@ export default class SoldierArea extends BaseArea {
     this.migrateLegacySoldierFlag(flag.name);
   }
 
-  // ─── Static: detect all Attack flags (cached per tick) ───────────────────
+  // Static: detect all Attack flags (cached per tick)
 
   public static detectAllFlags(): AttackFlagConfig[] {
     if (SoldierArea.detectedFlagsTick === Game.time) {
@@ -114,7 +114,7 @@ export default class SoldierArea extends BaseArea {
     return validFlags;
   }
 
-  // ─── Static: draw combined legend for all active flags ───────────────────
+  // Static: draw combined legend for all active flags
 
   public static drawLegend(soldierAreas: SoldierArea[], room: Room): void {
     if (!room) return;
@@ -177,7 +177,7 @@ export default class SoldierArea extends BaseArea {
     }
   }
 
-  // ─── Instance: per-flag spawn tasks ──────────────────────────────────────
+  // Instance: per-flag spawn tasks
 
   public handleSpawnTasks(): SpawnTask[] {
     const dying = this.creeps.filter(c => c.ticksToLive && c.ticksToLive < 150).length;
@@ -190,15 +190,12 @@ export default class SoldierArea extends BaseArea {
     return tasks;
   }
 
-  // ─── Instance: per-flag creep handling ───────────────────────────────────
+  // Instance: per-flag creep handling
 
   public handleThisArea(): void {
     this.runHealerSupport();
 
-    const formationMovement = this.shouldUseFormationMovement();
-    if (formationMovement) {
-      this.tryMoveAsFormation();
-    }
+    const formationMovementApplied = this.shouldUseFormationMovement() && this.tryMoveAsFormation();
 
     for (const creep of this.creeps) {
       if (!creep.isFree()) continue;
@@ -210,14 +207,14 @@ export default class SoldierArea extends BaseArea {
 
       if (creep.roleName !== "Healer") {
         const combatAssigned = this.assignCombatTask(creep, this.flag.secondaryColor);
-        if (!combatAssigned && !formationMovement) {
+        if (!combatAssigned && !formationMovementApplied) {
           creep.addTask(new CreepTask(Activity.Move, this.flag.position));
         }
       }
     }
   }
 
-  // ─── Private static helpers ───────────────────────────────────────────────
+  // Private static helpers
 
   private static parseAttackFlagName(
     name: string
@@ -259,7 +256,7 @@ export default class SoldierArea extends BaseArea {
     return "Melee";
   }
 
-  // ─── Private instance helpers ─────────────────────────────────────────────
+  // Private instance helpers
 
   /**
    * Migrate existing creeps that carry memory.soldierFlag from the old global
@@ -320,7 +317,7 @@ export default class SoldierArea extends BaseArea {
 
   private createRangedBody(segments: number): BodyPartConstant[] {
     const body: BodyPartConstant[] = [];
-    for (let i = 0; i < segments; i++) body.push(RANGED_ATTACK, MOVE, MOVE, MOVE); // RANGED_ATTACK-150; Move x3-150 plain=1  road=1  swamp=2
+    for (let i = 0; i < segments; i++) body.push(RANGED_ATTACK, MOVE); // RANGED_ATTACK-150; Move-50 plain=1  road=1  swamp=5
     return body;
   }
 
@@ -368,13 +365,15 @@ export default class SoldierArea extends BaseArea {
   }
 
   private shouldUseFormationMovement(): boolean {
-    if (this.creeps.length <= 1) {
+    const freeCreeps = this.creeps.filter(creep => creep.isFree());
+    if (freeCreeps.length < 4) {
       return false;
     }
 
-    // Formation only when all squad members are in the same room and not already fighting.
-    const roomName = this.creeps[0].pos.roomName;
-    if (!this.creeps.every(creep => creep.pos.roomName === roomName)) {
+    const ordered = this.getOrderedFormationCreeps(freeCreeps);
+    const quad = ordered.slice(0, 4);
+    const roomName = quad[0].pos.roomName;
+    if (!quad.every(creep => creep.pos.roomName === roomName)) {
       return false;
     }
 
@@ -382,75 +381,48 @@ export default class SoldierArea extends BaseArea {
   }
 
   private tryMoveAsFormation(): boolean {
+    const freeCreeps = this.creeps.filter(creep => creep.isFree());
+    if (freeCreeps.length < 4) {
+      return false;
+    }
+
+    const ordered = this.getOrderedFormationCreeps(freeCreeps);
+    const quad = ordered.slice(0, 4);
+    const leader = quad[0];
+
     const destination =
-      this.creeps[0].pos.roomName === this.flag.targetRoom
+      leader.pos.roomName === this.flag.targetRoom
         ? this.flag.position
         : new RoomPosition(25, 25, this.flag.targetRoom);
 
-    const leader = this.creeps.slice().sort((a, b) => a.pos.getRangeTo(destination) - b.pos.getRangeTo(destination))[0];
-    const leaderDirection = leader.pos.getDirectionTo(destination);
-    let step = this.getStepOffset(leaderDirection);
+    if (!this.isQuadAssembled(quad)) {
+      this.regroupQuad(quad, leader.pos);
+      return true;
+    }
+
+    const direction = this.getLeaderDirectionForQuadPath(leader, destination, quad);
+    if (!direction) {
+      return false;
+    }
+
+    const step = this.getStepOffset(direction);
     if (!step) {
-      // return false;
-      step = { dx: 0, dy: 0 }; // If leader is already at destination, just keep current formation.
+      return false;
     }
 
-    // Keep member ordering stable so each creep tends to keep its slot.
-    const unassignedCreeps = this.creeps.filter(
-      creep => creep.memory.formationOrder === null || creep.memory.formationOrder === undefined
-    );
-    if (unassignedCreeps.length > 0) {
-      const orderedByDistance = this.creeps
-        .slice()
-        .sort((a, b) => a.pos.getRangeTo(leader.pos) - b.pos.getRangeTo(leader.pos));
-      for (let i = 0; i < orderedByDistance.length; i++) {
-        orderedByDistance[i].memory.formationOrder = i;
-      }
+    const nextLeader = new RoomPosition(leader.pos.x + step.dx, leader.pos.y + step.dy, leader.pos.roomName);
+    const nextSquare = this.getSquareSlots(nextLeader);
+    const room = Game.rooms[nextLeader.roomName];
+    if (!room) {
+      return false;
     }
 
-    const ordered = this.creeps.slice().sort((a, b) => (a.memory.formationOrder ?? 0) - (b.memory.formationOrder ?? 0));
-    const leaderNext = new RoomPosition(leader.pos.x + step.dx, leader.pos.y + step.dy, leader.pos.roomName);
-
-    // Try square movement first (2x2). We require extra terrain buffer around the square
-    // to avoid hugging walls and getting stuck.
-    const squareAnchors: RoomPosition[] = [
-      new RoomPosition(leaderNext.x, leaderNext.y, leaderNext.roomName),
-      new RoomPosition(leaderNext.x - 1, leaderNext.y, leaderNext.roomName),
-      new RoomPosition(leaderNext.x, leaderNext.y - 1, leaderNext.roomName),
-      new RoomPosition(leaderNext.x - 1, leaderNext.y - 1, leaderNext.roomName)
-    ];
-
-    let selectedSquareSlots: RoomPosition[] | null = null;
-    for (const anchor of squareAnchors) {
-      const candidateSlots = this.getSquareSlots(anchor);
-      if (!this.areSquareSlotsWalkableWithBuffer(candidateSlots)) {
-        continue;
+    if (this.isSquareValid(nextSquare, new Set(quad.map(creep => creep.name)))) {
+      for (const creep of quad) {
+        creep.creep.move(direction);
       }
-      selectedSquareSlots = candidateSlots;
-      break;
-    }
-
-    if (selectedSquareSlots) {
-      const slotsForSquad: RoomPosition[] = [];
-      for (let i = 0; i < ordered.length; i++) {
-        if (i < 4) {
-          slotsForSquad.push(selectedSquareSlots[i]);
-        } else {
-          // Extra members trail behind the square in a line.
-          slotsForSquad.push(
-            new RoomPosition(
-              selectedSquareSlots[0].x - step.dx * (i - 3),
-              selectedSquareSlots[0].y - step.dy * (i - 3),
-              selectedSquareSlots[0].roomName
-            )
-          );
-        }
-      }
-
-      const room = Game.rooms[leaderNext.roomName];
-      for (let i = 0; i < ordered.length; i++) {
-        ordered[i].creep.move(leaderDirection);
-        room.visual.text(`${i}`, slotsForSquad[i].x, slotsForSquad[i].y, {
+      for (let i = 0; i < quad.length; i++) {
+        room.visual.text(`${i}`, nextSquare[i].x, nextSquare[i].y, {
           align: "center",
           opacity: 0.8,
           font: 0.5,
@@ -458,24 +430,226 @@ export default class SoldierArea extends BaseArea {
           backgroundColor: "#000000"
         });
       }
-      return true;
+    } else {
+      // Narrow path fallback: still use one shared directional move so creeps do not scatter.
+      const lineSlots = this.getLineSlots(nextLeader, quad.length, step);
+      for (const creep of quad) {
+        creep.creep.move(direction);
+      }
+      for (let i = 0; i < quad.length; i++) {
+        room.visual.text(`${i}`, lineSlots[i].x, lineSlots[i].y, {
+          align: "center",
+          opacity: 0.8,
+          font: 0.5,
+          color: "#ffcc00",
+          backgroundColor: "#000000"
+        });
+      }
     }
 
-    // If we are in a narrow path, break formation into a line and continue moving.
-    const lineSlots = this.getLineSlots(leaderNext, ordered.length, step);
-    const room = Game.rooms[leaderNext.roomName];
-    for (let i = 0; i < ordered.length; i++) {
-      ordered[i].creep.move(leaderDirection);
-      room.visual.text(`${i}`, lineSlots[i].x, lineSlots[i].y, {
-        align: "center",
-        opacity: 0.8,
-        font: 0.5,
-        color: "#ffcc00",
-        backgroundColor: "#000000"
-      });
+    // Non-quad members trail behind the leader with normal moveTo.
+    for (const trailing of ordered.slice(4)) {
+      trailing.creep.moveTo(leader.pos, { reusePath: 0, range: 1 });
     }
 
     return true;
+  }
+
+  private getOrderedFormationCreeps(creeps: CreepBase[]): CreepBase[] {
+    const unassigned = creeps.filter(
+      creep => creep.memory.formationOrder === null || creep.memory.formationOrder === undefined
+    );
+    if (unassigned.length > 0) {
+      const orderedByDistance = creeps
+        .slice()
+        .sort((a, b) => a.pos.getRangeTo(this.flag.position) - b.pos.getRangeTo(this.flag.position));
+      for (let i = 0; i < orderedByDistance.length; i++) {
+        orderedByDistance[i].memory.formationOrder = i;
+      }
+    }
+
+    return creeps.slice().sort((a, b) => (a.memory.formationOrder ?? 0) - (b.memory.formationOrder ?? 0));
+  }
+
+  private isQuadAssembled(quad: CreepBase[]): boolean {
+    const leader = quad[0];
+    const expectedSlots = this.getSquareSlots(leader.pos);
+    const occupied = new Set(quad.map(creep => `${creep.pos.x}:${creep.pos.y}:${creep.pos.roomName}`));
+    return expectedSlots.every(slot => occupied.has(`${slot.x}:${slot.y}:${slot.roomName}`));
+  }
+
+  private regroupQuad(quad: CreepBase[], leaderPos: RoomPosition): void {
+    const room = Game.rooms[leaderPos.roomName];
+    if (!room) {
+      return;
+    }
+
+    const slots = this.findBestRegroupSlots(quad, leaderPos);
+    if (!slots) {
+      return;
+    }
+
+    for (let i = 0; i < quad.length; i++) {
+      quad[i].creep.moveTo(slots[i], { reusePath: 0, range: 0 });
+      room.visual.text(`${i}`, slots[i].x, slots[i].y, {
+        align: "center",
+        opacity: 0.8,
+        font: 0.5,
+        color: "#66ccff",
+        backgroundColor: "#000000"
+      });
+    }
+  }
+
+  private findBestRegroupSlots(quad: CreepBase[], leaderPos: RoomPosition): RoomPosition[] | null {
+    const room = Game.rooms[leaderPos.roomName];
+    if (!room) {
+      return null;
+    }
+
+    const squadNames = new Set(quad.map(creep => creep.name));
+    const searchRadius = 3;
+    const minX = Math.max(1, leaderPos.x - searchRadius);
+    const maxX = Math.min(48, leaderPos.x + searchRadius);
+    const minY = Math.max(1, leaderPos.y - searchRadius);
+    const maxY = Math.min(48, leaderPos.y + searchRadius);
+
+    let bestSlots: RoomPosition[] | null = null;
+    let bestScore = Infinity;
+
+    for (let x = minX; x <= maxX; x++) {
+      for (let y = minY; y <= maxY; y++) {
+        const anchor = new RoomPosition(x, y, leaderPos.roomName);
+        const slots = this.getSquareSlots(anchor);
+        if (!this.isSquareValid(slots, squadNames)) {
+          continue;
+        }
+
+        const score = this.getQuadRegroupScore(quad, slots, leaderPos);
+        if (score < bestScore) {
+          bestScore = score;
+          bestSlots = slots;
+        }
+      }
+    }
+
+    return bestSlots;
+  }
+
+  private getQuadRegroupScore(quad: CreepBase[], slots: RoomPosition[], leaderPos: RoomPosition): number {
+    const followerIndexes = [1, 2, 3];
+    const followerSlotPermutations: number[][] = [
+      [1, 2, 3],
+      [1, 3, 2],
+      [2, 1, 3],
+      [2, 3, 1],
+      [3, 1, 2],
+      [3, 2, 1]
+    ];
+
+    // Keep the first creep as leader at slot[0], then choose the cheapest assignment for followers.
+    const leaderTravel = quad[0].pos.getRangeTo(slots[0]);
+    let bestFollowerTravel = Infinity;
+
+    for (const permutation of followerSlotPermutations) {
+      let travel = 0;
+      for (let i = 0; i < followerIndexes.length; i++) {
+        const creepIndex = followerIndexes[i];
+        const slotIndex = permutation[i];
+        travel += quad[creepIndex].pos.getRangeTo(slots[slotIndex]);
+      }
+      if (travel < bestFollowerTravel) {
+        bestFollowerTravel = travel;
+      }
+    }
+
+    // Prefer anchors near the current leader position when costs tie.
+    const leaderAnchorOffset = leaderPos.getRangeTo(slots[0]);
+    return leaderTravel + bestFollowerTravel + leaderAnchorOffset * 0.1;
+  }
+
+  private getLeaderDirectionForQuadPath(
+    leader: CreepBase,
+    destination: RoomPosition,
+    quad: CreepBase[]
+  ): DirectionConstant | null {
+    const squadNames = new Set(quad.map(creep => creep.name));
+    const result = PathFinder.search(
+      leader.pos,
+      { pos: destination, range: 0 },
+      {
+        plainCost: 2,
+        swampCost: 10,
+        maxOps: 5000,
+        roomCallback: roomName => {
+          const room = Game.rooms[roomName];
+          if (!room) {
+            return false;
+          }
+
+          const costs = new PathFinder.CostMatrix();
+          const terrain = room.getTerrain();
+          const blocked = new Set<string>();
+
+          const structures = room.find(FIND_STRUCTURES);
+          for (const structure of structures) {
+            if (
+              structure.structureType === STRUCTURE_ROAD ||
+              structure.structureType === STRUCTURE_CONTAINER ||
+              structure.structureType === STRUCTURE_RAMPART
+            ) {
+              continue;
+            }
+            blocked.add(`${structure.pos.x}:${structure.pos.y}`);
+          }
+
+          const hostileCreeps = room.find(FIND_HOSTILE_CREEPS);
+          for (const hostile of hostileCreeps) {
+            blocked.add(`${hostile.pos.x}:${hostile.pos.y}`);
+          }
+
+          const creeps = room.find(FIND_CREEPS);
+          for (const creep of creeps) {
+            if (squadNames.has(creep.name)) {
+              continue;
+            }
+            blocked.add(`${creep.pos.x}:${creep.pos.y}`);
+          }
+
+          for (let x = 0; x < 50; x++) {
+            for (let y = 0; y < 50; y++) {
+              // Keep anchor away from edges so 2x2 always remains inside room.
+              if (x < 1 || x > 48 || y < 1 || y > 48) {
+                costs.set(x, y, 255);
+                continue;
+              }
+
+              const squareBlocked =
+                terrain.get(x, y) === TERRAIN_MASK_WALL ||
+                terrain.get(x + 1, y) === TERRAIN_MASK_WALL ||
+                terrain.get(x, y + 1) === TERRAIN_MASK_WALL ||
+                terrain.get(x + 1, y + 1) === TERRAIN_MASK_WALL ||
+                blocked.has(`${x}:${y}`) ||
+                blocked.has(`${x + 1}:${y}`) ||
+                blocked.has(`${x}:${y + 1}`) ||
+                blocked.has(`${x + 1}:${y + 1}`);
+
+              if (squareBlocked) {
+                costs.set(x, y, 255);
+              }
+            }
+          }
+
+          return costs;
+        }
+      }
+    );
+
+    if (result.incomplete || result.path.length === 0) {
+      return null;
+    }
+
+    return leader.pos.getDirectionTo(result.path[0]);
   }
 
   private getStepOffset(direction: DirectionConstant): { dx: number; dy: number } | null {
@@ -522,7 +696,7 @@ export default class SoldierArea extends BaseArea {
     return slots;
   }
 
-  private areSquareSlotsWalkableWithBuffer(slots: RoomPosition[]): boolean {
+  private isSquareValid(slots: RoomPosition[], squadNames: Set<string>): boolean {
     if (slots.length !== 4) {
       return false;
     }
@@ -530,9 +704,6 @@ export default class SoldierArea extends BaseArea {
     const room = Game.rooms[slots[0].roomName];
     if (!room) return false;
 
-    const squadNames = new Set(this.creeps.map(creep => creep.name));
-
-    // First: all four square slots must be walkable.
     for (const slot of slots) {
       if (slot.x < 1 || slot.x > 48 || slot.y < 1 || slot.y > 48) {
         return false;
@@ -557,24 +728,6 @@ export default class SoldierArea extends BaseArea {
       const otherCreeps = slot.lookFor(LOOK_CREEPS);
       if (otherCreeps.some(creep => !squadNames.has(creep.name))) {
         return false;
-      }
-    }
-
-    // Extra terrain layer: the 1-tile ring around the square must not contain walls.
-    const minX = Math.min(...slots.map(slot => slot.x));
-    const maxX = Math.max(...slots.map(slot => slot.x));
-    const minY = Math.min(...slots.map(slot => slot.y));
-    const maxY = Math.max(...slots.map(slot => slot.y));
-
-    for (let x = minX - 1; x <= maxX + 1; x++) {
-      for (let y = minY - 1; y <= maxY + 1; y++) {
-        if (x < 1 || x > 48 || y < 1 || y > 48) {
-          return false;
-        }
-        const terrain = room.getTerrain().get(x, y);
-        if (terrain === TERRAIN_MASK_WALL) {
-          return false;
-        }
       }
     }
 

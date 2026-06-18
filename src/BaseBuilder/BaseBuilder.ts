@@ -481,14 +481,18 @@ export class BaseBuilder {
               costs.set(structure.pos.x, structure.pos.y, 1);
             } else if (
               structure.structureType !== STRUCTURE_CONTAINER &&
-              (structure.structureType !== STRUCTURE_RAMPART || !structure.my)
+              structure.structureType !== STRUCTURE_RAMPART
             ) {
               costs.set(structure.pos.x, structure.pos.y, 255);
             }
           });
 
           room.find(FIND_CONSTRUCTION_SITES).forEach(site => {
-            if (site.structureType !== STRUCTURE_ROAD && site.structureType !== STRUCTURE_CONTAINER) {
+            if (
+              site.structureType !== STRUCTURE_ROAD &&
+              site.structureType !== STRUCTURE_CONTAINER &&
+              site.structureType !== STRUCTURE_RAMPART
+            ) {
               costs.set(site.pos.x, site.pos.y, 255);
             }
           });

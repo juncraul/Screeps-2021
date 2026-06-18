@@ -3,6 +3,7 @@ import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
 import { CreepBase } from "CreepBase";
+import { Helper } from "Helpers/Helper";
 
 export default class CarryArea extends BaseArea {
   controller: StructureController;
@@ -36,7 +37,10 @@ export default class CarryArea extends BaseArea {
 
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
-    if (this.creeps.length < this.maxWorkerCount + this.getNumberOfDyingCreeps()) {
+    if (
+      this.creeps.length <
+      this.maxWorkerCount + this.getNumberOfDyingCreeps() + (this.doWeNeedToReplaceWeakCreep() ? 1 : 0)
+    ) {
       const task: SpawnTask | null = this.createCreepForThisArea();
       if (task) {
         tasksForThisArea.push(task);
@@ -140,6 +144,21 @@ export default class CarryArea extends BaseArea {
   }
 
   private findSomewhereToDeposit(creep: CreepBase): void {
+    // Check if we have an utility creep in UtilityArea
+    const creepsInUtilityArea = Helper.getCreepNamesFromArea("UtilityArea", this.room.name);
+    if (creepsInUtilityArea && creepsInUtilityArea.length > 0) {
+      if (!this.depositToFirstGeneralStore(creep)) {
+        this.depositToFirstLimitedStore(creep);
+      }
+    } else {
+      console.log(`CarryArea: UtilityArea in room ${this.room.name} has no creeps. Depositing to limited store first.`);
+      if (!this.depositToFirstLimitedStore(creep)) {
+        this.depositToFirstGeneralStore(creep);
+      }
+    }
+  }
+
+  private depositToFirstLimitedStore(creep: CreepBase): boolean {
     const depositToLimitedStoreSorted = this.depositToLimitedStore.sort((a, b) => {
       const aIsTower = a.structureType === STRUCTURE_TOWER;
       const bIsTower = b.structureType === STRUCTURE_TOWER;
@@ -152,14 +171,18 @@ export default class CarryArea extends BaseArea {
     for (let j = 0; j < depositToLimitedStoreSorted.length; j++) {
       if (depositToLimitedStoreSorted[j].store.getFreeCapacity(RESOURCE_ENERGY) === 0) continue;
       creep.addTask(new CreepTask(Activity.Deposit, depositToLimitedStoreSorted[j].pos));
-      return;
+      return true;
     }
+    return false;
+  }
 
+  private depositToFirstGeneralStore(creep: CreepBase): boolean {
     for (let j = 0; j < this.depositToGeneralStore.length; j++) {
-      if (this.depositToGeneralStore[j].store.getFreeCapacity(RESOURCE_ENERGY) === 0) continue;
+      if (this.depositToGeneralStore[j].store.getFreeCapacity(RESOURCE_ENERGY) < 1000) continue;
       creep.addTask(new CreepTask(Activity.Deposit, this.depositToGeneralStore[j].pos));
-      return;
+      return true;
     }
+    return false;
   }
 
   private getGeneralDeposits(): StructureContainer[] {
@@ -189,7 +212,8 @@ export default class CarryArea extends BaseArea {
 
   private createCreepForThisArea(): SpawnTask | null {
     const bodyPartConstants: BodyPartConstant[] = [];
-    let segments = Math.floor(this.room.energyCapacityAvailable / 100); // Carry-50; Move-50
+    const leaveAmountEnergyUnused = this.room.energyCapacityAvailable / 100 > 10 ? 300 : 0; // Don't wait for a full refill if we have a lot of energy capacity, but if we have less than 1000 energy capacity, wait for a full refill.
+    let segments = Math.floor((this.room.energyCapacityAvailable - leaveAmountEnergyUnused) / 100); // Carry-50; Move-50
     if (this.creeps.length === 0) {
       // Note: In this situation, there is no way to fill extensions
       // Use energyAvailable to setup the segments with 3 as a cap. A.k.a. wait till Spawn has 300 energy.
@@ -204,5 +228,16 @@ export default class CarryArea extends BaseArea {
     }
 
     return new SpawnTask(SpawnType.Carrier, this.areaId, "Carrier", bodyPartConstants, this);
+  }
+
+  protected doWeNeedToReplaceWeakCreep(): boolean {
+    if (this.creeps.length !== 1) {
+      return false;
+    }
+    const creep = this.creeps[0];
+    if (creep.body.length <= 6 && this.room.energyCapacityAvailable >= 450) {
+      return true;
+    }
+    return false;
   }
 }

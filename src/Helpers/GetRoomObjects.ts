@@ -12,26 +12,36 @@ export class GetRoomObjects {
     return _.filter(Game.creeps, creep => creep.spawning === includingSpawning);
   }
 
-  public static getAllRoomsToReserve(): { roomName: string; baseRoomName?: string; mineralOnly: boolean }[] {
+  public static getAllRoomsToReserve(
+    baseRoom?: Room
+  ): { roomName: string; baseRoomName?: string; mineralOnly: boolean }[] {
     const flags = _.filter(Game.flags, flag => flag.color === COLOR_PURPLE && flag.name.startsWith("Reserve"));
     const roomNames: { roomName: string; baseRoomName?: string; mineralOnly: boolean }[] = [];
     flags.forEach(flag => {
+      const baseRoomNameFlag = this.getBaseRoomNameFromReserveFlag(flag.name);
+      if (baseRoom && baseRoomNameFlag !== baseRoom.name) {
+        return;
+      }
       roomNames.push({
         roomName: flag.pos.roomName,
-        baseRoomName: this.getBaseRoomNameFromReserveFlag(flag.name),
+        baseRoomName: baseRoomNameFlag,
         mineralOnly: flag.secondaryColor === COLOR_BLUE
       });
     });
     return roomNames;
   }
 
-  public static getAllRoomsToClaim(): { roomName: string; baseRoomName?: string }[] {
+  public static getAllRoomsToClaim(baseRoom?: Room): { roomName: string; baseRoomName?: string }[] {
     const flags = _.filter(Game.flags, flag => flag.color === COLOR_BLUE && flag.name.startsWith("Reserve"));
     const roomNames: { roomName: string; baseRoomName?: string }[] = [];
     flags.forEach(flag => {
+      const baseRoomNameFlag = this.getBaseRoomNameFromReserveFlag(flag.name);
+      if (baseRoom && baseRoomNameFlag !== baseRoom.name) {
+        return;
+      }
       roomNames.push({
         roomName: flag.pos.roomName,
-        baseRoomName: this.getBaseRoomNameFromReserveFlag(flag.name)
+        baseRoomName: baseRoomNameFlag
       });
     });
     return roomNames;

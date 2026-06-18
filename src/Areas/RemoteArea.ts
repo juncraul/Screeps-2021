@@ -111,7 +111,7 @@ export default class RemoteArea extends BaseArea {
 
     // Handle Carrier spawning
     const carrierCount = this.getCreepCountByType("Carrier");
-    if (carrierCount < this.carriersPerRoom) {
+    if (carrierCount < this.carriersPerRoom && this.containers.length > 0) {
       tasksForThisArea.push(this.createCarrier());
     }
 
@@ -131,6 +131,7 @@ export default class RemoteArea extends BaseArea {
     this.drawLegend();
 
     for (let i = 0; i < this.creeps.length; i++) {
+      this.suicideCreepDueToBrokenParts(this.creeps[i]);
       if (!this.creeps[i].isFree()) continue;
 
       const creepType = this.getCreepType(this.creeps[i]);
@@ -711,7 +712,13 @@ export default class RemoteArea extends BaseArea {
 
   private createCarrier(): SpawnTask {
     const bodyPartConstants: BodyPartConstant[] = [];
-    const segments = Math.min(12, Math.floor(this.baseRoom.energyCapacityAvailable / 100));
+    let maxSegments = this.containers.length >= 2 ? 40 : 30; // For one container - 1500 Store capacity, for two or more containers - 2000 Store capacity
+    const totalEnergyInContainers = this.containers.reduce(
+      (sum, container) => sum + container.store.getUsedCapacity(RESOURCE_ENERGY),
+      0
+    );
+    maxSegments = totalEnergyInContainers < 1000 ? 10 : maxSegments / 2; // If total energy in containers is less than 1000, spawn a smaller carrier to avoid wasting energy on a large carrier that can't be filled.
+    const segments = Math.min(maxSegments, Math.floor(this.baseRoom.energyCapacityAvailable / 100));
     for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
     for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
     return new SpawnTask(
@@ -738,5 +745,16 @@ export default class RemoteArea extends BaseArea {
       this,
       "Repairer-" + this.roomName
     );
+  }
+
+  private suicideCreepDueToBrokenParts(creep: CreepBase): boolean {
+    if (creep.hits < creep.hitsMax / 2 && creep.willSuicideAtTick === undefined) {
+      console.log(
+        `Creep ${creep.name} is critically damaged and will be suicided soon if not repaired. Current hits: ${creep.hits}/${creep.hitsMax}`
+      );
+      creep.addSuicideTime(Game.time + 10); // Give it 10 ticks to get repaired
+      return true;
+    }
+    return false;
   }
 }

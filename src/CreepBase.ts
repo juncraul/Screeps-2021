@@ -25,6 +25,7 @@ export class CreepBase {
   // public lifetime: number;
   public actionLog: { [actionName: string]: boolean }; // Tracks the actions that a creep has completed this tick
   public task: CreepTask | undefined;
+  public willSuicideAtTick: number | undefined; // If set, the creep will suicide at this tick
 
   public constructor(creep: Creep) {
     this.creep = creep;
@@ -50,11 +51,17 @@ export class CreepBase {
     this.actionLog = {};
     this.task = creep.memory.task as CreepTask | undefined;
     // this.task.targetPlace = new RoomPosition(this.task.targetPlace.x, this.task.targetPlace.y, this.task.targetPlace.roomName)//This to make it back to an object
+    this.willSuicideAtTick = creep.memory.willSuicideAtTick;
   }
 
   public addTask(task: CreepTask): void {
     this.task = task;
     this.creep.memory.task = task;
+  }
+
+  public addSuicideTime(tick: number): void {
+    this.willSuicideAtTick = tick;
+    this.creep.memory.willSuicideAtTick = tick;
   }
 
   public workTheTask(): void {
@@ -358,6 +365,15 @@ export class CreepBase {
         break;
       }
     }
+
+    // Check if needs to suicide
+    if (this.willSuicideAtTick) {
+      this.creep.say(`Dead in ${this.willSuicideAtTick - Game.time}`);
+      if (Game.time >= this.willSuicideAtTick) {
+        this.creep.say("💀");
+        this.suicide();
+      }
+    }
   }
 
   public build(structure: ConstructionSite): ScreepsReturnCode {
@@ -510,6 +526,13 @@ export class CreepBase {
   }
 
   public upgradeController(controller: StructureController): ScreepsReturnCode {
+    if (Game.time % 100 === 0 && controller.sign?.username !== Helper.getUserName()) {
+      const result = this.creep.signController(controller, "Upgraded by me!");
+      if (result === ERR_NOT_IN_RANGE) {
+        this.goTo(controller.pos);
+      }
+      return result;
+    }
     const result = this.creep.upgradeController(controller);
     if (result === ERR_NOT_IN_RANGE) {
       this.goTo(controller.pos);
@@ -526,6 +549,13 @@ export class CreepBase {
   }
 
   public reserve(controller: StructureController): ScreepsReturnCode {
+    if (Game.time % 100 === 0 && controller.sign?.username !== Helper.getUserName()) {
+      const result = this.creep.signController(controller, "Reserved by me, no touchy touchy!");
+      if (result === ERR_NOT_IN_RANGE) {
+        this.goTo(controller.pos);
+      }
+      return result;
+    }
     const result = this.creep.reserveController(controller);
     if (result === ERR_NOT_IN_RANGE) {
       this.goTo(controller.pos);

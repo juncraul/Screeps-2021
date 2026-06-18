@@ -64,7 +64,7 @@ export default class CarryArea extends BaseArea {
     //   filter: (structure) => structure.structureType === STRUCTURE_SPAWN
     // }) as StructureSpawn[];
     const towers = this.room.find(FIND_MY_STRUCTURES, {
-      filter: structure => structure.structureType === STRUCTURE_TOWER
+      filter: structure => structure.structureType === STRUCTURE_TOWER && structure.store.getFreeCapacity(RESOURCE_ENERGY) < 950
     }) as StructureTower[];
 
     const structures = [...extensions, ...towers].filter(
@@ -87,6 +87,6 @@ export default class CarryArea extends BaseArea {
       for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
       for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
     }
-    return new SpawnTask(SpawnType.Carrier, this.areaId, "Carrier", bodyPartConstants, this);
+    return new SpawnTask(SpawnType.Carrier, this.areaId, "Utility", bodyPartConstants, this);
   }
 }

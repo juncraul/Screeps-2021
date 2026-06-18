@@ -8,6 +8,7 @@ interface CreepMemory {
   soldierFlag?: string | null;
   formationOrder?: number | null;
   currentMineralType?: string | null;
+  willSuicideAtTick?: number | undefined;
 }
 interface SoldierFlagState {
   x: number;

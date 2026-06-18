@@ -90,7 +90,9 @@ export default abstract class HarvestArea extends BaseArea {
     const isTheReplacementCreepCloseToHarvestArea = mostFreshCreep.pos.getRangeTo(this.harvestPosition) <= 2;
     for (const creep of this.creeps) {
       if (creep.id !== mostFreshCreep.id && finalStageCreep && isTheReplacementCreepCloseToHarvestArea) {
-        creep.suicide();
+        if (creep.willSuicideAtTick === undefined) {
+          creep.addSuicideTime(Game.time + 3); // Give it 3 ticks before suicide
+        }
       }
     }
   }

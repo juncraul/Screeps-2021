@@ -45,4 +45,9 @@ export class Helper {
     }
     return adjacentPositions;
   }
+
+  public static getCreepNamesFromArea(areaType: string, roomName: string): string[] {
+    const creeps: string[] = Helper.getCashedMemory(`${areaType}-${roomName}`, []);
+    return creeps;
+  }
 }

@@ -31,8 +31,8 @@ export default class Overseer implements IOverseer {
   }
 
   private overseeRoom(room: Room): SpawnTask[] {
-    const roomsToReserve = GetRoomObjects.getAllRoomsToReserve();
-    const roomsToClaim = GetRoomObjects.getAllRoomsToClaim();
+    const roomsToReserve = GetRoomObjects.getAllRoomsToReserve(room);
+    const roomsToClaim = GetRoomObjects.getAllRoomsToClaim(room);
     const harvest = this.handleHarvestArea(room);
     const carry = this.handleCarryArea(room);
     const upgrade = this.handleUpgradeArea(room);

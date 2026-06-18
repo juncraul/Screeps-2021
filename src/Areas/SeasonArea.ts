@@ -180,83 +180,52 @@ export default class SeasonArea extends BaseArea {
 
     const roomNames = Object.values(adjacentRooms).filter(room => room !== undefined) as string[];
 
-    // Prioritize unexplored rooms that aren't enemy rooms
-    const unexploredSafeRooms = roomNames.filter(
-      room => !this.exploredRooms.has(room) // && !this.enemyRooms.has(room)
-    );
-
-    if (unexploredSafeRooms.length > 0) {
-      // Return a random unexplored safe room
-      return unexploredSafeRooms[Math.floor(Math.random() * unexploredSafeRooms.length)];
-    }
-
-    // If all adjacent rooms are explored, try to find a path to unexplored rooms
-    // Disabled enemy avoidance
-    // for (const room of roomNames) {
-    //   if (!this.enemyRooms.has(room)) {
-    //     const pathToUnexplored = this.findPathToUnexplored(room);
-    //     if (pathToUnexplored) {
-    //       return pathToUnexplored;
-    //     }
-    //   }
-    // }
-
-    // Try to find any path to unexplored rooms, even through enemy rooms (last resort)
-    for (const room of roomNames) {
-      const pathToUnexplored = this.findPathToUnexplored(room);
-      if (pathToUnexplored) {
-        return pathToUnexplored;
-      }
-    }
-
-    // All reachable rooms are fully explored — pick the least-recently explored adjacent
-    // room so the creep can exit dead-ends and eventually re-explore expired rooms.
-    let oldestRoom: string | null = null;
-    let oldestTick = Infinity;
-    for (const room of roomNames) {
-      const exploredAt = this.exploredRooms.get(room) ?? 0;
-      if (exploredAt < oldestTick) {
-        oldestTick = exploredAt;
-        oldestRoom = room;
-      }
-    }
-    return oldestRoom;
+    return this.pickAdjacentRoomWeightedByLastVisited(roomNames);
   }
 
-  private findPathToUnexplored(startRoom: string): string | null {
-    const visited = new Set<string>();
-    const queue: string[] = [startRoom];
-    visited.add(startRoom);
+  private pickAdjacentRoomWeightedByLastVisited(adjacentRooms: string[]): string | null {
+    if (adjacentRooms.length === 0) {
+      return null;
+    }
 
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      const exits = Game.map.describeExits(current);
+    const currentTick = Game.time;
+    const weights: number[] = [];
 
-      if (exits) {
-        for (const direction of Object.values(exits)) {
-          if (!direction) continue;
+    for (const roomName of adjacentRooms) {
+      const exploredAt = this.exploredRooms.get(roomName);
 
-          if (!this.exploredRooms.has(direction) && !this.enemyRooms.has(direction)) {
-            return direction;
-          }
+      // Prefer rooms that are stale or never visited.
+      const ageWeight = exploredAt === undefined ? EXPLORATION_EXPIRATION_TICKS : Math.max(1, currentTick - exploredAt);
 
-          if (!visited.has(direction) && !this.enemyRooms.has(direction)) {
-            visited.add(direction);
-            queue.push(direction);
-          }
-        }
+      // Enemy rooms are still allowed, just less likely.
+      const enemyPenalty = this.enemyRooms.has(roomName) ? 0.25 : 1;
+      weights.push(ageWeight * enemyPenalty);
+    }
+
+    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+    if (totalWeight <= 0) {
+      return adjacentRooms[Math.floor(Math.random() * adjacentRooms.length)];
+    }
+
+    let roll = Math.random() * totalWeight;
+    for (let i = 0; i < adjacentRooms.length; i++) {
+      roll -= weights[i];
+      if (roll <= 0) {
+        return adjacentRooms[i];
       }
     }
 
-    return null;
+    return adjacentRooms[adjacentRooms.length - 1];
   }
 
   private isEnemyRoom(roomName: string): boolean {
     const room = Game.rooms[roomName];
     if (!room) return false;
 
-    // Check for enemy structures
-    const enemyStructures = room.find(FIND_HOSTILE_STRUCTURES);
+    // Check for enemy structure towers or spawns as a strong signal of an enemy room.
+    const enemyStructures = room.find(FIND_HOSTILE_STRUCTURES, {
+      filter: { structureType: STRUCTURE_TOWER }
+    });
     if (enemyStructures.length > 0) return true;
 
     return false;
