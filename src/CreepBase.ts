@@ -168,7 +168,8 @@ export class CreepBase {
           targetCollect instanceof StructureContainer ||
           targetCollect instanceof StructureStorage ||
           targetCollect instanceof StructureTerminal ||
-          targetCollect instanceof StructureLab
+          targetCollect instanceof StructureLab ||
+          targetCollect instanceof Ruin
         ) {
           if (targetCollect.store.energy === 0) {
             this.creep.say("Col Done");
@@ -177,7 +178,6 @@ export class CreepBase {
         } else if (
           targetCollect instanceof StructureLink ||
           targetCollect instanceof StructureExtension ||
-          targetCollect instanceof StructureLab ||
           targetCollect instanceof StructureSpawn ||
           targetCollect instanceof StructureTower
         ) {

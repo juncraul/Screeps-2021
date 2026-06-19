@@ -133,12 +133,12 @@ export default class CarryArea extends BaseArea {
       (a, b) => a.pos.getRangeTo(creep.pos.x, creep.pos.y) - b.pos.getRangeTo(creep.pos.x, creep.pos.y)
     );
     for (let j = 0; j < collectFromGeneralStoreSorted.length; j++) {
-      if (collectFromGeneralStoreSorted[j].store.energy < 200) continue;
+      if (collectFromGeneralStoreSorted[j].store.energy < creep.carryCapacity / 2) continue;
       creep.addTask(new CreepTask(Activity.Collect, collectFromGeneralStoreSorted[j].pos));
       return;
     }
     for (let j = 0; j < this.droppedResourcesToCollectFrom.length; j++) {
-      if (this.droppedResourcesToCollectFrom[j].amount < 200) continue;
+      if (this.droppedResourcesToCollectFrom[j].amount < creep.carryCapacity / 2) continue;
       creep.addTask(new CreepTask(Activity.Pickup, this.droppedResourcesToCollectFrom[j].pos));
       return;
     }

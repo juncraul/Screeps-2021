@@ -89,8 +89,9 @@ export default class CarryArea extends BaseArea {
       console.log(`Error: Trying to spawn a carrier with segments ${segments} less than 1`);
       return null;
     } else {
+      const moveParts = segments / 2;
       for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
-      for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
+      for (let i = 0; i < moveParts; i++) bodyPartConstants.push(MOVE);
     }
     return new SpawnTask(SpawnType.Carrier, this.areaId, "Utility", bodyPartConstants, this);
   }

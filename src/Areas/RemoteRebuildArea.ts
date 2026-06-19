@@ -35,7 +35,7 @@ export default class RemoteRebuildArea extends BaseArea {
     const baseRoom = Game.rooms[this.baseRoomName];
     if (!baseRoom) return tasks;
 
-    const cap = baseRoom.energyCapacityAvailable;
+    const cap = baseRoom.energyCapacityAvailable - 300;
     const remoteRoom = Game.rooms[this.remoteRoomName];
 
     // For each role check: in-transit count + already-registered count in the remote room.
@@ -152,10 +152,10 @@ export default class RemoteRebuildArea extends BaseArea {
 
   /**
    * Carrier body: mirrors CarryArea.createCreepForThisArea.
-   * Pattern: n×CARRY + n×MOVE, n capped at 14 (1400 energy max, 28 parts).
+   * Pattern: n×CARRY + n×MOVE, n capped at 30 (1500 energy spawn, 1500 store).
    */
   private createCarrier(energyCapacity: number): SpawnTask {
-    const n = Math.max(1, Math.min(14, Math.floor(energyCapacity / 100)));
+    const n = Math.max(1, Math.min(30, Math.floor(energyCapacity / 100)));
     const body: BodyPartConstant[] = [];
     for (let i = 0; i < n; i++) body.push(CARRY);
     for (let i = 0; i < n; i++) body.push(MOVE);

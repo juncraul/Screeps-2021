@@ -234,7 +234,7 @@ export default class Overseer implements IOverseer {
     const tasks: SpawnTask[] = [];
 
     for (const area of soldierAreas) {
-      tasks.push(...area.handleSpawnTasks());
+      tasks.push(...area.handleSpawnTasks(room));
       area.handleThisArea();
     }
 

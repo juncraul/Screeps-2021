@@ -32,12 +32,23 @@ export default class SourceArea extends HarvestArea {
 
     // After controller level 5, we want to build links next to the source
     if (this.controllerLevel >= 5) {
+      const linksBuiltAlreadyInRoom = this.room.find(FIND_STRUCTURES, {
+        filter: structure => structure.structureType === STRUCTURE_LINK
+      }).length;
+      const linksToBeBuiltAlreadyInRoom = this.room.find(FIND_CONSTRUCTION_SITES, {
+        filter: structure => structure.structureType === STRUCTURE_LINK
+      }).length;
       if (!this.linkNextToSource && !this.linkConstructionSiteNextToSource && this.containerNextToHarvestArea) {
-        const positionForLink = Helper.getFreeAdjacentPositions(this.containerNextToHarvestArea.pos, this.room)[0];
-        if (positionForLink) {
-          this.room.createConstructionSite(positionForLink, STRUCTURE_LINK);
-        } else {
-          console.log("SourceArea: No position for link next to source");
+        if (
+          (this.controllerLevel === 5 && linksBuiltAlreadyInRoom + linksToBeBuiltAlreadyInRoom < 1) || // Allow 1 link next to sourceat level 5
+          this.controllerLevel > 5
+        ) {
+          const positionForLink = Helper.getFreeAdjacentPositions(this.containerNextToHarvestArea.pos, this.room)[0];
+          if (positionForLink) {
+            this.room.createConstructionSite(positionForLink, STRUCTURE_LINK);
+          } else {
+            console.log("SourceArea: No position for link next to source");
+          }
         }
       }
     }

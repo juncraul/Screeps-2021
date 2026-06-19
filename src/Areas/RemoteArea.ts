@@ -8,6 +8,7 @@ import { CreepBase } from "CreepBase";
 export default class RemoteArea extends BaseArea {
   private static readonly ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
   private static readonly ROAD_WORK_DONE = "RemoteArea-RoadWorkDone-";
+  private static readonly INVADER_DEFENDER = "Attack-1-6-Invader-";
 
   controller: StructureController | null;
   roomName: string;
@@ -57,6 +58,10 @@ export default class RemoteArea extends BaseArea {
     this.mineralType = null;
     this.roadWorkDone = Helper.getCashedMemory(`${RemoteArea.ROAD_WORK_DONE}${roomName}`, false);
 
+    // if (claimThisRoom) {
+    //   this.claimersPerRoom = 1;
+    // }
+
     if (mineralOnly) {
       this.claimersPerRoom = 0;
       this.harvestersPerSource = 0;
@@ -79,7 +84,7 @@ export default class RemoteArea extends BaseArea {
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
     // Check if we have an invader flag
-    const invaderFlag = Game.flags["Attack-1-6-Invader-" + this.roomName];
+    const invaderFlag = Game.flags[RemoteArea.INVADER_DEFENDER + this.baseRoom.name];
     if (invaderFlag) {
       return [];
     }
@@ -97,13 +102,11 @@ export default class RemoteArea extends BaseArea {
 
     // Handle Claimer spawning
     if (
-      this.controller &&
-      this.controller.reservation &&
-      this.controller.reservation.username === Helper.getUserName() &&
-      this.controller.reservation.ticksToEnd < 2000
+      !this.controller ||
+      !this.controller.reservation ||
+      this.controller.reservation.username !== Helper.getUserName() ||
+      this.controller.reservation.ticksToEnd < 1000
     ) {
-      // Skip creating a claimer if already reserved by me and has plenty of ticks left.
-    } else {
       const claimerCount = this.getCreepCountByType("Claimer");
       if (claimerCount < this.claimersPerRoom) {
         tasksForThisArea.push(this.createClaimer());
@@ -142,7 +145,7 @@ export default class RemoteArea extends BaseArea {
       this.suicideCreepDueToBrokenParts(this.creeps[i]);
       if (!this.creeps[i].isFree()) continue;
 
-      const creepType = this.getCreepType(this.creeps[i]);
+      const creepType = this.creeps[i].roleName;
 
       // Move to the remote room if not there (except for carriers who need to go to base)
       if (this.creeps[i].pos.roomName !== this.roomName && creepType !== "Carrier" && creepType !== "MineralCarrier") {
@@ -288,6 +291,9 @@ export default class RemoteArea extends BaseArea {
       if (result.remainingRoadsToBuild === 0) {
         Helper.setCashedMemory(`${RemoteArea.ROAD_WORK_DONE}${start.roomName}`, true);
         this.roadWorkDone = true;
+      } else {
+        Helper.setCashedMemory(`${RemoteArea.ROAD_WORK_DONE}${start.roomName}`, false);
+        this.roadWorkDone = false;
       }
     });
   }
@@ -357,7 +363,7 @@ export default class RemoteArea extends BaseArea {
     const hostileInvaders = this.room.find(FIND_HOSTILE_CREEPS, {
       filter: creep => creep.owner && creep.owner.username === "Invader"
     });
-    const invaderFlag = Game.flags["Attack-1-6-Invader-" + this.roomName];
+    const invaderFlag = Game.flags[RemoteArea.INVADER_DEFENDER + this.baseRoom.name];
     if (hostileInvaders.length === 0) {
       // Threat gone: remove managed invader-defense flag.
       if (invaderFlag) {
@@ -369,7 +375,7 @@ export default class RemoteArea extends BaseArea {
     // Create a managed invader-defense flag.
     if (!invaderFlag) {
       const targetPos = hostileInvaders[0].pos;
-      const flagName = `Attack-1-6-Invader-${this.roomName}`;
+      const flagName = `${RemoteArea.INVADER_DEFENDER}${this.baseRoom.name}`;
       targetPos.createFlag(flagName, COLOR_RED, COLOR_BLUE);
     }
   }
@@ -773,15 +779,10 @@ export default class RemoteArea extends BaseArea {
     return bestStructure;
   }
 
-  private getCreepType(creep: CreepBase): string {
-    // Use the role name from creep memory to determine type
-    return creep.roleName || "Claimer"; // Default to Claimer for backwards compatibility
-  }
-
   private getCreepCountByType(type: string): number {
     let count = 0;
     for (const creep of this.creeps) {
-      if (this.getCreepType(creep) === type) {
+      if (creep.roleName === type) {
         count++;
       }
     }
@@ -832,7 +833,7 @@ export default class RemoteArea extends BaseArea {
       (sum, container) => sum + container.store.getUsedCapacity(RESOURCE_ENERGY),
       0
     );
-    maxSegments = totalEnergyInContainers < 1000 ? 10 : maxSegments / 2; // If total energy in containers is less than 1000, spawn a smaller carrier to avoid wasting energy on a large carrier that can't be filled.
+    maxSegments = totalEnergyInContainers < 1000 ? maxSegments / 2 : maxSegments; // If total energy in containers is less than 1000, spawn a smaller carrier to avoid wasting energy on a large carrier that can't be filled.
     const segments = Math.min(maxSegments, Math.floor(this.baseRoom.energyCapacityAvailable / 100));
     const moveParts = this.roadWorkDone ? segments / 2 : segments; // If we have roads, we can get away with fewer move parts.
 

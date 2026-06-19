@@ -53,7 +53,7 @@ export default class MineralArea extends HarvestArea {
       .filter(c => c.memory.role === "MineralHarvester" && c.memory.room === this.room.name);
     if (existing.length > 0) return null;
 
-    const bodyPartConstants: BodyPartConstant[] = [WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE, MOVE];
+    const bodyPartConstants: BodyPartConstant[] = [WORK, WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE];
     return new SpawnTask(SpawnType.Harvester, this.areaId, "MineralHarvester", bodyPartConstants, this);
   }
 }

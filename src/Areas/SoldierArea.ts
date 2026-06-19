@@ -179,7 +179,8 @@ export default class SoldierArea extends BaseArea {
 
   // Instance: per-flag spawn tasks
 
-  public handleSpawnTasks(): SpawnTask[] {
+  public handleSpawnTasks(room: Room): SpawnTask[] {
+    if (this.flag.baseRoomName && this.flag.baseRoomName !== room.name) return [];
     const dying = this.creeps.filter(c => c.ticksToLive && c.ticksToLive < 150).length;
     const deficit = Math.max(0, this.flag.squadSize - this.creeps.length + dying);
     const tasks: SpawnTask[] = [];
@@ -229,10 +230,9 @@ export default class SoldierArea extends BaseArea {
     const parts = name.split("-");
     const parsedSquad = parts[1];
     const parsedSegments = parts[2];
-    const parsedBaseRoom = parts[3];
     const squadSize = /^\d+$/.test(parsedSquad) ? parseInt(parsedSquad, 10) : SQUAD_SIZE;
     const bodySegments = /^\d+$/.test(parsedSegments) ? parseInt(parsedSegments, 10) : null;
-    const baseRoomName = parsedBaseRoom && ROOM_NAME_PATTERN.test(parsedBaseRoom) ? parsedBaseRoom : undefined;
+    const baseRoomName = parts.slice(3).find(part => ROOM_NAME_PATTERN.test(part));
     return { squadSize, bodySegments, baseRoomName };
   }
 
@@ -306,7 +306,7 @@ export default class SoldierArea extends BaseArea {
         return null;
     }
 
-    return new SpawnTask(spawnType, this.areaId, name, bodyPartConstants, this);
+    return new SpawnTask(spawnType, this.areaId, name, bodyPartConstants, this, null, this.flag.baseRoomName);
   }
 
   private createMeleeBody(segments: number): BodyPartConstant[] {
