@@ -61,13 +61,13 @@ export class GetRoomObjects {
     return candidateBaseRoomName;
   }
 
-  public static getAllRemoteRebuildTargets(): { remoteRoomName: string; baseRoomName: string }[] {
+  public static getAllRemoteRebuildTargets(): { remoteRoomName: string; baseRoomName: string; flag: Flag }[] {
     const pattern = /^RemoteRebuild-([WE]\d+[NS]\d+)(?:-.+)?$/;
-    const targets: { remoteRoomName: string; baseRoomName: string }[] = [];
+    const targets: { remoteRoomName: string; baseRoomName: string; flag: Flag }[] = [];
     _.filter(Game.flags, flag => flag.name.startsWith("RemoteRebuild-")).forEach(flag => {
       const match = pattern.exec(flag.name);
       if (match) {
-        targets.push({ remoteRoomName: flag.pos.roomName, baseRoomName: match[1] });
+        targets.push({ remoteRoomName: flag.pos.roomName, baseRoomName: match[1], flag });
       }
     });
     return targets;
@@ -138,17 +138,8 @@ export class GetRoomObjects {
   }
 
   public static getRoomMineral(room: Room, onlyActive = false): Mineral | null {
-    const mineralExtractor = room.find(FIND_STRUCTURES, {
-      filter: structure => {
-        return structure.structureType === STRUCTURE_EXTRACTOR;
-      }
-    })[0];
     const mineral = room.find(FIND_MINERALS, { filter: mineral => (onlyActive ? mineral.mineralAmount > 0 : true) })[0];
-    if (mineralExtractor && mineral) {
-      return mineral;
-    } else {
-      return null;
-    }
+    return mineral;
   }
 
   public static getRoomTowers(room: Room): StructureTower[] {

@@ -154,10 +154,10 @@ export default class UpgradeArea extends BaseArea {
 
     const carryParts =
       this.containerNextToController && this.containerNextToController.store.getFreeCapacity(RESOURCE_ENERGY) > 100
-        ? segments
-        : 1;
+        ? 1
+        : segments;
 
-    const moveParts = segments / (this.controllerLevel <= 3 ? 2 : 1); // More MOVE parts for lower level controllers to help with efficiency, later we should have roads to the controller which will reduce the need for MOVE parts.
+    const moveParts = this.controllerLevel <= 3 ? segments : segments / 2; // More MOVE parts for lower level controllers to help with efficiency, later we should have roads to the controller which will reduce the need for MOVE parts.
 
     // Build body parts with ratio: 1 WORK, 1 CARRY, 1 MOVE per segment
     for (let i = 0; i < segments; i++) bodyPartConstants.push(WORK);

@@ -197,6 +197,7 @@ export class CreepBase {
         }
         break;
       }
+      // TODO: There is a tick pause between collection and upgrade.
       case Activity.Upgrade: {
         const controller: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
         if (controller) {
@@ -307,7 +308,7 @@ export class CreepBase {
       }
       case Activity.HarvestMineral: {
         // targetPlace points at the mineral tile; targetPlaceSecond points at the container to deposit into.
-        const mineralAtPos = this.task.targetPlace.findInRange(FIND_MINERALS, 0)[0] as Mineral | undefined;
+        const mineralAtPos = CreepTask.getMineralFromTarget(this.task.targetPlace);
         if (mineralAtPos && mineralAtPos.mineralAmount > 0) {
           this.harvest(mineralAtPos);
         }
@@ -348,17 +349,21 @@ export class CreepBase {
         break;
       }
       case Activity.CollectMineral: {
-        // Withdraw a specific mineral type from a container at targetPlace; resource type in targetId.
-        const mineralContainer = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
-        const resourceType = (this.task.targetId ?? RESOURCE_ENERGY) as ResourceConstant;
-        if (mineralContainer) {
-          this.withdraw(mineralContainer, resourceType);
+        // Collect a specific mineral (targetId) or any mineral (non-energy) from resource/store holders at targetPlace.
+        const specificMineral = this.task.targetId as ResourceConstant | null;
+        const collectTarget = this.getCollectMineralTarget(this.task.targetPlace, specificMineral);
+
+        if (collectTarget instanceof Resource) {
+          this.pickup(collectTarget);
+        } else if (collectTarget && "store" in collectTarget) {
+          const targetResource = this.getStoreMineralResourceType(collectTarget, specificMineral);
+          if (targetResource) {
+            this.withdraw(collectTarget, targetResource);
+          }
         }
-        const amountLeft =
-          mineralContainer instanceof StructureContainer
-            ? mineralContainer.store.getUsedCapacity(resourceType) ?? 0
-            : 0;
-        if (this.store.getFreeCapacity() === 0 || !mineralContainer || amountLeft === 0) {
+
+        const amountLeft = this.getCollectMineralAmountLeft(collectTarget, specificMineral);
+        if (this.store.getFreeCapacity() === 0 || !collectTarget || amountLeft === 0) {
           this.creep.say("Min Col Done");
           this.task.taskDone = true;
         }
@@ -374,6 +379,84 @@ export class CreepBase {
         this.suicide();
       }
     }
+  }
+
+  private getCollectMineralTarget(
+    targetPlace: RoomPosition,
+    specificMineral: ResourceConstant | null
+  ): Structure | Ruin | Tombstone | Resource | null {
+    const dropped = CreepTask.getResourceFromTarget(targetPlace);
+    if (dropped && this.isValidMineralResource(dropped.resourceType, specificMineral) && dropped.amount > 0) {
+      return dropped;
+    }
+
+    const tombstone = CreepTask.getTombstoneFromTarget(targetPlace);
+    if (tombstone && this.getStoreMineralAmount(tombstone, specificMineral) > 0) {
+      return tombstone;
+    }
+
+    const ruin = CreepTask.getRuinFromTarget(targetPlace);
+    if (ruin && this.getStoreMineralAmount(ruin, specificMineral) > 0) {
+      return ruin;
+    }
+
+    const structure = CreepTask.getStructureFromTargetNoRoadNoRampart(targetPlace);
+    if (structure && "store" in structure && this.getStoreMineralAmount(structure, specificMineral) > 0) {
+      return structure;
+    }
+
+    return null;
+  }
+
+  private getCollectMineralAmountLeft(
+    target: Structure | Ruin | Tombstone | Resource | null,
+    specificMineral: ResourceConstant | null
+  ): number {
+    if (!target) return 0;
+    if (target instanceof Resource) {
+      return this.isValidMineralResource(target.resourceType, specificMineral) ? target.amount : 0;
+    }
+    if (!("store" in target)) return 0;
+    return this.getStoreMineralAmount(target, specificMineral);
+  }
+
+  private getStoreMineralAmount(
+    target: { store: Store<ResourceConstant, boolean> },
+    specificMineral: ResourceConstant | null
+  ): number {
+    const resourceType = this.getStoreMineralResourceType(target, specificMineral);
+    if (!resourceType) return 0;
+
+    return target.store.getUsedCapacity(resourceType) ?? 0;
+  }
+
+  private getStoreMineralResourceType(
+    target: { store: Store<ResourceConstant, boolean> },
+    specificMineral: ResourceConstant | null
+  ): ResourceConstant | null {
+    if (specificMineral) {
+      if (!this.isValidMineralResource(specificMineral, specificMineral)) return null;
+      const amount = target.store.getUsedCapacity(specificMineral) ?? 0;
+      return amount > 0 ? specificMineral : null;
+    }
+
+    for (const resourceType in target.store) {
+      const resource = resourceType as ResourceConstant;
+      if (!this.isValidMineralResource(resource, null)) continue;
+      const amount = target.store.getUsedCapacity(resource) ?? 0;
+      if (amount > 0) return resource;
+    }
+
+    return null;
+  }
+
+  private isValidMineralResource(
+    resourceType: ResourceConstant | null,
+    specificMineral: ResourceConstant | null
+  ): boolean {
+    if (!resourceType) return false;
+    if (specificMineral) return resourceType === specificMineral;
+    return resourceType !== RESOURCE_ENERGY;
   }
 
   public build(structure: ConstructionSite): ScreepsReturnCode {

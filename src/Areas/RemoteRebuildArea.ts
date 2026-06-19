@@ -21,11 +21,13 @@ import { CreepBase } from "CreepBase";
 export default class RemoteRebuildArea extends BaseArea {
   remoteRoomName: string;
   baseRoomName: string;
+  flag: Flag;
 
-  constructor(remoteRoomName: string, baseRoomName: string) {
+  constructor(remoteRoomName: string, baseRoomName: string, flag: Flag) {
     super("RemoteRebuildArea", remoteRoomName, new RoomPosition(25, 25, remoteRoomName), Game.rooms[remoteRoomName]);
     this.remoteRoomName = remoteRoomName;
     this.baseRoomName = baseRoomName;
+    this.flag = flag;
   }
 
   public handleSpawnTasks(): SpawnTask[] {
@@ -40,26 +42,26 @@ export default class RemoteRebuildArea extends BaseArea {
     // Only request a new spawn when both are 0.
     const constructorInTransit = this.creeps.filter(c => c.memory.role === "Constructor").length;
     const constructorInRemote = this.getRemoteAreaCount("ConstructionArea", this.remoteRoomName);
-    if (constructorInTransit + constructorInRemote < 3) {
+    if (constructorInTransit + constructorInRemote < 3 && this.flag.color === COLOR_WHITE) {
       tasks.push(this.createConstructor(cap));
     }
 
     const carrierInTransit = this.creeps.filter(c => c.memory.role === "Carrier").length;
     const carrierInRemote = this.getRemoteAreaCount("CarryArea", this.remoteRoomName);
-    if (carrierInTransit + carrierInRemote < 3) {
+    if (carrierInTransit + carrierInRemote < 3 && (this.flag.color === COLOR_WHITE || this.flag.color === COLOR_GREY)) {
       tasks.push(this.createCarrier(cap));
     }
 
     const harvesterInTransit = this.creeps.filter(c => c.memory.role === "Harvester").length;
     const harvesterInRemote = remoteRoom ? this.getRemoteHarvesterCount(remoteRoom) : 0;
-    if (harvesterInTransit + harvesterInRemote < 3) {
+    if (harvesterInTransit + harvesterInRemote < 3 && this.flag.color === COLOR_WHITE) {
       tasks.push(this.createHarvester(cap));
     }
 
     const upgraderInTransit = this.creeps.filter(c => c.memory.role === "Upgrader").length;
     const remoteController = remoteRoom?.controller;
     const upgraderInRemote = remoteController ? this.getRemoteAreaCount("UpgradeArea", remoteController.id) : 0;
-    if (upgraderInTransit + upgraderInRemote < 2) {
+    if (upgraderInTransit + upgraderInRemote < 2 && this.flag.color === COLOR_WHITE) {
       tasks.push(this.createUpgrader(cap));
     }
 

@@ -7,6 +7,7 @@ import { CreepBase } from "CreepBase";
 
 export default class RemoteArea extends BaseArea {
   private static readonly ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
+  private static readonly ROAD_WORK_DONE = "RemoteArea-RoadWorkDone-";
 
   controller: StructureController | null;
   roomName: string;
@@ -24,6 +25,7 @@ export default class RemoteArea extends BaseArea {
   mineral: Mineral | null;
   mineralContainer: StructureContainer | null;
   mineralType: ResourceConstant | null;
+  roadWorkDone: boolean;
 
   constructor(roomName: string, claimThisRoom: boolean, baseRoomName?: string, mineralOnly = false) {
     super("RemoteArea", roomName, new RoomPosition(25, 25, roomName), Game.rooms[roomName]);
@@ -53,6 +55,7 @@ export default class RemoteArea extends BaseArea {
     this.mineral = null;
     this.mineralContainer = null;
     this.mineralType = null;
+    this.roadWorkDone = Helper.getCashedMemory(`${RemoteArea.ROAD_WORK_DONE}${roomName}`, false);
 
     if (mineralOnly) {
       this.claimersPerRoom = 0;
@@ -75,6 +78,11 @@ export default class RemoteArea extends BaseArea {
 
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
+    // Check if we have an invader flag
+    const invaderFlag = Game.flags["Attack-1-6-Invader-" + this.roomName];
+    if (invaderFlag) {
+      return [];
+    }
 
     if (this.mineralOnly) {
       if (this.getCreepCountByType("MineralHarvester") < 1) {
@@ -223,6 +231,10 @@ export default class RemoteArea extends BaseArea {
       }
       return;
     }
+    // Check controller level from base room
+    if (this.baseRoom.controller && this.baseRoom.controller.level >= 4) {
+      this.createRemoteRoadConnections();
+    }
 
     for (const source of this.sources) {
       const container = GetRoomObjects.getWithinRangeContainer(source.pos, 2);
@@ -235,6 +247,106 @@ export default class RemoteArea extends BaseArea {
         }
       }
     }
+  }
+
+  private createRemoteRoadConnections(): void {
+    if (!this.room) {
+      return;
+    }
+
+    if (Game.time % 25 !== 0 || (this.roadWorkDone && Game.time % 1000 !== 0)) {
+      return; // Only run every 25 ticks, and if road work is done, only check every 1000 ticks to see if we need to do more work.
+    }
+
+    const roadTarget = this.getBaseRoadTarget();
+    const starts: RoomPosition[] = [];
+
+    this.containers.forEach(container => starts.push(container.pos));
+
+    // Probably not needed, but just in case we want to create a road to the controller in the future, we can leave this here.
+    // if (this.controller) {
+    //   starts.push(this.controller.pos);
+    // }
+
+    const seen = new Set<string>();
+    starts.forEach(start => {
+      const key = `${start.roomName}:${start.x}:${start.y}`;
+      if (seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+
+      const result = Helper.createRoadBetweenPoints(start, roadTarget, false, {
+        goalRange: 1,
+        maxOps: 6000,
+        maxRooms: 8
+      });
+
+      console.log(
+        `RemoteArea ${this.roomName}: Road creation from ${start} to ${roadTarget} - Remaining roads to build: ${result.remainingRoadsToBuild}`
+      );
+      if (result.remainingRoadsToBuild === 0) {
+        Helper.setCashedMemory(`${RemoteArea.ROAD_WORK_DONE}${start.roomName}`, true);
+        this.roadWorkDone = true;
+      }
+    });
+  }
+
+  private getBaseRoadTarget(): RoomPosition {
+    const logisticsStructures = this.baseRoom.find(FIND_STRUCTURES, {
+      filter: structure =>
+        structure.structureType === STRUCTURE_CONTAINER ||
+        structure.structureType === STRUCTURE_STORAGE ||
+        structure.structureType === STRUCTURE_LINK
+    }) as (StructureContainer | StructureStorage | StructureLink)[];
+
+    const exitDirection = Game.map.findExit(this.baseRoom.name, this.roomName);
+    if (exitDirection >= 0 && logisticsStructures.length > 0) {
+      const exitPositions = this.baseRoom.find(exitDirection as ExitConstant);
+      if (exitPositions.length > 0) {
+        let bestTargetPos: RoomPosition | null = null;
+        let bestDistance = Infinity;
+
+        logisticsStructures.forEach(structure => {
+          let nearestExitDistance = Infinity;
+          exitPositions.forEach(exitPos => {
+            const distance = structure.pos.getRangeTo(exitPos);
+            if (distance < nearestExitDistance) {
+              nearestExitDistance = distance;
+            }
+          });
+
+          if (nearestExitDistance < bestDistance) {
+            bestDistance = nearestExitDistance;
+            bestTargetPos = structure.pos;
+          }
+        });
+
+        if (bestTargetPos) {
+          return bestTargetPos;
+        }
+      }
+    }
+
+    const storage = GetRoomObjects.getRoomStorage(this.baseRoom);
+    if (storage) {
+      return storage.pos;
+    }
+
+    if (logisticsStructures.length > 0) {
+      const center = new RoomPosition(25, 25, this.baseRoom.name);
+      const closestToCenter = center.findClosestByRange(logisticsStructures);
+      if (closestToCenter) {
+        return closestToCenter.pos;
+      }
+    }
+
+    const spawn = GetRoomObjects.getRoomSpawns(this.baseRoom, true)[0];
+    if (spawn) {
+      return spawn.pos;
+    }
+
+    return new RoomPosition(25, 25, this.baseRoom.name);
   }
 
   private handleInvaderDefenseFlag() {
@@ -696,9 +808,12 @@ export default class RemoteArea extends BaseArea {
     // plain=1,2  road=1,1  swamp=5,6
     const bodyPartConstants: BodyPartConstant[] = [];
     const segments = Math.min(5, Math.floor((this.baseRoom.energyCapacityAvailable - 50) / 150));
+    const carryParts = this.containers.length !== this.sources.length ? 1 : 0; // If we don't have a container for each source, we need a carry part to build one.
+    const moveParts = this.roadWorkDone ? segments / 2 : segments; // If we have roads, we can get away with fewer move parts.
+
     for (let i = 0; i < segments; i++) bodyPartConstants.push(WORK);
-    bodyPartConstants.push(CARRY);
-    for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
+    for (let i = 0; i < carryParts; i++) bodyPartConstants.push(CARRY);
+    for (let i = 0; i < moveParts; i++) bodyPartConstants.push(MOVE);
 
     return new SpawnTask(
       SpawnType.Harvester,
@@ -719,8 +834,10 @@ export default class RemoteArea extends BaseArea {
     );
     maxSegments = totalEnergyInContainers < 1000 ? 10 : maxSegments / 2; // If total energy in containers is less than 1000, spawn a smaller carrier to avoid wasting energy on a large carrier that can't be filled.
     const segments = Math.min(maxSegments, Math.floor(this.baseRoom.energyCapacityAvailable / 100));
+    const moveParts = this.roadWorkDone ? segments / 2 : segments; // If we have roads, we can get away with fewer move parts.
+
     for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
-    for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
+    for (let i = 0; i < moveParts; i++) bodyPartConstants.push(MOVE);
     return new SpawnTask(
       SpawnType.Carrier,
       this.areaId,
@@ -734,6 +851,7 @@ export default class RemoteArea extends BaseArea {
   private createRepairer(): SpawnTask {
     const bodyPartConstants: BodyPartConstant[] = [];
     const segments = Math.min(4, Math.floor(this.baseRoom.energyCapacityAvailable / 200));
+
     for (let i = 0; i < segments; i++) bodyPartConstants.push(WORK);
     for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
     for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);

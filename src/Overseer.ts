@@ -56,7 +56,7 @@ export default class Overseer implements IOverseer {
 
     const remoteRebuildTasks: SpawnTask[] = [];
     for (const target of GetRoomObjects.getAllRemoteRebuildTargets().filter(t => t.baseRoomName === room.name)) {
-      const rebuildArea = new RemoteRebuildArea(target.remoteRoomName, target.baseRoomName);
+      const rebuildArea = new RemoteRebuildArea(target.remoteRoomName, target.baseRoomName, target.flag);
       remoteRebuildTasks.push(...rebuildArea.handleSpawnTasks());
       rebuildArea.handleThisArea();
       this.handleRemoteRebuildRoomAreas(target.remoteRoomName);

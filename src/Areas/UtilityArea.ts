@@ -59,15 +59,20 @@ export default class CarryArea extends BaseArea {
     const extensions = this.room.find(FIND_MY_STRUCTURES, {
       filter: structure => structure.structureType === STRUCTURE_EXTENSION
     }) as StructureExtension[];
-    // Disabled spawns for now because it is too far away
-    // const spawns = this.room.find(FIND_MY_STRUCTURES, {
-    //   filter: (structure) => structure.structureType === STRUCTURE_SPAWN
-    // }) as StructureSpawn[];
+    const spawns = this.room.find(FIND_MY_STRUCTURES, {
+      filter: structure => structure.structureType === STRUCTURE_SPAWN
+    }) as StructureSpawn[];
     const towers = this.room.find(FIND_MY_STRUCTURES, {
-      filter: structure => structure.structureType === STRUCTURE_TOWER && structure.store.getFreeCapacity(RESOURCE_ENERGY) < 950
+      filter: structure =>
+        structure.structureType === STRUCTURE_TOWER && structure.store.getFreeCapacity(RESOURCE_ENERGY) < 950
     }) as StructureTower[];
 
-    const structures = [...extensions, ...towers].filter(
+    // Disabled spawns for now because it is too far away
+    // if (this.room.name === "E29S25" && extensions.length !== 0 && towers.length !== 0) {
+    //   spawns = [];
+    // }
+
+    const structures = [...extensions, ...towers, ...spawns].filter(
       structure => structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0
     );
     if (structures.length === 0) {

@@ -458,73 +458,19 @@ export class BaseBuilder {
       }
       seen.add(posKey);
 
-      const search = PathFinder.search(pos, roadGoals, {
-        maxOps: 4000,
-        roomCallback: roomName => {
-          if (roomName !== room.name) {
-            return false;
-          }
-
-          const costs = new PathFinder.CostMatrix();
-          const terrain = Game.map.getRoomTerrain(roomName);
-
-          for (let x = 0; x < 50; x++) {
-            for (let y = 0; y < 50; y++) {
-              if (terrain.get(x, y) === TERRAIN_MASK_WALL) {
-                costs.set(x, y, 255);
-              }
-            }
-          }
-
-          room.find(FIND_STRUCTURES).forEach(structure => {
-            if (structure.structureType === STRUCTURE_ROAD) {
-              costs.set(structure.pos.x, structure.pos.y, 1);
-            } else if (
-              structure.structureType !== STRUCTURE_CONTAINER &&
-              structure.structureType !== STRUCTURE_RAMPART
-            ) {
-              costs.set(structure.pos.x, structure.pos.y, 255);
-            }
-          });
-
-          room.find(FIND_CONSTRUCTION_SITES).forEach(site => {
-            if (
-              site.structureType !== STRUCTURE_ROAD &&
-              site.structureType !== STRUCTURE_CONTAINER &&
-              site.structureType !== STRUCTURE_RAMPART
-            ) {
-              costs.set(site.pos.x, site.pos.y, 255);
-            }
-          });
-
-          roadGoals.forEach(goal => costs.set(goal.pos.x, goal.pos.y, 1));
-
-          return costs;
-        }
-      });
-
-      if (search.incomplete) {
+      if (roadGoals.length === 0) {
         return;
       }
 
-      search.path.forEach((step, index) => {
-        if (index === 0) {
-          return;
-        }
+      const nearestGoal = roadGoals.reduce((best, current) => {
+        return pos.getRangeTo(current.pos) < pos.getRangeTo(best.pos) ? current : best;
+      }, roadGoals[0]);
 
-        if (previewInsteadOfBuild) {
-          room.visual.structure(step.x, step.y, STRUCTURE_ROAD);
-          return;
-        }
-
-        const existingRoad = step
-          .lookFor(LOOK_STRUCTURES)
-          .some(structure => structure.structureType === STRUCTURE_ROAD);
-        const roadSite = step.lookFor(LOOK_CONSTRUCTION_SITES).some(site => site.structureType === STRUCTURE_ROAD);
-
-        if (!existingRoad && !roadSite) {
-          room.createConstructionSite(step.x, step.y, STRUCTURE_ROAD);
-        }
+      Helper.createRoadBetweenPoints(pos, nearestGoal.pos, previewInsteadOfBuild, {
+        goalRange: 0,
+        maxOps: 4000,
+        maxRooms: 1,
+        allowedRoomNames: [room.name]
       });
     });
   }

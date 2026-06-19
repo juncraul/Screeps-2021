@@ -18,6 +18,7 @@ export default class CarryArea extends BaseArea {
   collectFromLimitedStore: StructureLink[];
   droppedResourcesToCollectFrom: Resource[];
   mineralContainersByType: { container: StructureContainer; resourceType: ResourceConstant }[];
+  storage: StructureStorage | null;
 
   constructor(controller: StructureController) {
     super("CarryArea", controller.room.name, controller.pos, controller.room);
@@ -33,6 +34,7 @@ export default class CarryArea extends BaseArea {
     this.collectFromLimitedStore = this.getLimitedStoreToCollectFrom();
     this.droppedResourcesToCollectFrom = this.getDroppedResourcesToCollectFrom(RESOURCE_ENERGY);
     this.mineralContainersByType = this.getMineralContainers();
+    this.storage = GetRoomObjects.getRoomStorage(controller.room);
   }
 
   public handleSpawnTasks(): SpawnTask[] {
@@ -93,9 +95,7 @@ export default class CarryArea extends BaseArea {
         continue;
       }
       if (storage.store.getFreeCapacity() === 0) continue;
-      creep.addTask(new CreepTask(Activity.Collect, container.pos));
-      // Store the mineral type in a memory slot so DepositMineral knows what to transfer.
-      creep.memory.currentMineralType = resourceType;
+      creep.addTask(new CreepTask(Activity.CollectMineral, container.pos, null, resourceType));
       return true;
     }
     return false;
@@ -123,11 +123,12 @@ export default class CarryArea extends BaseArea {
   }
 
   private findSomewhereToCollectFrom(creep: CreepBase): void {
-    for (let j = 0; j < this.collectFromLimitedStore.length; j++) {
-      if (this.collectFromLimitedStore[j].store.energy < 100) continue;
-      creep.addTask(new CreepTask(Activity.Collect, this.collectFromLimitedStore[j].pos));
-      return;
-    }
+    // Disabled, we should never collect from links. This is for Utility creeps to use.
+    // for (let j = 0; j < this.collectFromLimitedStore.length; j++) {
+    //   if (this.collectFromLimitedStore[j].store.energy < 100) continue;
+    //   creep.addTask(new CreepTask(Activity.Collect, this.collectFromLimitedStore[j].pos));
+    //   return;
+    // }
     const collectFromGeneralStoreSorted = this.collectFromGeneralStore.sort(
       (a, b) => a.pos.getRangeTo(creep.pos.x, creep.pos.y) - b.pos.getRangeTo(creep.pos.x, creep.pos.y)
     );
@@ -146,15 +147,27 @@ export default class CarryArea extends BaseArea {
   private findSomewhereToDeposit(creep: CreepBase): void {
     // Check if we have an utility creep in UtilityArea
     const creepsInUtilityArea = Helper.getCreepNamesFromArea("UtilityArea", this.room.name);
-    if (creepsInUtilityArea && creepsInUtilityArea.length > 0) {
-      if (!this.depositToFirstGeneralStore(creep)) {
-        this.depositToFirstLimitedStore(creep);
+    if (
+      creepsInUtilityArea &&
+      creepsInUtilityArea.length > 0 &&
+      !(creepsInUtilityArea.length === 1 && Game.creeps[creepsInUtilityArea[0]].spawning === true)
+    ) {
+      if (this.storage && this.storage.store.getUsedCapacity(RESOURCE_ENERGY) < 2000) {
+        this.depositToStorage(creep);
+        return;
       }
+
+      if (this.depositToFirstGeneralStore(creep)) return;
+      if (this.depositToFirstLimitedStore(creep)) return;
     } else {
-      console.log(`CarryArea: UtilityArea in room ${this.room.name} has no creeps. Depositing to limited store first.`);
-      if (!this.depositToFirstLimitedStore(creep)) {
-        this.depositToFirstGeneralStore(creep);
-      }
+      if (this.depositToFirstLimitedStore(creep)) return;
+      if (this.depositToFirstGeneralStore(creep)) return;
+    }
+  }
+
+  private depositToStorage(creep: CreepBase): void {
+    if (this.storage && this.storage.store.getFreeCapacity() > 0) {
+      creep.addTask(new CreepTask(Activity.Deposit, this.storage.pos));
     }
   }
 

@@ -5,7 +5,12 @@ export default class CreepTask implements ICreepTask {
   taskDone: boolean;
   targetId: string | null;
 
-  constructor(activity: number, targetPlace: RoomPosition, targetPlaceSecond: RoomPosition | null = null, targetId: string | null = null) {
+  constructor(
+    activity: number,
+    targetPlace: RoomPosition,
+    targetPlaceSecond: RoomPosition | null = null,
+    targetId: string | null = null
+  ) {
     this.activity = activity;
     this.targetPlace = targetPlace;
     this.taskDone = false;
@@ -15,6 +20,10 @@ export default class CreepTask implements ICreepTask {
 
   public static getSourceFromTarget(target: RoomPosition): Source | null {
     return new RoomPosition(target.x, target.y, target.roomName).findInRange(FIND_SOURCES, 0)[0];
+  }
+
+  public static getMineralFromTarget(target: RoomPosition): Mineral | null {
+    return new RoomPosition(target.x, target.y, target.roomName).findInRange(FIND_MINERALS, 0)[0];
   }
 
   public static getConstructionSiteFromTarget(target: RoomPosition): ConstructionSite | null {
@@ -39,6 +48,10 @@ export default class CreepTask implements ICreepTask {
 
   public static getRuinFromTarget(target: RoomPosition): Ruin | null {
     return new RoomPosition(target.x, target.y, target.roomName).findInRange(FIND_RUINS, 0)[0];
+  }
+
+  public static getTombstoneFromTarget(target: RoomPosition): Tombstone | null {
+    return new RoomPosition(target.x, target.y, target.roomName).findInRange(FIND_TOMBSTONES, 0)[0];
   }
 
   public static getControllerFromTarget(target: RoomPosition): StructureController | null {
