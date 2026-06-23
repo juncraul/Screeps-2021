@@ -6,6 +6,7 @@ import HarvestArea from "./HarvestArea";
 
 export default class SourceArea extends HarvestArea {
   source: Source;
+  controller: StructureController;
   linkNextToSource: StructureLink | null;
   linkConstructionSiteNextToSource: ConstructionSite | null;
   linksForDeposits: StructureLink[];
@@ -13,6 +14,7 @@ export default class SourceArea extends HarvestArea {
   constructor(source: Source, controller: StructureController) {
     super("SourceArea", source.id, source.pos, controller);
     this.source = source;
+    this.controller = controller;
     this.linkConstructionSiteNextToSource = GetRoomObjects.getWithinRangeConstructionSite(
       source.pos,
       1,
@@ -30,7 +32,6 @@ export default class SourceArea extends HarvestArea {
   protected handleSetup() {
     super.handleSetup();
 
-    // After controller level 5, we want to build links next to the source
     if (this.controllerLevel >= 5) {
       const linksBuiltAlreadyInRoom = this.room.find(FIND_STRUCTURES, {
         filter: structure => structure.structureType === STRUCTURE_LINK
@@ -38,11 +39,15 @@ export default class SourceArea extends HarvestArea {
       const linksToBeBuiltAlreadyInRoom = this.room.find(FIND_CONSTRUCTION_SITES, {
         filter: structure => structure.structureType === STRUCTURE_LINK
       }).length;
+
       if (!this.linkNextToSource && !this.linkConstructionSiteNextToSource && this.containerNextToHarvestArea) {
-        if (
-          (this.controllerLevel === 5 && linksBuiltAlreadyInRoom + linksToBeBuiltAlreadyInRoom < 1) || // Allow 1 link next to sourceat level 5
-          this.controllerLevel > 5
-        ) {
+        const canCreateLink =
+          this.controllerLevel > 5 ||
+          (this.controllerLevel === 5 &&
+            linksBuiltAlreadyInRoom + linksToBeBuiltAlreadyInRoom < 1 &&
+            this.isFurthestSourceInRoom());
+
+        if (canCreateLink) {
           const positionForLink = Helper.getFreeAdjacentPositions(this.containerNextToHarvestArea.pos, this.room)[0];
           if (positionForLink) {
             this.room.createConstructionSite(positionForLink, STRUCTURE_LINK);
@@ -68,7 +73,6 @@ export default class SourceArea extends HarvestArea {
           this.creeps[i].addTask(new CreepTask(Activity.Deposit, this.containerNextToHarvestArea.pos));
         }
       } else {
-        // When we are not full or partial full
         if (this.containerConstructionSiteNextToHarvestArea) {
           this.creeps[i].addTask(new CreepTask(Activity.Harvest, this.source.pos));
         } else if (this.linkNextToSource && this.containerNextToHarvestArea) {
@@ -97,6 +101,28 @@ export default class SourceArea extends HarvestArea {
       this.linkNextToSource.transferEnergy(this.linksForDeposits[i]);
       break;
     }
+  }
+
+  private isFurthestSourceInRoom(): boolean {
+    const sources = this.room.find(FIND_SOURCES);
+    if (sources.length === 0) {
+      return false;
+    }
+
+    const spawn = GetRoomObjects.getRoomSpawns(this.room, true)[0];
+    const thisSourceDistance = this.source.pos.getRangeTo(spawn.pos);
+    let furthestDistance = -1;
+    let furthestSourceId = "";
+
+    for (const source of sources) {
+      const distance = source.pos.getRangeTo(spawn.pos);
+      if (distance > furthestDistance || (distance === furthestDistance && source.id < furthestSourceId)) {
+        furthestDistance = distance;
+        furthestSourceId = source.id;
+      }
+    }
+
+    return thisSourceDistance === furthestDistance && this.source.id === furthestSourceId;
   }
 
   private populateLinksForDeposits(): StructureLink[] {

@@ -30,6 +30,7 @@ export const loop = () => {
   GetRoomObjects.getAllMyCreeps().forEach(creep => {
     const creepBase: CreepBase = new CreepBase(creep);
     creepBase.workTheTask();
+    creepBase.updateSomeMemoryAtTheEndOfTheTick();
   });
 
   // We can generate a pixel when the bucket is full

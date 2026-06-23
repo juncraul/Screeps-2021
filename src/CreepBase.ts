@@ -144,25 +144,22 @@ export class CreepBase {
         break;
       }
       case Activity.Collect: {
-        let targetCollect: Structure | Ruin | Resource | null = CreepTask.getResourceFromTarget(this.task.targetPlace);
-        if (targetCollect instanceof Resource && targetCollect.amount < 20) {
-          targetCollect = null; // If the resource is almost gone, just consider it gone to avoid creeps getting stuck trying to collect from it. Harvester will keep dropping resource.
-        }
+        let targetCollect: Structure | Ruin | null = CreepTask.getStructureFromTargetNoRoadNoRampart(
+          this.task.targetPlace
+        );
         if (!targetCollect) {
           targetCollect = CreepTask.getRuinFromTarget(this.task.targetPlace);
           if (!targetCollect) {
-            targetCollect = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
-            if (!targetCollect) {
-              this.creep.say("Col Done");
-              this.task.taskDone = true;
-            }
+            this.creep.say("Col Done"); // Target must have dissappeared.
+            this.task.taskDone = true;
           }
         }
-        if (targetCollect && !(targetCollect instanceof Resource)) {
-          this.withdraw(targetCollect, RESOURCE_ENERGY);
-        }
-        if (targetCollect instanceof Resource) {
-          this.pickup(targetCollect);
+        if (targetCollect) {
+          const result = this.withdraw(targetCollect, RESOURCE_ENERGY);
+          if (result === OK) {
+            this.creep.say("Col Done");
+            this.task.taskDone = true;
+          }
         }
         if (
           targetCollect instanceof StructureContainer ||
@@ -212,10 +209,14 @@ export class CreepBase {
       case Activity.Pickup: {
         const targetPickup: Resource | null = CreepTask.getResourceFromTarget(this.task.targetPlace);
         if (targetPickup) {
-          this.pickup(targetPickup);
+          const result = this.pickup(targetPickup);
+          if (result === OK) {
+            this.creep.say("Pick up Done");
+            this.task.taskDone = true;
+          }
         }
         if (!targetPickup || this.carryCurrent === this.carryCapacity) {
-          this.creep.say("Pick Done");
+          this.creep.say("Pick up Done");
           this.task.taskDone = true;
         }
         break;
@@ -379,6 +380,21 @@ export class CreepBase {
         this.suicide();
       }
     }
+  }
+
+  public updateSomeMemoryAtTheEndOfTheTick() {
+    if (!this.creep.memory.lastTickEnergy) {
+      this.creep.memory.lastTickEnergy = 0;
+    }
+
+    const currentEnergy = this.creep.store.getUsedCapacity(RESOURCE_ENERGY);
+    const gained = Math.max(0, currentEnergy - this.creep.memory.lastTickEnergy ?? 0);
+
+    if (gained > 0) {
+      this.trackRemoteEnergyCollected(gained);
+    }
+
+    this.creep.memory.lastTickEnergy = currentEnergy;
   }
 
   private getCollectMineralTarget(
@@ -606,6 +622,27 @@ export class CreepBase {
       this.goTo(resource.pos);
     }
     return result;
+  }
+
+  private trackRemoteEnergyCollected(gainedEnergy: number): void {
+    if (this.roleName !== "Carrier") {
+      return;
+    }
+
+    console.log(`Creep ${this.name} energy gained: ${gainedEnergy}`);
+
+    const remoteRoomName = this.memory.remoteRoomName;
+    if (!remoteRoomName || this.room.name !== remoteRoomName) {
+      return;
+    }
+
+    console.log(`Creep ${this.name} is collecting energy from remote room ${remoteRoomName}.`);
+
+    const remoteRoomEconomy = Memory.remoteRoomEconomy ?? {};
+    const currentStats = remoteRoomEconomy[remoteRoomName] ?? { energyCollected: 0, energySpent: 0 };
+    currentStats.energyCollected += gainedEnergy;
+    remoteRoomEconomy[remoteRoomName] = currentStats;
+    Memory.remoteRoomEconomy = remoteRoomEconomy;
   }
 
   public upgradeController(controller: StructureController): ScreepsReturnCode {

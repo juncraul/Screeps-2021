@@ -1,8 +1,8 @@
 import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
-import BaseArea from "./BaseArea";
-import { CreepBase } from "../CreepBase";
+import BaseArea from "./../BaseArea";
+import { CreepBase } from "../../CreepBase";
 
 const SQUAD_SIZE = 5;
 const ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
@@ -40,9 +40,8 @@ export interface AttackFlagConfig {
 export default class SoldierArea extends BaseArea {
   flag: AttackFlagConfig;
 
-  // Static tick-guard so flag detection & task-clearing run only once
-  private static detectedFlagsTick: number | null = null;
-  private static cachedFlags: AttackFlagConfig[] = [];
+  // Shared tick cache for military flag detection helpers.
+  protected static cachedFlagLists: Record<string, { tick: number; flags: unknown[] }> = {};
 
   constructor(flag: AttackFlagConfig) {
     super("SoldierArea", flag.name, flag.position, Game.rooms[flag.targetRoom]);
@@ -53,11 +52,6 @@ export default class SoldierArea extends BaseArea {
   // Static: detect all Attack flags (cached per tick)
 
   public static detectAllFlags(): AttackFlagConfig[] {
-    if (SoldierArea.detectedFlagsTick === Game.time) {
-      return SoldierArea.cachedFlags;
-    }
-    SoldierArea.detectedFlagsTick = Game.time;
-
     const flags = _.filter(Game.flags, flag => flag.name === "Attack" || flag.name.startsWith("Attack-"));
     const currentStates: Record<string, SoldierFlagState> = {};
     const configs: AttackFlagConfig[] = [];
@@ -110,7 +104,7 @@ export default class SoldierArea extends BaseArea {
 
     const validFlags = configs.filter(c => c.squadSize > 0);
     validFlags.sort((a, b) => a.name.localeCompare(b.name));
-    SoldierArea.cachedFlags = validFlags;
+    SoldierArea.cachedFlagLists.Attack = { tick: Game.time, flags: validFlags as unknown[] };
     return validFlags;
   }
 
@@ -245,6 +239,31 @@ export default class SoldierArea extends BaseArea {
         creep.memory.task = null;
       }
     }
+  }
+
+  protected static detectFlagsForPrefix<T extends { name: string }>(
+    cacheKey: string,
+    prefix: string,
+    parseFlag: (flag: Flag) => T | null
+  ): T[] {
+    const cached = this.cachedFlagLists[cacheKey];
+    if (cached && cached.tick === Game.time) {
+      return cached.flags as T[];
+    }
+
+    const flags = _.filter(Game.flags, flag => flag.name === prefix || flag.name.startsWith(`${prefix}-`));
+    const configs: T[] = [];
+
+    for (const flag of flags) {
+      const parsed = parseFlag(flag);
+      if (parsed) {
+        configs.push(parsed);
+      }
+    }
+
+    configs.sort((a, b) => a.name.localeCompare(b.name));
+    this.cachedFlagLists[cacheKey] = { tick: Game.time, flags: configs as unknown[] };
+    return configs;
   }
 
   private static getRoleNameFromColor(primaryColor: number, existingCountInFlag: number, squadSize: number): string {

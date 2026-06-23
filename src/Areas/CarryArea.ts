@@ -17,7 +17,7 @@ export default class CarryArea extends BaseArea {
   collectFromGeneralStore: (StructureContainer | Ruin)[];
   collectFromLimitedStore: StructureLink[];
   droppedResourcesToCollectFrom: Resource[];
-  mineralContainersByType: { container: StructureContainer; resourceType: ResourceConstant }[];
+  mineralContainer: { container: StructureContainer; resourceType: ResourceConstant } | null;
   storage: StructureStorage | null;
 
   constructor(controller: StructureController) {
@@ -33,7 +33,7 @@ export default class CarryArea extends BaseArea {
     this.collectFromGeneralStore = this.getGeneralStoreToCollectFrom();
     this.collectFromLimitedStore = this.getLimitedStoreToCollectFrom();
     this.droppedResourcesToCollectFrom = this.getDroppedResourcesToCollectFrom(RESOURCE_ENERGY);
-    this.mineralContainersByType = this.getMineralContainers();
+    this.mineralContainer = this.getMineralContainer();
     this.storage = GetRoomObjects.getRoomStorage(controller.room);
   }
 
@@ -88,17 +88,18 @@ export default class CarryArea extends BaseArea {
     const storage = GetRoomObjects.getRoomStorage(this.room);
     if (!storage) return false;
 
-    for (const { container, resourceType } of this.mineralContainersByType) {
-      const available = container.store.getUsedCapacity(resourceType);
-      if (available === null || available < creep.carryCapacity) {
-        // Not enough to fill the creep completely — skip mineral collection this trip.
-        continue;
-      }
-      if (storage.store.getFreeCapacity() === 0) continue;
-      creep.addTask(new CreepTask(Activity.CollectMineral, container.pos, null, resourceType));
-      return true;
+    const mineralContainer = this.getMineralContainer();
+    if (!mineralContainer) return false;
+
+    const { container, resourceType } = mineralContainer;
+    const available = container.store.getUsedCapacity(resourceType);
+    if (available === null || available < creep.carryCapacity) {
+      // Not enough to fill the creep completely — skip mineral collection this trip.
+      return false;
     }
-    return false;
+    if (storage.store.getFreeCapacity() === 0) return false;
+    creep.addTask(new CreepTask(Activity.CollectMineral, container.pos, null, resourceType));
+    return true;
   }
 
   private depositMineralToStorage(creep: CreepBase, resourceType: ResourceConstant): void {
@@ -108,18 +109,18 @@ export default class CarryArea extends BaseArea {
     }
   }
 
-  private getMineralContainers(): { container: StructureContainer; resourceType: ResourceConstant }[] {
+  private getMineralContainer(): { container: StructureContainer; resourceType: ResourceConstant } | null {
     const result: { container: StructureContainer; resourceType: ResourceConstant }[] = [];
-    if (this.controllerLevel < 6) return result;
+    if (this.controllerLevel < 6) return null;
     const mineral = GetRoomObjects.getRoomMineral(this.room, false);
-    if (!mineral) return result;
+    if (!mineral) return null;
     const container = GetRoomObjects.getWithinRangeContainer(mineral.pos, 2);
-    if (!container) return result;
+    if (!container) return null;
     const mineralType = mineral.mineralType as ResourceConstant;
     if (container.store.getUsedCapacity(mineralType)! > 0) {
       result.push({ container, resourceType: mineralType });
     }
-    return result;
+    return result[0] ?? null;
   }
 
   private findSomewhereToCollectFrom(creep: CreepBase): void {
@@ -129,6 +130,13 @@ export default class CarryArea extends BaseArea {
     //   creep.addTask(new CreepTask(Activity.Collect, this.collectFromLimitedStore[j].pos));
     //   return;
     // }
+    // In case we put energy by mistake in the mineral container, we should collect it from there.
+    const mineralContainer = this.getMineralContainer();
+    if (mineralContainer && mineralContainer.container.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+      creep.addTask(new CreepTask(Activity.Collect, mineralContainer.container.pos));
+      return;
+    }
+
     const collectFromGeneralStoreSorted = this.collectFromGeneralStore.sort(
       (a, b) => a.pos.getRangeTo(creep.pos.x, creep.pos.y) - b.pos.getRangeTo(creep.pos.x, creep.pos.y)
     );
@@ -137,6 +145,7 @@ export default class CarryArea extends BaseArea {
       creep.addTask(new CreepTask(Activity.Collect, collectFromGeneralStoreSorted[j].pos));
       return;
     }
+    // TODO: I have noticed that sometimes when there is 2000 energy in container and 300 resource dropped on the ground, creeps will go for the dropped resource instead of the container.
     for (let j = 0; j < this.droppedResourcesToCollectFrom.length; j++) {
       if (this.droppedResourcesToCollectFrom[j].amount < creep.carryCapacity / 2) continue;
       creep.addTask(new CreepTask(Activity.Pickup, this.droppedResourcesToCollectFrom[j].pos));
@@ -150,7 +159,11 @@ export default class CarryArea extends BaseArea {
     if (
       creepsInUtilityArea &&
       creepsInUtilityArea.length > 0 &&
-      !(creepsInUtilityArea.length === 1 && Game.creeps[creepsInUtilityArea[0]].spawning === true)
+      !(
+        creepsInUtilityArea.length === 1 &&
+        Game.creeps[creepsInUtilityArea[0]] && // This might be undefined, even though creepsInUtilityArea.length is 1. Adding this extra check to prevent that. Observed after utility died.
+        Game.creeps[creepsInUtilityArea[0]].spawning === true
+      )
     ) {
       if (this.storage && this.storage.store.getUsedCapacity(RESOURCE_ENERGY) < 2000) {
         this.depositToStorage(creep);

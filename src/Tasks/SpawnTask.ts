@@ -23,7 +23,7 @@ export default class SpawnTask {
     this.roleName = roleName;
     this.bodyPartConstant = bodyPartConstant;
     this.area = area;
-    this.namePrefix = namePrefix;
+    this.namePrefix = namePrefix ?? this.getSpawnTypeText();
     this.spawnRoomName = spawnRoomName;
   }
 

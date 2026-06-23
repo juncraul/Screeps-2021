@@ -5,10 +5,18 @@ interface CreepMemory {
   working: boolean;
   task: any;
   seasonSpawnRoom?: string;
+  remoteRoomName?: string;
   soldierFlag?: string | null;
   formationOrder?: number | null;
   currentMineralType?: string | null;
   willSuicideAtTick?: number | undefined;
+  sourceKeeperRecovering?: boolean;
+  lastTickEnergy: number;
+}
+
+interface RemoteRoomEconomy {
+  energyCollected: number;
+  energySpent: number;
 }
 interface SoldierFlagState {
   x: number;
@@ -28,6 +36,7 @@ interface Memory {
   seasonEnemyRooms?: string[];
   soldierFlagState?: SoldierFlagState;
   soldierFlagStates?: Record<string, SoldierFlagState>;
+  remoteRoomEconomy?: Record<string, RemoteRoomEconomy>;
 }
 
 interface ScoreCollectionRecord {

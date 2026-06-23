@@ -28,6 +28,35 @@ export default class RemoteArea extends BaseArea {
   mineralType: ResourceConstant | null;
   roadWorkDone: boolean;
 
+  public static addRemoteRoomCollectedEnergy(roomName: string, amount: number): void {
+    if (amount <= 0) {
+      return;
+    }
+
+    const economy = Memory.remoteRoomEconomy ?? {};
+    const current = economy[roomName] ?? { energyCollected: 0, energySpent: 0 };
+    current.energyCollected += amount;
+    economy[roomName] = current;
+    Memory.remoteRoomEconomy = economy;
+  }
+
+  public static addRemoteRoomExpense(roomName: string, amount: number): void {
+    if (amount <= 0) {
+      return;
+    }
+
+    const economy = Memory.remoteRoomEconomy ?? {};
+    const current = economy[roomName] ?? { energyCollected: 0, energySpent: 0 };
+    current.energySpent += amount;
+    economy[roomName] = current;
+    Memory.remoteRoomEconomy = economy;
+  }
+
+  public static getRemoteRoomEconomy(roomName: string): RemoteRoomEconomy {
+    const economy = Memory.remoteRoomEconomy ?? {};
+    return economy[roomName] ?? { energyCollected: 0, energySpent: 0 };
+  }
+
   constructor(roomName: string, claimThisRoom: boolean, baseRoomName?: string, mineralOnly = false) {
     super("RemoteArea", roomName, new RoomPosition(25, 25, roomName), Game.rooms[roomName]);
     this.roomName = roomName;
@@ -45,12 +74,11 @@ export default class RemoteArea extends BaseArea {
     this.containers = [];
     this.containerConstructionSites = [];
     this.resources = [];
-    // TODO: We still need to create a claimer even if we need to claim this room, if the room is not ours yet
-    this.claimersPerRoom = claimThisRoom ? 0 : 1; // Default value, can be adjusted based on strategy
+    this.claimersPerRoom = 1;
     // TODO: Find a proper way to increase harvester per source, we've incresed for this room because it is too far away from our base and we need more harvesters to make it work (creeps die too quickly)
     this.harvestersPerSource = 1; // Default value, can be adjusted based on strategy
-    this.carriersPerRoom = claimThisRoom ? 0 : 1; // Default value, can be adjusted based on strategy
-    this.repairersPerRoom = 1; // Default value, can be adjusted based on strategy
+    this.carriersPerRoom = 1;
+    this.repairersPerRoom = 1;
     this.claimThisRoom = claimThisRoom;
     this.mineralOnly = mineralOnly;
     this.mineral = null;
@@ -58,15 +86,22 @@ export default class RemoteArea extends BaseArea {
     this.mineralType = null;
     this.roadWorkDone = Helper.getCashedMemory(`${RemoteArea.ROAD_WORK_DONE}${roomName}`, false);
 
-    // if (claimThisRoom) {
-    //   this.claimersPerRoom = 1;
-    // }
-
-    if (mineralOnly) {
+    if (claimThisRoom) {
+      // TODO: We still need to create a claimer even if we need to claim this room, if the room is not ours yet
+      this.claimersPerRoom = 0;
+      this.carriersPerRoom = 0;
+    } else if (mineralOnly) {
       this.claimersPerRoom = 0;
       this.harvestersPerSource = 0;
       this.carriersPerRoom = 0;
       this.repairersPerRoom = 0;
+    } else {
+      const energyInRoom = this.totalEnergyInRoom();
+      if (energyInRoom > 2000) {
+        this.carriersPerRoom = 2;
+      } else if (energyInRoom > 4000) {
+        this.carriersPerRoom = 3;
+      }
     }
 
     if (Game.rooms[roomName]) {
@@ -193,8 +228,15 @@ export default class RemoteArea extends BaseArea {
     let y = 3;
     const title: TextStyle = { align: "left", opacity: 1, font: 0.6, color: "#ffffff" };
     const plain: TextStyle = { align: "left", opacity: 0.85, font: 0.5 };
+    const economy = RemoteArea.getRemoteRoomEconomy(this.roomName);
 
     visual.text("=== Remote Room ===", x, y, title);
+    y += 0.7;
+    visual.text(`Energy collected: ${economy.energyCollected}`, x, y, plain);
+    y += 0.7;
+    visual.text(`Energy spent: ${economy.energySpent}`, x, y, plain);
+    y += 0.7;
+    visual.text(`Net energy: ${economy.energyCollected - economy.energySpent}`, x, y, plain);
     y += 0.7;
     if (this.mineralOnly) {
       visual.text("Mode: Mineral Only", x, y, plain);
@@ -286,7 +328,9 @@ export default class RemoteArea extends BaseArea {
       });
 
       console.log(
-        `RemoteArea ${this.roomName}: Road creation from ${start} to ${roadTarget} - Remaining roads to build: ${result.remainingRoadsToBuild}`
+        `RemoteArea ${this.roomName}: Road creation from ${String(start)} to ${String(
+          roadTarget
+        )} - Remaining roads to build: ${result.remainingRoadsToBuild}`
       );
       if (result.remainingRoadsToBuild === 0) {
         Helper.setCashedMemory(`${RemoteArea.ROAD_WORK_DONE}${start.roomName}`, true);
@@ -363,8 +407,11 @@ export default class RemoteArea extends BaseArea {
     const hostileInvaders = this.room.find(FIND_HOSTILE_CREEPS, {
       filter: creep => creep.owner && creep.owner.username === "Invader"
     });
-    const invaderFlag = Game.flags[RemoteArea.INVADER_DEFENDER + this.baseRoom.name];
-    if (hostileInvaders.length === 0) {
+    const invaderCores = this.room.find(FIND_HOSTILE_STRUCTURES, {
+      filter: structure => structure.structureType === STRUCTURE_INVADER_CORE
+    });
+    const invaderFlag = Game.flags[RemoteArea.INVADER_DEFENDER + this.baseRoom.name + "-" + this.roomName];
+    if (hostileInvaders.length === 0 && invaderCores.length === 0) {
       // Threat gone: remove managed invader-defense flag.
       if (invaderFlag) {
         invaderFlag.remove();
@@ -374,9 +421,9 @@ export default class RemoteArea extends BaseArea {
 
     // Create a managed invader-defense flag.
     if (!invaderFlag) {
-      const targetPos = hostileInvaders[0].pos;
-      const flagName = `${RemoteArea.INVADER_DEFENDER}${this.baseRoom.name}`;
-      targetPos.createFlag(flagName, COLOR_RED, COLOR_BLUE);
+      const targetPos = hostileInvaders[0] ? hostileInvaders[0].pos : invaderCores[0].pos;
+      const flagName = `${RemoteArea.INVADER_DEFENDER}${this.baseRoom.name}-${this.roomName}`;
+      targetPos.createFlag(flagName, COLOR_RED, COLOR_RED);
     }
   }
 
@@ -516,7 +563,7 @@ export default class RemoteArea extends BaseArea {
         // Collect from resources
         const sourceResource = this.findResourceWithEnergy(creep);
         if (sourceResource) {
-          creep.addTask(new CreepTask(Activity.Collect, sourceResource.pos));
+          creep.addTask(new CreepTask(Activity.Pickup, sourceResource.pos));
           return;
         }
 
@@ -762,6 +809,7 @@ export default class RemoteArea extends BaseArea {
       }
     }
 
+    // TODO: Avoid depositing at the container next to mineral
     // Check containers
     const containers = this.baseRoom.find(FIND_STRUCTURES, {
       filter: structure =>
@@ -801,7 +849,7 @@ export default class RemoteArea extends BaseArea {
       "Claimer",
       bodyPartConstants,
       this,
-      "Claimer-" + this.roomName
+      "RemoteClaimer-" + this.roomName
     );
   }
 
@@ -822,7 +870,7 @@ export default class RemoteArea extends BaseArea {
       "Harvester",
       bodyPartConstants,
       this,
-      "Harvester-" + this.roomName
+      "RemoteHarvester-" + this.roomName
     );
   }
 
@@ -845,7 +893,7 @@ export default class RemoteArea extends BaseArea {
       "Carrier",
       bodyPartConstants,
       this,
-      "Carrier-" + this.roomName
+      "RemoteCarrier-" + this.roomName
     );
   }
 
@@ -862,7 +910,7 @@ export default class RemoteArea extends BaseArea {
       "Repairer",
       bodyPartConstants,
       this,
-      "Repairer-" + this.roomName
+      "RemoteRepairer-" + this.roomName
     );
   }
 
@@ -875,5 +923,21 @@ export default class RemoteArea extends BaseArea {
       return true;
     }
     return false;
+  }
+
+  private totalEnergyInRoom(): number {
+    if (!this.room) return 0;
+    let totalEnergy = 0;
+    // Add energy from containers
+    for (const container of this.containers) {
+      totalEnergy += container.store.getUsedCapacity(RESOURCE_ENERGY);
+    }
+    // Add energy from dropped resources
+    for (const resource of this.resources) {
+      if (resource.resourceType === RESOURCE_ENERGY) {
+        totalEnergy += resource.amount;
+      }
+    }
+    return totalEnergy;
   }
 }

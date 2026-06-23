@@ -12,7 +12,8 @@ import RemoteRebuildArea from "Areas/RemoteRebuildArea";
 import UtilityArea from "Areas/UtilityArea";
 import SeasonArea from "Areas/SeasonArea";
 import RepairArea from "Areas/RepairArea";
-import SoldierArea from "Areas/SoldierArea";
+import SoldierArea from "./Areas/Military/SoldierArea";
+import SourceKeeperArea from "./Areas/Military/SourceKeeperArea";
 
 export default class Overseer implements IOverseer {
   public refresh(): void {
@@ -40,6 +41,7 @@ export default class Overseer implements IOverseer {
     const repairTasks = this.handleRepairArea(room);
     const utilityTasks = this.handleUtilityArea(room);
     const soldierTasks = this.handleSoldierArea(room);
+    const sourceKeeperTasks = this.handleSourceKeeperArea(room);
     let seasonTasks: SpawnTask[] = [];
     if (Memory.Keys.IsSeason) {
       seasonTasks = this.handleSeasonArea(room);
@@ -106,6 +108,7 @@ export default class Overseer implements IOverseer {
       ...(taskBuckets[SpawnType.Repairer] ?? []),
       ...utilityTasks,
       ...soldierTasks,
+      ...sourceKeeperTasks,
       ...remoteTasks,
       ...remoteRebuildTasks,
       ...seasonTasks
@@ -242,6 +245,27 @@ export default class Overseer implements IOverseer {
     return tasks;
   }
 
+  private handleSourceKeeperArea(room: Room): SpawnTask[] {
+    const flags = SourceKeeperArea.detectAllFlags();
+    if (flags.length === 0) return [];
+
+    const sourceKeeperAreas = flags
+      .filter(flag => flag.spawnRoomName === room.name)
+      .map(flag => new SourceKeeperArea(flag));
+    if (sourceKeeperAreas.length === 0) {
+      return [];
+    }
+
+    const tasks: SpawnTask[] = [];
+
+    for (const area of sourceKeeperAreas) {
+      tasks.push(...area.handleSpawnTasks(room));
+      area.handleThisArea();
+    }
+
+    return tasks;
+  }
+
   private handleSeasonArea(room: Room): SpawnTask[] {
     const seasonArea = new SeasonArea(room.name);
     const tasks: SpawnTask[] = seasonArea.handleSpawnTasks();
@@ -253,12 +277,11 @@ export default class Overseer implements IOverseer {
     if (newTasks.length > 0) {
       room.visual.text("List of spawns", 30, 25, { align: "left", opacity: 0.5, color: "#ff0000" });
       for (let i = 0; i < newTasks.length; i++) {
-        room.visual.text(
-          `${newTasks[i].getSpawnTypeText()} - ${newTasks[i].getBodyPartAsTextAggregated()}`,
-          30,
-          26 + i,
-          { align: "left", opacity: 0.5, color: "#ff0000" }
-        );
+        room.visual.text(`${newTasks[i].namePrefix ?? ""} - ${newTasks[i].getBodyPartAsTextAggregated()}`, 30, 26 + i, {
+          align: "left",
+          opacity: 0.5,
+          color: "#ff0000"
+        });
       }
     }
     if (newTasks.length > 0) {
@@ -278,6 +301,11 @@ export default class Overseer implements IOverseer {
           theNewCreep.memory.role = task.roleName;
           if (task.spawnRoomName) {
             theNewCreep.memory.seasonSpawnRoom = task.spawnRoomName;
+          }
+          if (task.area.memoryType.startsWith("Remote")) {
+            theNewCreep.memory.remoteRoomName = task.area.areaId;
+            const spentEnergy = task.bodyPartConstant.reduce((sum, bodyPart) => sum + BODYPART_COST[bodyPart], 0);
+            RemoteArea.addRemoteRoomExpense(task.area.areaId, spentEnergy);
           }
           task.area.handleNewCreepMemory(creepName);
         } else {
