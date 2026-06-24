@@ -86,6 +86,17 @@ export default class RemoteArea extends BaseArea {
     this.mineralType = null;
     this.roadWorkDone = Helper.getCashedMemory(`${RemoteArea.ROAD_WORK_DONE}${roomName}`, false);
 
+    if (Game.rooms[roomName]) {
+      this.sources = GetRoomObjects.getRoomSources(Game.rooms[roomName]);
+      this.resources = GetRoomObjects.getRoomDroppedResources(Game.rooms[roomName]);
+      this.updateContainers();
+      if (mineralOnly) {
+        this.mineral = GetRoomObjects.getRoomMineral(Game.rooms[roomName], false);
+        this.mineralContainer = this.mineral ? GetRoomObjects.getWithinRangeContainer(this.mineral.pos, 2) : null;
+        this.mineralType = this.mineral ? (this.mineral.mineralType as ResourceConstant) : null;
+      }
+    }
+
     if (claimThisRoom) {
       // TODO: We still need to create a claimer even if we need to claim this room, if the room is not ours yet
       this.claimersPerRoom = 0;
@@ -97,21 +108,10 @@ export default class RemoteArea extends BaseArea {
       this.repairersPerRoom = 0;
     } else {
       const energyInRoom = this.totalEnergyInRoom();
-      if (energyInRoom > 2000) {
-        this.carriersPerRoom = 2;
-      } else if (energyInRoom > 4000) {
+      if (energyInRoom > 4000) {
         this.carriersPerRoom = 3;
-      }
-    }
-
-    if (Game.rooms[roomName]) {
-      this.sources = GetRoomObjects.getRoomSources(Game.rooms[roomName]);
-      this.resources = GetRoomObjects.getRoomDroppedResources(Game.rooms[roomName]);
-      this.updateContainers();
-      if (mineralOnly) {
-        this.mineral = GetRoomObjects.getRoomMineral(Game.rooms[roomName], false);
-        this.mineralContainer = this.mineral ? GetRoomObjects.getWithinRangeContainer(this.mineral.pos, 2) : null;
-        this.mineralType = this.mineral ? (this.mineral.mineralType as ResourceConstant) : null;
+      } else if (energyInRoom > 2000) {
+        this.carriersPerRoom = 2;
       }
     }
   }

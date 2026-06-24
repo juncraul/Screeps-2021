@@ -4,7 +4,8 @@ import UpgradeArea from "Areas/UpgradeArea";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import CarryArea from "Areas/CarryArea";
 import ConstructionArea from "Areas/ConstructionArea";
-import { Cannon } from "Cannon";
+import { Cannon } from "Defense/Cannon";
+import { SafeMode } from "Defense/SafeMode";
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { BaseBuilder } from "BaseBuilder/BaseBuilder";
 import RemoteArea from "Areas/RemoteArea";
@@ -27,6 +28,7 @@ export default class Overseer implements IOverseer {
         const cannon = new Cannon(tower);
         cannon.cannonLogic();
       });
+      SafeMode.run(roomWithSpawn, towers);
       BaseBuilder.logicCreateConstructionSites();
     });
   }

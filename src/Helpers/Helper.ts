@@ -31,11 +31,12 @@ export class Helper {
     Memory.Keys[key] = value;
   }
 
-  public static getFreeAdjacentPositions(pos: RoomPosition, room: Room) {
+  public static getFreeAdjacentPositions(pos: RoomPosition, room: Room, minRange = 1, maxRange = 1): RoomPosition[] {
     const adjacentPositions: RoomPosition[] = [];
-    for (let x = -1; x <= 1; x++) {
-      for (let y = -1; y <= 1; y++) {
-        if (x === 0 && y === 0) continue;
+    for (let x = -maxRange; x <= maxRange; x++) {
+      for (let y = -maxRange; y <= maxRange; y++) {
+        const range = Math.max(Math.abs(x), Math.abs(y));
+        if (range < minRange || range > maxRange) continue;
         const adjacentPos = new RoomPosition(pos.x + x, pos.y + y, room.name);
         if (adjacentPos.x < 0 || adjacentPos.x > 49 || adjacentPos.y < 0 || adjacentPos.y > 49) continue;
         if (adjacentPos.lookFor(LOOK_TERRAIN)[0] === "wall") continue;

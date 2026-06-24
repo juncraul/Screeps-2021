@@ -18,6 +18,14 @@ interface RemoteRoomEconomy {
   energyCollected: number;
   energySpent: number;
 }
+
+interface RoomDefenseState {
+  wallAndRampartCount: number;
+  coreStructureCount: number;
+  breachDetected: boolean;
+  lastAttackTick: number;
+}
+
 interface SoldierFlagState {
   x: number;
   y: number;
@@ -37,6 +45,7 @@ interface Memory {
   soldierFlagState?: SoldierFlagState;
   soldierFlagStates?: Record<string, SoldierFlagState>;
   remoteRoomEconomy?: Record<string, RemoteRoomEconomy>;
+  roomDefenseStates?: Record<string, RoomDefenseState>;
 }
 
 interface ScoreCollectionRecord {

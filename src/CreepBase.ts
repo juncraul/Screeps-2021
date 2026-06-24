@@ -275,9 +275,17 @@ export class CreepBase {
         break;
       }
       case Activity.Repair: {
-        const structure3: Structure | null = CreepTask.getStructureFromTarget(this.task.targetPlace);
+        let structure3: Structure | null = CreepTask.getStructureFromTarget(this.task.targetPlace);
         if (structure3) {
-          this.repair(structure3);
+          const result = this.repair(structure3);
+          if (result === OK && structure3.hits === structure3.hitsMax) {
+            // If the structure is fully repaired, check if there is a non-road, non-rampart structure at the same position to repair instead.
+            const nonRoadStructure = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
+            if (nonRoadStructure) {
+              structure3 = nonRoadStructure;
+              this.repair(structure3);
+            }
+          }
         }
         if (this.carryCurrent === 0 || !structure3 || structure3.hits === structure3.hitsMax) {
           this.creep.say("Rep Done");
@@ -629,14 +637,10 @@ export class CreepBase {
       return;
     }
 
-    console.log(`Creep ${this.name} energy gained: ${gainedEnergy}`);
-
     const remoteRoomName = this.memory.remoteRoomName;
     if (!remoteRoomName || this.room.name !== remoteRoomName) {
       return;
     }
-
-    console.log(`Creep ${this.name} is collecting energy from remote room ${remoteRoomName}.`);
 
     const remoteRoomEconomy = Memory.remoteRoomEconomy ?? {};
     const currentStats = remoteRoomEconomy[remoteRoomName] ?? { energyCollected: 0, energySpent: 0 };

@@ -3,6 +3,7 @@ import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
+import { CreepBase } from "CreepBase";
 
 export default class UpgradeArea extends BaseArea {
   controller: StructureController;
@@ -11,12 +12,13 @@ export default class UpgradeArea extends BaseArea {
   containerNextToController: StructureContainer | null;
   linkNextToController: StructureLink | null;
   containerConstructionSiteNextToController: ConstructionSite | null;
+  linkConstructionSiteNextToController: ConstructionSite | null;
 
   constructor(controller: StructureController) {
     super("UpgradeArea", controller.id, controller.pos, controller.room);
     this.controller = controller;
     this.controllerLevel = controller.level;
-    this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 1);
+    this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 2);
     this.linkNextToController = GetRoomObjects.getWithinRangeLink(controller.pos, 2);
     this.containerConstructionSiteNextToController = GetRoomObjects.getWithinRangeConstructionSite(
       controller.pos,
@@ -24,6 +26,11 @@ export default class UpgradeArea extends BaseArea {
       STRUCTURE_CONTAINER
     );
     this.maxWorkerCount = this.calculateMaxWorkerCount();
+    this.linkConstructionSiteNextToController = GetRoomObjects.getWithinRangeConstructionSite(
+      controller.pos,
+      2,
+      STRUCTURE_LINK
+    );
   }
 
   public handleSpawnTasks(): SpawnTask[] {
@@ -47,16 +54,23 @@ export default class UpgradeArea extends BaseArea {
   }
 
   private handleSetup() {
-    if (
-      !this.containerNextToController &&
-      !this.linkNextToController &&
-      !this.containerConstructionSiteNextToController
-    ) {
-      const positionForContainer = Helper.getFreeAdjacentPositions(this.controller.pos, this.room)[0];
+    if (!this.containerNextToController && !this.containerConstructionSiteNextToController) {
+      const positionForContainer = Helper.getFreeAdjacentPositions(this.controller.pos, this.room, 2, 2)[0];
       if (positionForContainer) {
         this.room.createConstructionSite(positionForContainer, STRUCTURE_CONTAINER);
       } else {
         console.log("UpgradeArea: No position for container next to controller");
+      }
+    }
+
+    if (this.controllerLevel < 6) return;
+
+    if (!this.linkNextToController && !this.linkConstructionSiteNextToController && this.containerNextToController) {
+      const positionForLink = Helper.getFreeAdjacentPositions(this.containerNextToController.pos, this.room, 2, 2)[0];
+      if (positionForLink) {
+        this.room.createConstructionSite(positionForLink, STRUCTURE_LINK);
+      } else {
+        console.log("UpgradeArea: No position for link next to controller");
       }
     }
   }
@@ -69,22 +83,7 @@ export default class UpgradeArea extends BaseArea {
 
       // Find some resources
       if (!this.creeps[i].isFull()) {
-        if (this.containerNextToController && this.containerNextToController.store[RESOURCE_ENERGY] > 100) {
-          this.creeps[i].addTask(new CreepTask(Activity.Collect, this.containerNextToController.pos));
-        } else if (this.linkNextToController && this.linkNextToController.store[RESOURCE_ENERGY] > 100) {
-          this.creeps[i].addTask(new CreepTask(Activity.Collect, this.linkNextToController.pos));
-        } else {
-          const collectFromGeneralStoreSorted = this.getGeneralStoreToCollectFrom().sort(
-            (a, b) =>
-              a.pos.getRangeTo(this.creeps[i].pos.x, this.creeps[i].pos.y) -
-              b.pos.getRangeTo(this.creeps[i].pos.x, this.creeps[i].pos.y)
-          );
-          for (let j = 0; j < collectFromGeneralStoreSorted.length; j++) {
-            if (collectFromGeneralStoreSorted[j].store.energy < 200) continue;
-            this.creeps[i].addTask(new CreepTask(Activity.Collect, collectFromGeneralStoreSorted[j].pos));
-            break;
-          }
-        }
+        this.findSomwhereToCollectEnergyFrom(this.creeps[i]);
       }
 
       // Build the construction site(Container) or do the main job, which is upgrade the controller.
@@ -105,13 +104,18 @@ export default class UpgradeArea extends BaseArea {
     }
 
     const availableUpgradeEnergy = this.getAvailableUpgradeEnergy();
-    let maxWorkerCount = 1;
 
-    if (availableUpgradeEnergy >= 3000) {
-      maxWorkerCount = 2;
+    if (availableUpgradeEnergy > 50000) {
+      return 5;
+    } else if (availableUpgradeEnergy >= 20000) {
+      return 4;
+    } else if (availableUpgradeEnergy >= 10000) {
+      return 3;
+    } else if (availableUpgradeEnergy >= 3000) {
+      return 2;
     }
 
-    return Math.min(maxWorkerCount, 2);
+    return 1;
   }
 
   private getAvailableUpgradeEnergy(): number {
@@ -128,6 +132,11 @@ export default class UpgradeArea extends BaseArea {
     const generalStores = this.getGeneralStoreToCollectFrom();
     for (const structure of generalStores) {
       availableEnergy += structure.store.getUsedCapacity(RESOURCE_ENERGY);
+    }
+
+    const storage = GetRoomObjects.getRoomStorage(this.room);
+    if (storage) {
+      availableEnergy += storage.store.getUsedCapacity(RESOURCE_ENERGY);
     }
 
     return availableEnergy;
@@ -165,5 +174,31 @@ export default class UpgradeArea extends BaseArea {
     for (let i = 0; i < moveParts; i++) bodyPartConstants.push(MOVE);
 
     return new SpawnTask(SpawnType.Upgrader, this.areaId, "Upgrader", bodyPartConstants, this);
+  }
+
+  private findSomwhereToCollectEnergyFrom(creep: CreepBase): void {
+    if (this.containerNextToController && this.containerNextToController.store[RESOURCE_ENERGY] > 0) {
+      creep.addTask(new CreepTask(Activity.Collect, this.containerNextToController.pos));
+    } else if (this.linkNextToController && this.linkNextToController.store[RESOURCE_ENERGY] > 0) {
+      creep.addTask(new CreepTask(Activity.Collect, this.linkNextToController.pos));
+    } else {
+      const storagesAndContainers: (
+        | StructureStorage
+        | StructureContainer
+      )[] = this.getGeneralStoreToCollectFrom().filter(
+        store => store instanceof StructureContainer && store.store[RESOURCE_ENERGY] > 500
+      ) as StructureContainer[];
+      const roomStorage = GetRoomObjects.getRoomStorage(this.room);
+      if (roomStorage && roomStorage.store[RESOURCE_ENERGY] > 1000) {
+        storagesAndContainers.push(roomStorage);
+      }
+      const collectFromGeneralStoreSorted = storagesAndContainers.sort(
+        (a, b) => a.pos.getRangeTo(creep.pos.x, creep.pos.y) - b.pos.getRangeTo(creep.pos.x, creep.pos.y)
+      );
+      for (let j = 0; j < collectFromGeneralStoreSorted.length; j++) {
+        creep.addTask(new CreepTask(Activity.Collect, collectFromGeneralStoreSorted[j].pos));
+        break;
+      }
+    }
   }
 }
