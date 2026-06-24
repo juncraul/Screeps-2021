@@ -1,5 +1,5 @@
 import CreepTask, { Activity } from "Tasks/CreepTask";
-import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
+import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import HarvestArea from "./HarvestArea";
 
 export default class MineralArea extends HarvestArea {
@@ -9,6 +9,10 @@ export default class MineralArea extends HarvestArea {
     super("MineralArea", mineral.id, mineral.pos, controller);
     this.mineral = mineral;
     this.maxWorkerCount = 1;
+
+    if (this.mineral.mineralAmount === 0) {
+      this.maxWorkerCount = 0; // No need to spawn a miner if there is no mineral to mine.
+    }
   }
 
   public handleSpawnTasks(): SpawnTask[] {
@@ -54,6 +58,6 @@ export default class MineralArea extends HarvestArea {
     if (existing.length > 0) return null;
 
     const bodyPartConstants: BodyPartConstant[] = [WORK, WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE];
-    return new SpawnTask(SpawnType.Harvester, this.areaId, "MineralHarvester", bodyPartConstants, this);
+    return new SpawnTask(CreepType.MineralHarvester, this.areaId, bodyPartConstants, this);
   }
 }

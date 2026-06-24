@@ -1,6 +1,6 @@
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
-import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
+import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
 
 export default class ConstructionArea extends BaseArea {
@@ -100,6 +100,6 @@ export default class ConstructionArea extends BaseArea {
       // 600 energy
       bodyPartConstants = [WORK, WORK, WORK, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE];
     }
-    return new SpawnTask(SpawnType.Constructor, this.areaId, "Constructor", bodyPartConstants, this);
+    return new SpawnTask(CreepType.Constructor, this.areaId, bodyPartConstants, this);
   }
 }

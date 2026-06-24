@@ -1,54 +1,60 @@
 import BaseArea from "Areas/BaseArea";
+import { CreepType } from "CreepType";
+
+export { CreepType };
 
 export default class SpawnTask {
-  spawnType: SpawnType;
+  creepType: CreepType;
   areaId: string;
-  roleName: string;
   bodyPartConstant: BodyPartConstant[];
   area: BaseArea;
-  namePrefix: string | null = null;
+  namePrefix: string;
   spawnRoomName?: string;
 
   constructor(
-    spawnType: SpawnType,
+    creepType: CreepType,
     areaId: string,
-    roleName: string,
     bodyPartConstant: BodyPartConstant[],
     area: BaseArea,
     namePrefix: string | null = null,
     spawnRoomName?: string
   ) {
-    this.spawnType = spawnType;
+    this.creepType = creepType;
     this.areaId = areaId;
-    this.roleName = roleName;
     this.bodyPartConstant = bodyPartConstant;
     this.area = area;
-    this.namePrefix = namePrefix ?? this.getSpawnTypeText();
+    this.namePrefix = namePrefix ?? this.getCreepTypeText();
     this.spawnRoomName = spawnRoomName;
   }
 
-  public getSpawnTypeText(): string {
-    switch (this.spawnType) {
-      case SpawnType.Harvester:
+  public getCreepTypeText(): string {
+    switch (this.creepType) {
+      case CreepType.Harvester:
         return "Harvester";
-      case SpawnType.Upgrader:
+      case CreepType.Upgrader:
         return "Upgrader";
-      case SpawnType.Carrier:
+      case CreepType.Carrier:
         return "Carrier";
-      case SpawnType.Constructor:
+      case CreepType.Constructor:
         return "Constructor";
-      case SpawnType.Claimer:
+      case CreepType.Claimer:
         return "Claimer";
-      case SpawnType.Collector:
+      case CreepType.Collector:
         return "Collector";
-      case SpawnType.Repairer:
+      case CreepType.Repairer:
         return "Repairer";
-      case SpawnType.Melee:
+      case CreepType.Melee:
         return "Melee";
-      case SpawnType.Ranged:
+      case CreepType.Ranged:
         return "Ranged";
-      case SpawnType.Healer:
+      case CreepType.Healer:
         return "Healer";
+      case CreepType.Utility:
+        return "Utility";
+      case CreepType.MineralHarvester:
+        return "MineralHarvester";
+      case CreepType.MineralCarrier:
+        return "MineralCarrier";
     }
   }
 
@@ -61,17 +67,4 @@ export default class SpawnTask {
       .map(([part, count]) => `${count}x${part}`)
       .join(", ");
   }
-}
-
-export enum SpawnType {
-  Harvester = 0,
-  Upgrader = 1,
-  Carrier = 2,
-  Constructor = 3,
-  Claimer = 4,
-  Collector = 5,
-  Repairer = 6,
-  Melee = 7,
-  Ranged = 8,
-  Healer = 9
 }

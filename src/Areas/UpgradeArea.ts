@@ -1,7 +1,7 @@
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
-import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
+import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
 import { CreepBase } from "CreepBase";
 
@@ -173,7 +173,7 @@ export default class UpgradeArea extends BaseArea {
     for (let i = 0; i < carryParts; i++) bodyPartConstants.push(CARRY);
     for (let i = 0; i < moveParts; i++) bodyPartConstants.push(MOVE);
 
-    return new SpawnTask(SpawnType.Upgrader, this.areaId, "Upgrader", bodyPartConstants, this);
+    return new SpawnTask(CreepType.Upgrader, this.areaId, bodyPartConstants, this);
   }
 
   private findSomwhereToCollectEnergyFrom(creep: CreepBase): void {

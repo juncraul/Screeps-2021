@@ -1,6 +1,6 @@
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
-import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
+import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
 import { CreepBase } from "CreepBase";
 import { Helper } from "Helpers/Helper";
@@ -253,7 +253,7 @@ export default class CarryArea extends BaseArea {
       for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
     }
 
-    return new SpawnTask(SpawnType.Carrier, this.areaId, "Carrier", bodyPartConstants, this);
+    return new SpawnTask(CreepType.Carrier, this.areaId, bodyPartConstants, this);
   }
 
   protected doWeNeedToReplaceWeakCreep(): boolean {

@@ -1,7 +1,7 @@
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
-import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
+import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import HarvestArea from "./HarvestArea";
 
 export default class SourceArea extends HarvestArea {
@@ -206,7 +206,7 @@ export default class SourceArea extends HarvestArea {
         bodyPartConstants = [WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE, CARRY, CARRY, CARRY, CARRY];
       }
     }
-    return new SpawnTask(SpawnType.Harvester, this.source.id, "Harvester", bodyPartConstants, this);
+    return new SpawnTask(CreepType.Harvester, this.source.id, bodyPartConstants, this);
   }
 
   protected doWeNeedToReplaceWeakCreep(): boolean {

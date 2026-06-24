@@ -1,5 +1,5 @@
 import CreepTask, { Activity } from "Tasks/CreepTask";
-import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
+import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import { CreepBase } from "../../CreepBase";
 import SoldierArea, { AttackFlagConfig } from "./SoldierArea";
 
@@ -200,15 +200,7 @@ export default class SourceKeeperArea extends SoldierArea {
     for (let i = 0; i < 15; i++) bodyPartConstants.push(ATTACK); // 450 Attack
     for (let i = 0; i < 2; i++) bodyPartConstants.push(HEAL); // 24 Heal
 
-    return new SpawnTask(
-      SpawnType.Melee,
-      this.areaId,
-      "SourceKeeper",
-      bodyPartConstants,
-      this,
-      null,
-      this.flag.spawnRoomName
-    );
+    return new SpawnTask(CreepType.Melee, this.areaId, bodyPartConstants, this, null, this.flag.spawnRoomName);
   }
 
   private findClosestInvader(position: RoomPosition): Creep | null {

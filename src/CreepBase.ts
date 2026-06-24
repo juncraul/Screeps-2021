@@ -1,5 +1,6 @@
 import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
+import { CreepType } from "CreepType";
 
 export class CreepBase {
   public creep: Creep; // The creep that this wrapper class will control
@@ -17,7 +18,7 @@ export class CreepBase {
   public owner: Owner; // |
   public pos: RoomPosition; // |
   // public ref: string;						// |
-  public roleName: string; // |
+  public creepType: CreepType; // |
   public room: Room; // |
   public saying: string; // |
   public spawning: boolean; // |
@@ -42,7 +43,7 @@ export class CreepBase {
     this.name = creep.name;
     this.owner = creep.owner;
     this.pos = creep.pos;
-    this.roleName = creep.memory.role;
+    this.creepType = CreepType[creep.memory.role as keyof typeof CreepType] ?? CreepType.Harvester;
     this.room = creep.room;
     this.saying = creep.saying;
     this.spawning = creep.spawning;
@@ -633,7 +634,7 @@ export class CreepBase {
   }
 
   private trackRemoteEnergyCollected(gainedEnergy: number): void {
-    if (this.roleName !== "Carrier") {
+    if (this.creepType !== CreepType.Carrier) {
       return;
     }
 

@@ -1,7 +1,7 @@
 import { Helper } from "Helpers/Helper";
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
-import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
+import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
 import { CreepBase } from "CreepBase";
 
@@ -125,11 +125,11 @@ export default class RemoteArea extends BaseArea {
     }
 
     if (this.mineralOnly) {
-      if (this.getCreepCountByType("MineralHarvester") < 1) {
+      if (this.getCreepCountByType(CreepType.MineralHarvester) < 1) {
         const task = this.createMineralHarvester();
         if (task) tasksForThisArea.push(task);
       }
-      if (this.getCreepCountByType("MineralCarrier") < 1) {
+      if (this.getCreepCountByType(CreepType.MineralCarrier) < 1) {
         tasksForThisArea.push(this.createMineralCarrier());
       }
       return tasksForThisArea;
@@ -142,7 +142,7 @@ export default class RemoteArea extends BaseArea {
       this.controller.reservation.username !== Helper.getUserName() ||
       this.controller.reservation.ticksToEnd < 1000
     ) {
-      const claimerCount = this.getCreepCountByType("Claimer");
+      const claimerCount = this.getCreepCountByType(CreepType.Claimer);
       if (claimerCount < this.claimersPerRoom) {
         tasksForThisArea.push(this.createClaimer());
       }
@@ -150,19 +150,19 @@ export default class RemoteArea extends BaseArea {
 
     if (
       this.sources.length > 0 &&
-      this.getCreepCountByType("Harvester") < this.harvestersPerSource * this.sources.length
+      this.getCreepCountByType(CreepType.Harvester) < this.harvestersPerSource * this.sources.length
     ) {
       tasksForThisArea.push(this.createHarvester());
     }
 
     // Handle Carrier spawning
-    const carrierCount = this.getCreepCountByType("Carrier");
+    const carrierCount = this.getCreepCountByType(CreepType.Carrier);
     if (carrierCount < this.carriersPerRoom && this.containers.length > 0) {
       tasksForThisArea.push(this.createCarrier());
     }
 
     // Handle Repairer spawning for remote maintenance
-    const repairerCount = this.getCreepCountByType("Repairer");
+    const repairerCount = this.getCreepCountByType(CreepType.Repairer);
     if (repairerCount < this.repairersPerRoom && this.shouldSpawnRepairer()) {
       tasksForThisArea.push(this.createRepairer());
     }
@@ -180,32 +180,36 @@ export default class RemoteArea extends BaseArea {
       this.suicideCreepDueToBrokenParts(this.creeps[i]);
       if (!this.creeps[i].isFree()) continue;
 
-      const creepType = this.creeps[i].roleName;
+      const creepType = this.creeps[i].creepType;
 
       // Move to the remote room if not there (except for carriers who need to go to base)
-      if (this.creeps[i].pos.roomName !== this.roomName && creepType !== "Carrier" && creepType !== "MineralCarrier") {
+      if (
+        this.creeps[i].pos.roomName !== this.roomName &&
+        creepType !== CreepType.Carrier &&
+        creepType !== CreepType.MineralCarrier
+      ) {
         this.creeps[i].addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.roomName)));
         continue;
       }
 
       // Handle based on creep type
       switch (creepType) {
-        case "Claimer":
+        case CreepType.Claimer:
           this.handleClaimer(this.creeps[i]);
           break;
-        case "Harvester":
+        case CreepType.Harvester:
           this.handleHarvester(this.creeps[i]);
           break;
-        case "Carrier":
+        case CreepType.Carrier:
           this.handleCarrier(this.creeps[i]);
           break;
-        case "Repairer":
+        case CreepType.Repairer:
           this.handleRepairer(this.creeps[i]);
           break;
-        case "MineralHarvester":
+        case CreepType.MineralHarvester:
           this.handleMineralHarvester(this.creeps[i]);
           break;
-        case "MineralCarrier":
+        case CreepType.MineralCarrier:
           this.handleMineralCarrier(this.creeps[i]);
           break;
         default:
@@ -241,24 +245,32 @@ export default class RemoteArea extends BaseArea {
     if (this.mineralOnly) {
       visual.text("Mode: Mineral Only", x, y, plain);
       y += 0.7;
-      visual.text("MineralHarvesters " + this.getCreepCountByType("MineralHarvester") + "/1", x, y, plain);
+      visual.text("MineralHarvesters " + this.getCreepCountByType(CreepType.MineralHarvester) + "/1", x, y, plain);
       y += 0.7;
-      visual.text("MineralCarriers " + this.getCreepCountByType("MineralCarrier") + "/1", x, y, plain);
+      visual.text("MineralCarriers " + this.getCreepCountByType(CreepType.MineralCarrier) + "/1", x, y, plain);
       y += 0.7;
       visual.text("Mineral: " + (this.mineralType ?? "unknown"), x, y, plain);
     } else {
-      visual.text("Claimers " + this.getCreepCountByType("Claimer") + "/" + this.claimersPerRoom, x, y, plain);
+      visual.text("Claimers " + this.getCreepCountByType(CreepType.Claimer) + "/" + this.claimersPerRoom, x, y, plain);
       y += 0.7;
       visual.text(
-        "Harvesters " + this.getCreepCountByType("Harvester") + "/" + this.harvestersPerSource * this.sources.length,
+        "Harvesters " +
+          this.getCreepCountByType(CreepType.Harvester) +
+          "/" +
+          this.harvestersPerSource * this.sources.length,
         x,
         y,
         plain
       );
       y += 0.7;
-      visual.text("Carriers " + this.getCreepCountByType("Carrier") + "/" + this.carriersPerRoom, x, y, plain);
+      visual.text("Carriers " + this.getCreepCountByType(CreepType.Carrier) + "/" + this.carriersPerRoom, x, y, plain);
       y += 0.7;
-      visual.text("Repairers " + this.getCreepCountByType("Repairer") + "/" + this.repairersPerRoom, x, y, plain);
+      visual.text(
+        "Repairers " + this.getCreepCountByType(CreepType.Repairer) + "/" + this.repairersPerRoom,
+        x,
+        y,
+        plain
+      );
     }
     y += 0.7;
     visual.text("The base room is " + this.baseRoom.name, x, y, plain);
@@ -475,9 +487,8 @@ export default class RemoteArea extends BaseArea {
     }
     const bodyPartConstants: BodyPartConstant[] = [WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE, MOVE];
     return new SpawnTask(
-      SpawnType.Harvester,
+      CreepType.MineralHarvester,
       this.areaId,
-      "MineralHarvester",
       bodyPartConstants,
       this,
       "MinHarvester-" + this.roomName
@@ -489,14 +500,7 @@ export default class RemoteArea extends BaseArea {
     const bodyPartConstants: BodyPartConstant[] = [];
     for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
     for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
-    return new SpawnTask(
-      SpawnType.Carrier,
-      this.areaId,
-      "MineralCarrier",
-      bodyPartConstants,
-      this,
-      "MinCarrier-" + this.roomName
-    );
+    return new SpawnTask(CreepType.MineralCarrier, this.areaId, bodyPartConstants, this, "MinCarrier-" + this.roomName);
   }
 
   private handleClaimer(creep: CreepBase) {
@@ -827,10 +831,10 @@ export default class RemoteArea extends BaseArea {
     return bestStructure;
   }
 
-  private getCreepCountByType(type: string): number {
+  private getCreepCountByType(type: CreepType): number {
     let count = 0;
     for (const creep of this.creeps) {
-      if (creep.roleName === type) {
+      if (creep.creepType === type) {
         count++;
       }
     }
@@ -843,14 +847,7 @@ export default class RemoteArea extends BaseArea {
     for (let i = 0; i < segments; i++) bodyPartConstants.push(CLAIM);
     for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
 
-    return new SpawnTask(
-      SpawnType.Claimer,
-      this.areaId,
-      "Claimer",
-      bodyPartConstants,
-      this,
-      "RemoteClaimer-" + this.roomName
-    );
+    return new SpawnTask(CreepType.Claimer, this.areaId, bodyPartConstants, this, "RemoteClaimer-" + this.roomName);
   }
 
   private createHarvester(): SpawnTask {
@@ -864,14 +861,7 @@ export default class RemoteArea extends BaseArea {
     for (let i = 0; i < carryParts; i++) bodyPartConstants.push(CARRY);
     for (let i = 0; i < moveParts; i++) bodyPartConstants.push(MOVE);
 
-    return new SpawnTask(
-      SpawnType.Harvester,
-      this.areaId,
-      "Harvester",
-      bodyPartConstants,
-      this,
-      "RemoteHarvester-" + this.roomName
-    );
+    return new SpawnTask(CreepType.Harvester, this.areaId, bodyPartConstants, this, "RemoteHarvester-" + this.roomName);
   }
 
   private createCarrier(): SpawnTask {
@@ -887,14 +877,7 @@ export default class RemoteArea extends BaseArea {
 
     for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
     for (let i = 0; i < moveParts; i++) bodyPartConstants.push(MOVE);
-    return new SpawnTask(
-      SpawnType.Carrier,
-      this.areaId,
-      "Carrier",
-      bodyPartConstants,
-      this,
-      "RemoteCarrier-" + this.roomName
-    );
+    return new SpawnTask(CreepType.Carrier, this.areaId, bodyPartConstants, this, "RemoteCarrier-" + this.roomName);
   }
 
   private createRepairer(): SpawnTask {
@@ -904,14 +887,7 @@ export default class RemoteArea extends BaseArea {
     for (let i = 0; i < segments; i++) bodyPartConstants.push(WORK);
     for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
     for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
-    return new SpawnTask(
-      SpawnType.Repairer,
-      this.areaId,
-      "Repairer",
-      bodyPartConstants,
-      this,
-      "RemoteRepairer-" + this.roomName
-    );
+    return new SpawnTask(CreepType.Repairer, this.areaId, bodyPartConstants, this, "RemoteRepairer-" + this.roomName);
   }
 
   private suicideCreepDueToBrokenParts(creep: CreepBase): boolean {

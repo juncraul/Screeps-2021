@@ -1,6 +1,6 @@
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
-import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
+import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
 
 export default class RepairArea extends BaseArea {
@@ -143,6 +143,6 @@ export default class RepairArea extends BaseArea {
       bodyPartConstants.push(WORK, CARRY, MOVE);
     }
 
-    return new SpawnTask(SpawnType.Repairer, this.areaId, "Repairer", bodyPartConstants, this);
+    return new SpawnTask(CreepType.Repairer, this.areaId, bodyPartConstants, this);
   }
 }

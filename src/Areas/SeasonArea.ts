@@ -1,6 +1,6 @@
 import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
-import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
+import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
 import { CreepBase } from "../CreepBase";
 
@@ -341,6 +341,6 @@ export default class SeasonArea extends BaseArea {
 
   private createCreepForThisArea(): SpawnTask | null {
     const bodyParts: BodyPartConstant[] = [MOVE];
-    return new SpawnTask(SpawnType.Collector, this.areaId, "Collector", bodyParts, this, null, this.spawnRoomName);
+    return new SpawnTask(CreepType.Collector, this.areaId, bodyParts, this, null, this.spawnRoomName);
   }
 }

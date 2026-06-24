@@ -1,0 +1,15 @@
+export enum CreepType {
+  Harvester = 0,
+  Upgrader = 1,
+  Carrier = 2,
+  Constructor = 3,
+  Claimer = 4,
+  Collector = 5,
+  Repairer = 6,
+  Melee = 7,
+  Ranged = 8,
+  Healer = 9,
+  Utility = 10,
+  MineralHarvester = 11,
+  MineralCarrier = 12
+}

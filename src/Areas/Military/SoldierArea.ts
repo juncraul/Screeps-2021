@@ -1,6 +1,6 @@
 import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
-import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
+import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./../BaseArea";
 import { CreepBase } from "../../CreepBase";
 
@@ -154,7 +154,7 @@ export default class SoldierArea extends BaseArea {
     y += 0.7;
     for (const area of soldierAreas) {
       const flag = area.flag;
-      const role = SoldierArea.getRoleNameFromColor(flag.primaryColor, 0, flag.squadSize);
+      const role = CreepType[SoldierArea.getCreepTypeFromColor(flag.primaryColor, 0, flag.squadSize)];
       let targetType = "Everything";
       if (flag.secondaryColor === SecondaryColor.GRAY) targetType = "Structures";
       else if (flag.secondaryColor === SecondaryColor.BLUE) targetType = "Creeps";
@@ -200,7 +200,7 @@ export default class SoldierArea extends BaseArea {
         continue;
       }
 
-      if (creep.roleName !== "Healer") {
+      if (creep.creepType !== CreepType.Healer) {
         const combatAssigned = this.assignCombatTask(creep, this.flag.secondaryColor);
         if (!combatAssigned && !formationMovementApplied) {
           creep.addTask(new CreepTask(Activity.Move, this.flag.position));
@@ -266,13 +266,17 @@ export default class SoldierArea extends BaseArea {
     return configs;
   }
 
-  private static getRoleNameFromColor(primaryColor: number, existingCountInFlag: number, squadSize: number): string {
-    if (primaryColor === PrimaryColor.GREEN) return "Ranged";
-    if (primaryColor === PrimaryColor.BLUE) return "Healer";
+  private static getCreepTypeFromColor(
+    primaryColor: number,
+    existingCountInFlag: number,
+    squadSize: number
+  ): CreepType {
+    if (primaryColor === PrimaryColor.GREEN) return CreepType.Ranged;
+    if (primaryColor === PrimaryColor.BLUE) return CreepType.Healer;
     if (primaryColor === PrimaryColor.PURPLE) {
-      return existingCountInFlag < Math.ceil(squadSize / 2) ? "Melee" : "Ranged";
+      return existingCountInFlag < Math.ceil(squadSize / 2) ? CreepType.Melee : CreepType.Ranged;
     }
-    return "Melee";
+    return CreepType.Melee;
   }
 
   // Private instance helpers
@@ -300,32 +304,28 @@ export default class SoldierArea extends BaseArea {
   }
 
   private createCreepForFlag(): SpawnTask | null {
-    const role = SoldierArea.getRoleNameFromColor(this.flag.primaryColor, this.creeps.length, this.flag.squadSize);
+    const creepType = SoldierArea.getCreepTypeFromColor(
+      this.flag.primaryColor,
+      this.creeps.length,
+      this.flag.squadSize
+    );
     let bodyPartConstants: BodyPartConstant[];
-    let spawnType: SpawnType;
-    let name: string;
 
-    switch (role) {
-      case "Melee":
-        spawnType = SpawnType.Melee;
-        name = "Melee";
+    switch (creepType) {
+      case CreepType.Melee:
         bodyPartConstants = this.createMeleeBody(this.flag.bodySegments ?? 1);
         break;
-      case "Ranged":
-        spawnType = SpawnType.Ranged;
-        name = "Ranged";
+      case CreepType.Ranged:
         bodyPartConstants = this.createRangedBody(this.flag.bodySegments ?? 1);
         break;
-      case "Healer":
-        spawnType = SpawnType.Healer;
-        name = "Healer";
+      case CreepType.Healer:
         bodyPartConstants = this.createHealerBody(this.flag.bodySegments ?? 1);
         break;
       default:
         return null;
     }
 
-    return new SpawnTask(spawnType, this.areaId, name, bodyPartConstants, this, null, this.flag.baseRoomName);
+    return new SpawnTask(creepType, this.areaId, bodyPartConstants, this, null, this.flag.baseRoomName);
   }
 
   private createMeleeBody(segments: number): BodyPartConstant[] {
@@ -347,7 +347,7 @@ export default class SoldierArea extends BaseArea {
   }
 
   private runHealerSupport(): void {
-    const healers = this.creeps.filter(creep => creep.roleName === "Healer");
+    const healers = this.creeps.filter(creep => creep.creepType === CreepType.Healer);
     for (const healer of healers) {
       this.healMostDamagedTarget(healer);
     }

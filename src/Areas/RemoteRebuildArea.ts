@@ -1,7 +1,7 @@
 import { Helper } from "Helpers/Helper";
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
-import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
+import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
 import { CreepBase } from "CreepBase";
 
@@ -141,9 +141,8 @@ export default class RemoteRebuildArea extends BaseArea {
     for (let i = 0; i < n; i++) body.push(CARRY);
     for (let i = 0; i < n; i++) body.push(MOVE);
     return new SpawnTask(
-      SpawnType.Constructor,
+      CreepType.Constructor,
       this.areaId,
-      "Constructor",
       body,
       this,
       `RemoteRebuild-Constructor-${this.remoteRoomName}`
@@ -159,14 +158,7 @@ export default class RemoteRebuildArea extends BaseArea {
     const body: BodyPartConstant[] = [];
     for (let i = 0; i < n; i++) body.push(CARRY);
     for (let i = 0; i < n; i++) body.push(MOVE);
-    return new SpawnTask(
-      SpawnType.Carrier,
-      this.areaId,
-      "Carrier",
-      body,
-      this,
-      `RemoteRebuild-Carrier-${this.remoteRoomName}`
-    );
+    return new SpawnTask(CreepType.Carrier, this.areaId, body, this, `RemoteRebuild-Carrier-${this.remoteRoomName}`);
   }
 
   /**
@@ -180,9 +172,8 @@ export default class RemoteRebuildArea extends BaseArea {
     for (let i = 0; i < n; i++) body.push(MOVE);
     for (let i = 0; i < n; i++) body.push(CARRY);
     return new SpawnTask(
-      SpawnType.Harvester,
+      CreepType.Harvester,
       this.areaId,
-      "Harvester",
       body,
       this,
       `RemoteRebuild-Harvester-${this.remoteRoomName}`
@@ -199,13 +190,6 @@ export default class RemoteRebuildArea extends BaseArea {
     for (let i = 0; i < n; i++) body.push(WORK);
     for (let i = 0; i < n; i++) body.push(CARRY);
     for (let i = 0; i < n; i++) body.push(MOVE);
-    return new SpawnTask(
-      SpawnType.Upgrader,
-      this.areaId,
-      "Upgrader",
-      body,
-      this,
-      `RemoteRebuild-Upgrader-${this.remoteRoomName}`
-    );
+    return new SpawnTask(CreepType.Upgrader, this.areaId, body, this, `RemoteRebuild-Upgrader-${this.remoteRoomName}`);
   }
 }

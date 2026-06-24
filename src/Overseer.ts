@@ -1,7 +1,7 @@
 import SourceArea from "Areas/SourceArea";
 import MineralArea from "Areas/MineralArea";
 import UpgradeArea from "Areas/UpgradeArea";
-import SpawnTask, { SpawnType } from "Tasks/SpawnTask";
+import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import CarryArea from "Areas/CarryArea";
 import ConstructionArea from "Areas/ConstructionArea";
 import { Cannon } from "Defense/Cannon";
@@ -70,25 +70,25 @@ export default class Overseer implements IOverseer {
     // Harvester x2 -> Carry x1 -> Upgrader x1 -> Carry x1 -> Upgrader x1
     // Existing creeps count as filling their pattern slot so the order stays
     // stable across ticks regardless of which creeps have already been spawned.
-    const spawnOrder: SpawnType[] = [
-      SpawnType.Harvester,
-      SpawnType.Carrier,
-      SpawnType.Harvester,
-      SpawnType.Upgrader,
-      SpawnType.Carrier,
-      SpawnType.Upgrader
+    const spawnOrder: CreepType[] = [
+      CreepType.Harvester,
+      CreepType.Carrier,
+      CreepType.Harvester,
+      CreepType.Upgrader,
+      CreepType.Carrier,
+      CreepType.Upgrader
     ];
     const existing: Record<number, number> = {
-      [SpawnType.Harvester]: harvest.existing,
-      [SpawnType.Carrier]: carry.existing,
-      [SpawnType.Upgrader]: upgrade.existing
+      [CreepType.Harvester]: harvest.existing,
+      [CreepType.Carrier]: carry.existing,
+      [CreepType.Upgrader]: upgrade.existing
     };
     const taskBuckets: Record<number, SpawnTask[]> = {
-      [SpawnType.Harvester]: [...harvest.tasks],
-      [SpawnType.Carrier]: [...carry.tasks],
-      [SpawnType.Upgrader]: [...upgrade.tasks],
-      [SpawnType.Constructor]: [...constructionTasks],
-      [SpawnType.Repairer]: [...repairTasks]
+      [CreepType.Harvester]: [...harvest.tasks],
+      [CreepType.Carrier]: [...carry.tasks],
+      [CreepType.Upgrader]: [...upgrade.tasks],
+      [CreepType.Constructor]: [...constructionTasks],
+      [CreepType.Repairer]: [...repairTasks]
     };
     const ordered: SpawnTask[] = [];
     for (const type of spawnOrder) {
@@ -103,11 +103,11 @@ export default class Overseer implements IOverseer {
     }
     // Append any remaining tasks not consumed by the pattern
     const remaining = [
-      ...(taskBuckets[SpawnType.Harvester] ?? []),
-      ...(taskBuckets[SpawnType.Carrier] ?? []),
-      ...(taskBuckets[SpawnType.Upgrader] ?? []),
-      ...(taskBuckets[SpawnType.Constructor] ?? []),
-      ...(taskBuckets[SpawnType.Repairer] ?? []),
+      ...(taskBuckets[CreepType.Harvester] ?? []),
+      ...(taskBuckets[CreepType.Carrier] ?? []),
+      ...(taskBuckets[CreepType.Upgrader] ?? []),
+      ...(taskBuckets[CreepType.Constructor] ?? []),
+      ...(taskBuckets[CreepType.Repairer] ?? []),
       ...utilityTasks,
       ...soldierTasks,
       ...sourceKeeperTasks,
@@ -297,10 +297,11 @@ export default class Overseer implements IOverseer {
     let theNewCreep: Creep | null = null;
     spawns.forEach(spawn => {
       if (spawn.spawning == null) {
-        const creepName = task.namePrefix ? `${task.namePrefix}-${Game.time}` : `${task.roleName}-${Game.time}`;
+        const roleName = task.getCreepTypeText();
+        const creepName = task.namePrefix ? `${task.namePrefix}-${Game.time}` : `${roleName}-${Game.time}`;
         if (spawn.spawnCreep(task.bodyPartConstant, creepName) === OK) {
           theNewCreep = Game.creeps[creepName];
-          theNewCreep.memory.role = task.roleName;
+          theNewCreep.memory.role = roleName;
           if (task.spawnRoomName) {
             theNewCreep.memory.seasonSpawnRoom = task.spawnRoomName;
           }
