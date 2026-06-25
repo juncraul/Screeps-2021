@@ -2,7 +2,7 @@ import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
-import BaseArea from "./BaseArea";
+import BaseArea from "../BaseArea";
 import { CreepBase } from "CreepBase";
 
 export default class UpgradeArea extends BaseArea {
@@ -177,10 +177,10 @@ export default class UpgradeArea extends BaseArea {
   }
 
   private findSomwhereToCollectEnergyFrom(creep: CreepBase): void {
-    if (this.containerNextToController && this.containerNextToController.store[RESOURCE_ENERGY] > 0) {
-      creep.addTask(new CreepTask(Activity.Collect, this.containerNextToController.pos));
-    } else if (this.linkNextToController && this.linkNextToController.store[RESOURCE_ENERGY] > 0) {
+    if (this.linkNextToController && this.linkNextToController.store[RESOURCE_ENERGY] > 0) {
       creep.addTask(new CreepTask(Activity.Collect, this.linkNextToController.pos));
+    } else if (this.containerNextToController && this.containerNextToController.store[RESOURCE_ENERGY] > 0) {
+      creep.addTask(new CreepTask(Activity.Collect, this.containerNextToController.pos));
     } else {
       const storagesAndContainers: (
         | StructureStorage

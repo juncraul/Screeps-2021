@@ -51,6 +51,13 @@ export default class SourceArea {
         containers.push(potentialContainer);
       }
     }
+    // Get all the containers on the edge which are used by remote carries.
+    const edgeContainers: StructureContainer[] = Game.rooms[this.areaPos.roomName].find(FIND_STRUCTURES, {
+      filter: s =>
+        s.structureType === STRUCTURE_CONTAINER && (s.pos.x < 3 || s.pos.x > 47 || s.pos.y < 3 || s.pos.y > 47)
+    }) as StructureContainer[];
+    containers.push(...edgeContainers);
+
     const ruins: Ruin[] = Game.rooms[this.areaPos.roomName].find(FIND_RUINS);
     for (let i: number = ruins.length - 1; i >= 0; i--) {
       if (ruins[i].store.getUsedCapacity(RESOURCE_ENERGY) !== 0) containers.push(ruins[i]);

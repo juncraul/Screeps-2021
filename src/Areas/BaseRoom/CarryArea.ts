@@ -1,7 +1,7 @@
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
-import BaseArea from "./BaseArea";
+import BaseArea from "../BaseArea";
 import { CreepBase } from "CreepBase";
 import { Helper } from "Helpers/Helper";
 
