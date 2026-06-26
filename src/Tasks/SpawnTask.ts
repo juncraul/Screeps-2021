@@ -55,6 +55,8 @@ export default class SpawnTask {
         return "MineralHarvester";
       case CreepType.MineralCarrier:
         return "MineralCarrier";
+      case CreepType.Looter:
+        return "Looter";
     }
   }
 

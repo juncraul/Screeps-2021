@@ -105,13 +105,13 @@ export default class UpgradeArea extends BaseArea {
 
     const availableUpgradeEnergy = this.getAvailableUpgradeEnergy();
 
-    if (availableUpgradeEnergy > 50000) {
+    if (availableUpgradeEnergy > 100000) {
       return 5;
-    } else if (availableUpgradeEnergy >= 20000) {
+    } else if (availableUpgradeEnergy >= 40000) {
       return 4;
-    } else if (availableUpgradeEnergy >= 10000) {
+    } else if (availableUpgradeEnergy >= 30000) {
       return 3;
-    } else if (availableUpgradeEnergy >= 3000) {
+    } else if (availableUpgradeEnergy >= 10000) {
       return 2;
     }
 

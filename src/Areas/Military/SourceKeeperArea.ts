@@ -10,7 +10,6 @@ export interface SourceKeeperFlagConfig extends AttackFlagConfig {
   spawnRoomName: string;
 }
 
-// TODO: need to work out why it does not create more than 1 creep
 export default class SourceKeeperArea extends SoldierArea {
   public flag: SourceKeeperFlagConfig;
 

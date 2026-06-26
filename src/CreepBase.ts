@@ -145,9 +145,15 @@ export class CreepBase {
         break;
       }
       case Activity.Collect: {
-        let targetCollect: Structure | Ruin | null = CreepTask.getStructureFromTargetNoRoadNoRampart(
+        let targetCollect: Structure | Tombstone | Ruin | null = CreepTask.getStructureFromTargetNoRoadNoRampart(
           this.task.targetPlace
         );
+        if (!targetCollect) {
+          targetCollect = CreepTask.getTombstoneFromTarget(this.task.targetPlace);
+          if (!targetCollect) {
+            targetCollect = CreepTask.getRuinFromTarget(this.task.targetPlace);
+          }
+        }
         if (!targetCollect) {
           targetCollect = CreepTask.getRuinFromTarget(this.task.targetPlace);
           if (!targetCollect) {
@@ -167,7 +173,8 @@ export class CreepBase {
           targetCollect instanceof StructureStorage ||
           targetCollect instanceof StructureTerminal ||
           targetCollect instanceof StructureLab ||
-          targetCollect instanceof Ruin
+          targetCollect instanceof Ruin ||
+          targetCollect instanceof Tombstone
         ) {
           if (targetCollect.store.energy === 0) {
             this.creep.say("Col Done");
@@ -345,10 +352,16 @@ export class CreepBase {
         // Move minerals from carry to storage; targetPlaceSecond carries the resource type name via targetId.
         const storageStruct = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
         if (storageStruct) {
-          const resourceType = (this.task.targetId ?? RESOURCE_ENERGY) as ResourceConstant;
-          const result = this.transfer(storageStruct, resourceType);
-          if (result === OK || result === ERR_FULL) {
-            this.creep.say("Min Dep Done");
+          // Get resource type from creep store
+          const resourceType = Object.keys(this.creep.store)[0] as ResourceConstant | undefined;
+          if (resourceType) {
+            const result = this.transfer(storageStruct, resourceType);
+            if (result === OK || result === ERR_FULL) {
+              this.creep.say("Min Dep Done");
+              this.task.taskDone = true;
+            }
+          } else {
+            this.creep.say("No min");
             this.task.taskDone = true;
           }
         }

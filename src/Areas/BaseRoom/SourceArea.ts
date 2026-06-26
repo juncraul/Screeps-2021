@@ -104,7 +104,7 @@ export default class SourceArea extends HarvestArea {
     if (
       linkForController &&
       linkForController.store.energy === 0 &&
-      ((storage && storage.store.energy > 10000) || !storage)
+      ((storage && storage.store.energy > 30000) || !storage)
     ) {
       this.linkNextToSource.transferEnergy(linkForController);
       return;

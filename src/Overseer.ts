@@ -14,6 +14,7 @@ import UtilityArea from "Areas/BaseRoom/UtilityArea";
 import SeasonArea from "Areas/SeasonArea";
 import RepairArea from "Areas/BaseRoom/RepairArea";
 import SoldierArea from "./Areas/Military/SoldierArea";
+import LooterArea from "./Areas/Military/LooterArea";
 import SourceKeeperArea from "./Areas/Military/SourceKeeperArea";
 
 export default class Overseer implements IOverseer {
@@ -43,6 +44,7 @@ export default class Overseer implements IOverseer {
     const repair = this.handleRepairArea(room);
     const utility = this.handleUtilityArea(room);
     const soldierTasks = this.handleSoldierArea(room);
+    const looterTasks = this.handleLooterArea(room);
     const sourceKeeperTasks = this.handleSourceKeeperArea(room);
     let seasonTasks: SpawnTask[] = [];
     if (Memory.Keys.IsSeason) {
@@ -111,13 +113,13 @@ export default class Overseer implements IOverseer {
       ...utility.tasks,
       ...soldierTasks,
       ...sourceKeeperTasks,
+      ...looterTasks,
       ...remoteTasks,
       ...remoteRebuildTasks,
       ...seasonTasks
     ];
 
     this.drawBaseRoomAreaStats(room, {
-      HarvestArea: { existing: harvest.existing, queued: harvest.tasks.length },
       SourceArea: { existing: harvest.sourceExisting, queued: harvest.sourceTasks.length },
       MineralArea: { existing: harvest.mineralExisting, queued: harvest.mineralTasks.length },
       CarryArea: { existing: carry.existing, queued: carry.tasks.length },
@@ -130,7 +132,9 @@ export default class Overseer implements IOverseer {
     return ordered.concat(remaining);
   }
 
-  private handleHarvestArea(room: Room): {
+  private handleHarvestArea(
+    room: Room
+  ): {
     tasks: SpawnTask[];
     existing: number;
     sourceTasks: SpawnTask[];
@@ -295,6 +299,30 @@ export default class Overseer implements IOverseer {
     }
 
     SoldierArea.drawLegend(soldierAreas, room);
+    return tasks;
+  }
+
+  private handleLooterArea(room: Room): SpawnTask[] {
+    const flags = LooterArea.detectAllFlags();
+    if (flags.length === 0) {
+      return [];
+    }
+
+    const looterAreas = flags
+      .filter(flag => !flag.baseRoomName || flag.baseRoomName === room.name)
+      .map(flag => new LooterArea(flag));
+
+    if (looterAreas.length === 0) {
+      return [];
+    }
+
+    const tasks: SpawnTask[] = [];
+
+    for (const area of looterAreas) {
+      tasks.push(...area.handleSpawnTasks(room));
+      area.handleThisArea();
+    }
+
     return tasks;
   }
 
