@@ -14,6 +14,7 @@ import UtilityArea from "Areas/BaseRoom/UtilityArea";
 import SeasonArea from "Areas/SeasonArea";
 import RepairArea from "Areas/BaseRoom/RepairArea";
 import SoldierArea from "./Areas/Military/SoldierArea";
+import DefenseArea from "./Areas/Military/DefenseArea";
 import LooterArea from "./Areas/Military/LooterArea";
 import SourceKeeperArea from "./Areas/Military/SourceKeeperArea";
 
@@ -43,6 +44,7 @@ export default class Overseer implements IOverseer {
     const construction = this.handleConstructionArea(room);
     const repair = this.handleRepairArea(room);
     const utility = this.handleUtilityArea(room);
+    const defense = this.handleDefenseArea(room);
     const soldierTasks = this.handleSoldierArea(room);
     const looterTasks = this.handleLooterArea(room);
     const sourceKeeperTasks = this.handleSourceKeeperArea(room);
@@ -126,10 +128,11 @@ export default class Overseer implements IOverseer {
       ConstructionArea: { existing: construction.existing, queued: construction.tasks.length },
       RepairArea: { existing: repair.existing, queued: repair.tasks.length },
       UpgradeArea: { existing: upgrade.existing, queued: upgrade.tasks.length },
-      UtilityArea: { existing: utility.existing, queued: utility.tasks.length }
+      UtilityArea: { existing: utility.existing, queued: utility.tasks.length },
+      DefenseArea: { existing: defense.existing, queued: defense.tasks.length }
     });
 
-    return ordered.concat(remaining);
+    return [...defense.tasks, ...ordered, ...remaining];
   }
 
   private handleHarvestArea(
@@ -224,6 +227,26 @@ export default class Overseer implements IOverseer {
     const tasks = repairArea.handleSpawnTasks();
     const existing = repairArea.creeps.length;
     repairArea.handleThisArea();
+
+    return { tasks, existing };
+  }
+
+  private handleDefenseArea(room: Room): { tasks: SpawnTask[]; existing: number } {
+    const flags = DefenseArea.detectAllFlags().filter(f => f.roomName === room.name);
+    if (flags.length === 0) {
+      return { tasks: [], existing: 0 };
+    }
+
+    const tasks: SpawnTask[] = [];
+    let existing = 0;
+
+    for (const flagConfig of flags) {
+      const area = new DefenseArea(flagConfig);
+      tasks.push(...area.handleSpawnTasks(room));
+      existing += area.creeps.length;
+      area.handleThisArea();
+    }
+
     return { tasks, existing };
   }
 

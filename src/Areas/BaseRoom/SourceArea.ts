@@ -36,18 +36,21 @@ export default class SourceArea extends HarvestArea {
       return;
     }
 
-    const linksBuiltAlreadyInRoom = this.room.find(FIND_STRUCTURES, {
-      filter: structure => structure.structureType === STRUCTURE_LINK
-    }).length;
-    const linksToBeBuiltAlreadyInRoom = this.room.find(FIND_CONSTRUCTION_SITES, {
-      filter: structure => structure.structureType === STRUCTURE_LINK
-    }).length;
+    const sourcesInRoom = this.room.find(FIND_SOURCES);
+    const linksNextToSourcesInRoom = sourcesInRoom
+      .map(source => GetRoomObjects.getWithinRangeLink(source.pos, 2))
+      .filter(link => link !== null) as StructureLink[];
+
+    // TODO: This does not work properly it gives [null, null] when there are no construction sites next to sources in the room, need to fix this.
+    const linksConstructionSitesNextToSourcesInRoom = sourcesInRoom
+      .map(source => GetRoomObjects.getWithinRangeConstructionSite(source.pos, 2, STRUCTURE_LINK))
+      .filter(constructionSite => constructionSite !== null) as ConstructionSite[];
 
     if (!this.linkNextToSource && !this.linkConstructionSiteNextToSource && this.containerNextToHarvestArea) {
       const canCreateLink =
         this.controllerLevel >= 7 || // At level 7 we can create another link at the second source, the link for level 6 is for the controller.
         (this.controllerLevel === 5 && // At level 5 we create only one link at the source and one at the base.
-          linksBuiltAlreadyInRoom + linksToBeBuiltAlreadyInRoom < 1 &&
+          linksNextToSourcesInRoom.length + linksConstructionSitesNextToSourcesInRoom.length < 1 &&
           this.isFurthestSourceInRoom());
 
       if (canCreateLink) {

@@ -6,6 +6,7 @@ import { CreepBase } from "../../CreepBase";
 
 const SQUAD_SIZE = 5;
 const ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
+const EXCEPTION_PLAYER_NAMES = ["nekey975"];
 
 enum PrimaryColor {
   RED = COLOR_RED, // Melee
@@ -770,8 +771,13 @@ export default class SoldierArea extends BaseArea {
   }
 
   private attackEverything(creep: CreepBase, room: Room): boolean {
-    const enemyCreeps = room.find(FIND_HOSTILE_CREEPS);
-    const enemyStructures = room.find(FIND_HOSTILE_STRUCTURES);
+    // We need to filter players we don't want to attack, like our allies or exceptions.
+    const enemyCreeps = room
+      .find(FIND_HOSTILE_CREEPS)
+      .filter(creep => !EXCEPTION_PLAYER_NAMES.includes(creep.owner.username));
+    const enemyStructures = room
+      .find(FIND_HOSTILE_STRUCTURES)
+      .filter(structure => structure.owner && !EXCEPTION_PLAYER_NAMES.includes(structure.owner.username));
     if (enemyCreeps.length > 0) {
       const target = creep.pos.findClosestByRange(enemyCreeps);
       if (target) {
@@ -789,7 +795,9 @@ export default class SoldierArea extends BaseArea {
   }
 
   private attackStructures(creep: CreepBase, room: Room): boolean {
-    const enemyStructures = room.find(FIND_HOSTILE_STRUCTURES);
+    const enemyStructures = room
+      .find(FIND_HOSTILE_STRUCTURES)
+      .filter(structure => structure.owner && !EXCEPTION_PLAYER_NAMES.includes(structure.owner.username));
     if (enemyStructures.length > 0) {
       const target = creep.pos.findClosestByRange(enemyStructures);
       if (target) {
@@ -801,7 +809,9 @@ export default class SoldierArea extends BaseArea {
   }
 
   private attackCreeps(creep: CreepBase, room: Room): boolean {
-    const enemyCreeps = room.find(FIND_HOSTILE_CREEPS);
+    const enemyCreeps = room
+      .find(FIND_HOSTILE_CREEPS)
+      .filter(creep => !EXCEPTION_PLAYER_NAMES.includes(creep.owner.username));
     if (enemyCreeps.length > 0) {
       const target = creep.pos.findClosestByRange(enemyCreeps);
       if (target) {

@@ -319,6 +319,34 @@ export class GetRoomObjects {
     return structure;
   }
 
+  // public static getStructureToRepairByRange(
+  //   room: Room,
+  //   damageProportionForNonWallRamp: number,
+  //   includeRampartsWalls = false
+  // ): Structure | null {
+  //   let structure = room.find(FIND_STRUCTURES, {
+  //     filter: structure => structure.structureType === STRUCTURE_RAMPART && structure.hits < 5000 // Just choose low life ramparts first, as they degrade quickly
+  //   });
+  //   if (!structure) {
+  //     structure = room.find(FIND_STRUCTURES, {
+  //       filter: structure =>
+  //         structure.hits < structure.hitsMax * damageProportionForNonWallRamp &&
+  //         structure.structureType !== STRUCTURE_WALL &&
+  //         structure.structureType !== STRUCTURE_RAMPART
+  //     });
+  //   }
+  //   if (!structure && includeRampartsWalls) {
+  //     for (let i = 0.00001; i < 1 && !structure; i *= 2) {
+  //       structure = room.find(FIND_STRUCTURES, {
+  //         filter: structure =>
+  //           (structure.structureType !== STRUCTURE_RAMPART && structure.hits < structure.hitsMax * i) ||
+  //           (structure.structureType === STRUCTURE_RAMPART && structure.hits < structure.hitsMax * i * 300) // Ramparts are 300 times smaller than wall
+  //       });
+  //     }
+  //   }
+  //   return structure;
+  // }
+
   public static getClosestEnemyByRange(fromThis: RoomPosition, containsBodyPart?: BodyPartConstant): Creep | null {
     if (containsBodyPart) {
       return fromThis.findClosestByRange(FIND_HOSTILE_CREEPS, {

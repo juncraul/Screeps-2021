@@ -25,7 +25,7 @@ export default class CarryArea extends BaseArea {
     this.controller = controller;
     this.maxWorkerCount = 1;
     this.controllerLevel = controller.level;
-    this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 1);
+    this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 2);
     this.spawns = GetRoomObjects.getRoomSpawns(controller.room, true);
     this.extensions = GetRoomObjects.getRoomExtensions(controller.room, true);
     this.depositToGeneralStore = this.getGeneralDeposits();
@@ -220,10 +220,10 @@ export default class CarryArea extends BaseArea {
   private getLimitedDeposits(): (StructureSpawn | StructureExtension | StructureTower | StructureLink)[] {
     const structures: (StructureSpawn | StructureExtension | StructureTower | StructureLink)[] = [];
     this.extensions.forEach(extension => {
-      if (extension.store.getFreeCapacity(RESOURCE_ENERGY) !== 0) structures.push(extension);
+      if (extension.store.getFreeCapacity(RESOURCE_ENERGY) > 0) structures.push(extension);
     });
     this.spawns.forEach(spawn => {
-      if (spawn.store.getFreeCapacity(RESOURCE_ENERGY) !== 0) structures.push(spawn);
+      if (spawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) structures.push(spawn);
     });
     GetRoomObjects.getRoomTowers(this.room).forEach(tower => {
       if (tower.store.getFreeCapacity(RESOURCE_ENERGY) > 200) structures.push(tower);

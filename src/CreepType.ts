@@ -12,5 +12,8 @@ export enum CreepType {
   Utility = 10,
   MineralHarvester = 11,
   MineralCarrier = 12,
-  Looter = 13
+  Looter = 13,
+  Defender = 14,
+  DefenseHealer = 15,
+  DefenseRanger = 16
 }

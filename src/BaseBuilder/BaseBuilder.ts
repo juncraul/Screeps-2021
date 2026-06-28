@@ -5,7 +5,8 @@ import {
   layoutReverseRooftop,
   layoutRooftop,
   layoutSieve,
-  layoutUtility
+  layoutUtility,
+  layoutFixedExtension
 } from "./Layout";
 import { Helper } from "./../Helpers/Helper";
 import { GetRoomObjects } from "./../Helpers/GetRoomObjects";
@@ -32,12 +33,14 @@ interface BaseBuildData {
 // WHITE - ORANGE Preview Layout FourWays
 // WHITE - GREEN Preview Layout Bunker
 // WHITE - CYAN  Preview Layout Utility
+// WHITE - YELLOW  Preview Layout Fixed Extensions
 // GREY  - WHITE Build Layout Sieve
 // GREY  - GREY  Build Layout Rooftop
 // GREY  - BROWN Build Layout Reverse/Rooftop
 // GREY  - ORANGE Build Layout FourWays
 // GREY  - GREEN Build Layout Bunker
 // GREY  - CYAN  Build Layout Utility
+// GREY  - YELLOW  Build Layout Fixed Extensions
 
 // BROWN - WHITE Build Rampart instead of wall
 
@@ -150,11 +153,11 @@ export class BaseBuilder {
         buildData.plans = buildPlans;
         this.setBaseBuildData(roomName, buildData);
 
-        const availablePreviewLevels = [2, 3, 4, 5, 6, 7].filter(level => layoutToBeUsed[level] !== undefined);
+        const availablePreviewLevels = [8, 7, 6, 5, 4, 3, 2].filter(level => layoutToBeUsed[level] !== undefined);
         if (availablePreviewLevels.length === 0) {
           continue;
         }
-        const level = availablePreviewLevels[Game.time % availablePreviewLevels.length];
+        const level = availablePreviewLevels[0];
 
         this.buildBase(autoPlaceFlag.pos, layoutToBeUsed, level, true);
         this.createContainerRoadConnections(autoPlaceFlag.room, autoPlaceFlag.pos, layoutToBeUsed, level, true);
@@ -278,6 +281,9 @@ export class BaseBuilder {
     for (const plan of buildPlans) {
       const layoutToBeUsed = this.getBaseLayout(plan.secondaryColor);
       if (!layoutToBeUsed || !layoutToBeUsed[controller.level]) {
+        console.log(
+          "No layout found for secondary color " + plan.secondaryColor + " and controller level " + controller.level
+        );
         continue;
       }
 
@@ -313,6 +319,8 @@ export class BaseBuilder {
         return layoutBunker;
       case COLOR_CYAN:
         return layoutUtility;
+      case COLOR_YELLOW:
+        return layoutFixedExtension;
       default:
         return null;
     }
@@ -329,6 +337,7 @@ export class BaseBuilder {
       { text: "ORANGE -> FourWays", color: "#ffa500" },
       { text: "GREEN  -> Bunker", color: "#00ff00" },
       { text: "CYAN   -> Utility", color: "#00ffff" },
+      { text: "YELLOW -> Fixed Extensions", color: "#ffff00" },
       { text: "Rampart: BROWN/WHITE", color: "#d2b48c" }
     ];
 
@@ -374,9 +383,8 @@ export class BaseBuilder {
     const labCoordinates = layout[controllerLevel]!.buildings.lab.pos;
 
     this.buildBuildingType(anchor, spawnCoordinates, STRUCTURE_SPAWN, previewInsteadOfBuild, layout);
-    if (GetRoomObjects.getRoomSpawns(Game.rooms[anchor.roomName], true).length === 0)
-      // Don't build the other stuff while Spawn is not built yet
-      return;
+    if (GetRoomObjects.getRoomSpawns(Game.rooms[anchor.roomName], true).length === 0 && !previewInsteadOfBuild) return; // Don't build the other stuff while Spawn is not built yet
+
     this.buildBuildingType(anchor, roadCoordinates, STRUCTURE_ROAD, previewInsteadOfBuild, layout);
     Game.rooms[anchor.roomName].visual.connectRoads();
     this.buildBuildingType(anchor, extensionCoordinates, STRUCTURE_EXTENSION, previewInsteadOfBuild, layout);
@@ -433,11 +441,15 @@ export class BaseBuilder {
       return;
     }
 
-    const roadGoals = roadCoordinates.map(coord => {
-      const x = coord.x - layout.data.anchor.x + anchor.x;
-      const y = coord.y - layout.data.anchor.y + anchor.y;
-      return { pos: new RoomPosition(x, y, room.name), range: 0 };
-    });
+    const roadGoals = roadCoordinates
+      .map(coord => {
+        const x = coord.x - layout.data.anchor.x + anchor.x;
+        const y = coord.y - layout.data.anchor.y + anchor.y;
+        if (x < 0 || x > 49 || y < 0 || y > 49) return null;
+        return { pos: new RoomPosition(x, y, room.name), range: 0 };
+      })
+      .filter(goal => goal !== null) as { pos: RoomPosition; range: number }[];
+    console.log(JSON.stringify(roadGoals));
 
     const containerPositions: RoomPosition[] = [];
     const containers = room.find(FIND_STRUCTURES, {

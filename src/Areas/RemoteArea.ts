@@ -98,8 +98,7 @@ export default class RemoteArea extends BaseArea {
     }
 
     if (claimThisRoom) {
-      // TODO: We still need to create a claimer even if we need to claim this room, if the room is not ours yet
-      this.claimersPerRoom = 0;
+      this.claimersPerRoom = this.room.controller?.owner ? 0 : 1;
       this.carriersPerRoom = 0;
     } else if (mineralOnly) {
       this.claimersPerRoom = 0;
@@ -587,7 +586,11 @@ export default class RemoteArea extends BaseArea {
     if (creep.isEmpty()) {
       const energySource = this.findNearbyRemoteEnergy(creep);
       if (energySource) {
-        creep.addTask(new CreepTask(Activity.Collect, energySource.pos));
+        if (energySource instanceof Resource) {
+          creep.addTask(new CreepTask(Activity.Pickup, energySource.pos));
+        } else {
+          creep.addTask(new CreepTask(Activity.Collect, energySource.pos));
+        }
         return;
       }
 
@@ -843,7 +846,7 @@ export default class RemoteArea extends BaseArea {
 
   private createClaimer(): SpawnTask {
     const bodyPartConstants: BodyPartConstant[] = [];
-    const segments = Math.min(3, Math.floor(this.baseRoom.energyCapacityAvailable / 650));
+    const segments = this.claimThisRoom ? 1 : Math.min(3, Math.floor(this.baseRoom.energyCapacityAvailable / 650));
     for (let i = 0; i < segments; i++) bodyPartConstants.push(CLAIM);
     for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
 

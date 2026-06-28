@@ -21,7 +21,7 @@ interface RemoteRoomEconomy {
 
 interface RoomDefenseState {
   wallAndRampartCount: number;
-  coreStructureCount: number;
+  coreStructureDamaged: number;
   breachDetected: boolean;
   lastAttackTick: number;
 }

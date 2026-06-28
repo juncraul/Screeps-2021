@@ -5,9 +5,14 @@ export class SafeMode {
       return;
     }
 
+    if (controller.level < 3) return; // Safe mode is not available until controller level 3
+
     const hostilePlayers = room.find(FIND_HOSTILE_CREEPS, {
       filter: creep => creep.owner && creep.owner.username !== "Invader" && creep.owner.username !== "Source Keeper"
     });
+
+    // Always manage the Defense flag so it is removed when the threat is gone.
+    this.updateDefenseFlag(room, hostilePlayers);
 
     if (hostilePlayers.length === 0) {
       return;
@@ -16,15 +21,13 @@ export class SafeMode {
     const defenseStates = Memory.roomDefenseStates ?? {};
     const previousState = defenseStates[room.name] ?? {
       wallAndRampartCount: this.getWallAndRampartCount(room),
-      coreStructureCount: this.getCoreStructureCount(room),
       breachDetected: false,
       lastAttackTick: 0
     };
 
     const currentWallAndRampartCount = this.getWallAndRampartCount(room);
-    const currentCoreStructureCount = this.getCoreStructureCount(room);
+    const coreStructureDamaged = this.getCoreStructureDamaged(room);
     const wallsDestroyed = currentWallAndRampartCount < previousState.wallAndRampartCount;
-    const coreStructuresDestroyed = currentCoreStructureCount < previousState.coreStructureCount;
 
     const towerEnergy = towers.reduce((sum, tower) => sum + tower.store.getUsedCapacity(RESOURCE_ENERGY), 0);
     const towersOutOfEnergy = towers.length > 0 && towerEnergy === 0;
@@ -39,7 +42,7 @@ export class SafeMode {
       hostilePlayers.length > 0 &&
       breachDetected &&
       strongHostiles &&
-      (towersOutOfEnergy || coreStructuresDestroyed) &&
+      (towersOutOfEnergy || coreStructureDamaged > 0) &&
       controller.safeMode === undefined &&
       controller.safeModeAvailable > 0 &&
       !controller.safeModeCooldown;
@@ -56,7 +59,7 @@ export class SafeMode {
       breachDetected,
       strongHostiles,
       towersOutOfEnergy,
-      coreStructuresDestroyed,
+      coreStructureDamaged > 0,
       shouldActivateSafeMode,
       safeModeActivated,
       towerEnergy,
@@ -65,7 +68,7 @@ export class SafeMode {
 
     defenseStates[room.name] = {
       wallAndRampartCount: currentWallAndRampartCount,
-      coreStructureCount: currentCoreStructureCount,
+      coreStructureDamaged,
       breachDetected: hostilePlayers.length > 0 ? breachDetected : false,
       lastAttackTick: hostilePlayers.length > 0 ? Game.time : previousState.lastAttackTick
     };
@@ -78,9 +81,12 @@ export class SafeMode {
     }).length;
   }
 
-  private static getCoreStructureCount(room: Room): number {
+  private static getCoreStructureDamaged(room: Room): number {
     return room.find(FIND_MY_STRUCTURES, {
-      filter: structure => structure.structureType !== STRUCTURE_RAMPART
+      filter: structure =>
+        structure.structureType !== STRUCTURE_RAMPART &&
+        structure.structureType !== STRUCTURE_LINK && // Exclude links because they can be very outside of our main buildings.
+        structure.hits < structure.hitsMax * 0.5
     }).length;
   }
 
@@ -107,13 +113,35 @@ export class SafeMode {
     return totalOffense >= 15;
   }
 
+  /**
+   * Places a "Defense-{roomName}" flag at the spawn when any hostile player is
+   * within 15 tiles of a spawn. Removes the flag once no such threat is present.
+   */
+  private static updateDefenseFlag(room: Room, hostilePlayers: Creep[]): void {
+    const defenseFlagName = `Defense-${room.name}`;
+    const existingFlag = Game.flags[defenseFlagName];
+    const spawns: StructureSpawn[] = room.find(FIND_MY_SPAWNS);
+
+    const enemyBreachedOutsideWall = hostilePlayers.some(
+      enemy => enemy.pos.x > 2 && enemy.pos.x < 47 && enemy.pos.y > 2 && enemy.pos.y < 47
+    );
+
+    if (enemyBreachedOutsideWall && !existingFlag && spawns.length > 0) {
+      room.createFlag(spawns[0].pos, defenseFlagName, COLOR_RED, COLOR_RED);
+      console.log(`DefenseArea: Placed flag in ${room.name}`);
+    } else if (!enemyBreachedOutsideWall && existingFlag) {
+      existingFlag.remove();
+      console.log(`DefenseArea: Removed flag from ${room.name}`);
+    }
+  }
+
   private static drawDefenseVisuals(
     room: Room,
     hostileCount: number,
     breachDetected: boolean,
     strongHostiles: boolean,
     towersOutOfEnergy: boolean,
-    coreStructuresDestroyed: boolean,
+    coreStructuresDamaged: boolean,
     shouldActivateSafeMode: boolean,
     safeModeActivated: boolean,
     towerEnergy: number,
@@ -139,7 +167,7 @@ export class SafeMode {
     y += 0.6;
     room.visual.text(`Tower energy: ${towerEnergy} (${towerCount} towers)`, x, y, warning);
     y += 0.6;
-    room.visual.text(`Core structures lost: ${coreStructuresDestroyed ? "YES" : "NO"}`, x, y, warning);
+    room.visual.text(`Core structures damaged: ${coreStructuresDamaged ? "YES" : "NO"}`, x, y, warning);
 
     if (shouldActivateSafeMode || safeModeActivated || (breachDetected && strongHostiles)) {
       y += 0.7;

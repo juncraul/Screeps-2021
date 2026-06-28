@@ -63,7 +63,7 @@ export default class RepairArea extends BaseArea {
       return 2;
     }
 
-    return 1;
+    return 2;
   }
 
   private getClosestStructureToRepair(pos: RoomPosition): Structure | null {
@@ -135,8 +135,8 @@ export default class RepairArea extends BaseArea {
     if (segments < 1) {
       segments = 1;
     }
-    if (segments > 4) {
-      segments = 2;
+    if (segments > 5) {
+      segments = 5;
     }
 
     for (let i = 0; i < segments; i++) {
