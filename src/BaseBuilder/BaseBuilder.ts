@@ -449,7 +449,6 @@ export class BaseBuilder {
         return { pos: new RoomPosition(x, y, room.name), range: 0 };
       })
       .filter(goal => goal !== null) as { pos: RoomPosition; range: number }[];
-    console.log(JSON.stringify(roadGoals));
 
     const containerPositions: RoomPosition[] = [];
     const containers = room.find(FIND_STRUCTURES, {

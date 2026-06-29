@@ -1,4 +1,5 @@
 import { Helper } from "Helpers/Helper";
+import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import { CreepType } from "CreepType";
 
@@ -244,9 +245,19 @@ export class CreepBase {
         break;
       }
       case Activity.MoveDifferentRoom: {
-        const pos: RoomPosition = CreepTask.getRoomPositionFromTarget(this.task.targetPlace);
-        this.goTo(pos);
-        if (pos.roomName === this.room.name) {
+        const targetPos: RoomPosition = CreepTask.getRoomPositionFromTarget(this.task.targetPlace);
+        const currentRoom = this.room.name;
+        const reRouteRoom = GetRoomObjects.getReRouteRoom(targetPos.roomName, currentRoom);
+
+        // If a ReRoute flag exists for this (target, from) pair, route through that room first.
+        const moveTarget =
+          reRouteRoom && reRouteRoom !== currentRoom && reRouteRoom !== targetPos.roomName
+            ? new RoomPosition(25, 25, reRouteRoom)
+            : targetPos;
+
+        this.goTo(moveTarget);
+
+        if (targetPos.roomName === this.room.name) {
           this.creep.say("Move Done");
           this.task.taskDone = true;
         }
@@ -268,17 +279,22 @@ export class CreepBase {
         if (source2) {
           this.harvest(source2);
         }
-        if (this.task.targetPlaceSecond) {
-          const structure2: Structure | null = CreepTask.getStructureFromTargetNoRoadNoRampart(
-            this.task.targetPlaceSecond
-          );
-          if (structure2) {
-            if (this.transfer(structure2, RESOURCE_ENERGY) !== OK) {
+        // Deposit to extensions
+        const structureEmptyExtensions = GetRoomObjects.getWithinRangeExtensions(this.creep.pos, 1).find(
+          a => a.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+        );
+        if (structureEmptyExtensions) {
+          if (this.transfer(structureEmptyExtensions, RESOURCE_ENERGY) !== OK) {
+            this.drop(RESOURCE_ENERGY);
+          }
+        } else {
+          // Deposit to link
+          const structureLink = GetRoomObjects.getWithinRangeLink(this.creep.pos, 1);
+          if (structureLink) {
+            if (this.transfer(structureLink, RESOURCE_ENERGY) !== OK) {
               this.drop(RESOURCE_ENERGY);
             }
           }
-        } else {
-          this.drop(RESOURCE_ENERGY);
         }
         break;
       }

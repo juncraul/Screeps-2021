@@ -21,7 +21,10 @@ export default class CarryArea extends BaseArea {
 
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
-    if (this.creeps.length < this.maxWorkerCount + this.getNumberOfDyingCreeps()) {
+    if (
+      this.creeps.length <
+      this.maxWorkerCount + this.getNumberOfDyingCreeps() + (this.doWeNeedToReplaceWeakCreep() ? 1 : 0)
+    ) {
       const task: SpawnTask | null = this.createCreepForThisArea();
       if (task) {
         tasksForThisArea.push(task);
@@ -56,23 +59,23 @@ export default class CarryArea extends BaseArea {
   private getWhereToDeposit(
     currentPosition: RoomPosition
   ): StructureSpawn | StructureExtension | StructureTower | null {
-    const extensions = this.room.find(FIND_MY_STRUCTURES, {
+    let extensions = this.room.find(FIND_MY_STRUCTURES, {
       filter: structure => structure.structureType === STRUCTURE_EXTENSION
     }) as StructureExtension[];
-    const spawns = this.room.find(FIND_MY_STRUCTURES, {
+    let spawns = this.room.find(FIND_MY_STRUCTURES, {
       filter: structure => structure.structureType === STRUCTURE_SPAWN
     }) as StructureSpawn[];
     const towers = this.room.find(FIND_MY_STRUCTURES, {
-      filter: structure =>
-        structure.structureType === STRUCTURE_TOWER && structure.store.getFreeCapacity(RESOURCE_ENERGY) < 950
+      filter: structure => structure.structureType === STRUCTURE_TOWER && structure.energy < 950
     }) as StructureTower[];
 
-    // Disabled spawns for now because it is too far away
-    // if (this.room.name === "E29S25" && extensions.length !== 0 && towers.length !== 0) {
-    //   spawns = [];
-    // }
+    if (towers.find(tower => tower.energy < 50)) {
+      // If any tower is below 50 energy, prioritize it over extensions and spawns
+      extensions = [];
+      spawns = [];
+    }
 
-    const structures = [...extensions, ...towers, ...spawns].filter(
+    const structures = [...extensions, ...spawns, ...towers].filter(
       structure => structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0
     );
     if (structures.length === 0) {
@@ -82,9 +85,21 @@ export default class CarryArea extends BaseArea {
     return closestStructure;
   }
 
+  private doWeNeedToReplaceWeakCreep(): boolean {
+    if (this.creeps.length !== 1) {
+      return false;
+    }
+    const creep = this.creeps[0];
+    if (creep.body.length < 5 && this.room.energyCapacityAvailable >= 450) {
+      return true;
+    }
+    return false;
+  }
+
   private createCreepForThisArea(): SpawnTask | null {
     const bodyPartConstants: BodyPartConstant[] = [];
-    const segments = Math.min(15, Math.floor(this.room.energyCapacityAvailable / 100)); // Carry-50; Move-50
+    const haveUtilityCreeps = this.creeps.length > 0;
+    const segments = haveUtilityCreeps ? Math.min(15, Math.floor(this.room.energyCapacityAvailable / 100)) : 1; // Carry-50; Move-50
     if (segments < 1) {
       console.log(`Error: Trying to spawn a carrier with segments ${segments} less than 1`);
       return null;

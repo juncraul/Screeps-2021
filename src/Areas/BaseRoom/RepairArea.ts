@@ -78,6 +78,14 @@ export default class RepairArea extends BaseArea {
     }
 
     return GetRoomObjects.getClosestStructureToRepairByRange(pos, 0.9, true);
+
+    // TODO: This needs more testing, it almost lost me a room
+    // structure = GetRoomObjects.getClosestStructureToRepairByRange(pos, 0.9, true);
+    // if (structure) {
+    //   return structure;
+    // }
+
+    // return GetRoomObjects.getClosestStructureToRepairByRange(pos, 1); // In case all walls are ramparts are full, or we don't have any.
   }
 
   private getClosestEnergyTarget(

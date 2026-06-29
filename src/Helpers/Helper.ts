@@ -92,6 +92,10 @@ export class Helper {
               if (terrain.get(x, y) === TERRAIN_MASK_WALL) {
                 costs.set(x, y, 255);
               }
+              if (terrain.get(x, y) === TERRAIN_MASK_SWAMP) {
+                // Treat swamp just a bit worse than plain for road building purposes
+                costs.set(x, y, 3);
+              }
             }
           }
 

@@ -67,6 +67,8 @@ All current flags are documented here so you only need this section.
 | `SourceKeeper-SpawnRoom` | `SourceKeeper-E29S25` | Source Keeper hunting squad | Required from name (`SpawnRoom`) |
 | `Looter-SpawnRoom` | `Looter-E29S25` | Looter carrier unit | Required from name (`SpawnRoom`) |
 | `Defense-RoomName` | `Defense-E29S25` | Emergency in-room defense team | Auto-placed by SafeMode logic |
+| `ReRoute-TargetRoom-From-CurrentRoom[-AnyText]` | `ReRoute-E29S25-From-E30S25` | Forces cross-room movement through the flag room | N/A (movement helper) |
+| `Season[-SquadSize]` | `Season-5` | Creates 5 collectors | Spawns from the room where the flag is placed in |
 
 ---
 
@@ -183,6 +185,33 @@ DefenseArea behavior:
 
 Example:
 - `Defense-E29S25` (typically auto-created; manual placement also works if room name matches).
+
+---
+
+### `ReRoute-TargetRoom-From-CurrentRoom[-AnyText]`
+
+- File source: `src/Helpers/GetRoomObjects.ts`, `src/CreepBase.ts`
+- Prefix: `ReRoute`.
+- Parsed format:
+1. `TargetRoom` (final destination room)
+2. literal `From`
+3. `CurrentRoom` (room where reroute should activate)
+4. Optional suffix text
+
+How it works:
+1. Any creep executing `MoveDifferentRoom` checks for a matching `ReRoute` flag.
+2. Match key is: `(targetRoom, currentRoom)`.
+3. If matched, the creep temporarily moves to center `(25,25)` of the room where the flag is placed.
+4. After entering that room, normal routing continues toward the original target (or next matching reroute).
+
+This supports multi-hop chains by placing multiple flags:
+- `ReRoute-E29S25-From-E30S25` in room `E30S24`
+- `ReRoute-E29S25-From-E30S24` in another intermediary room
+
+Example:
+- Creep in `E30S25` targeting `E29S25`
+- Place flag named `ReRoute-E29S25-From-E30S25` in `E30S24`
+- Creep will route via `E30S24` first.
 
 ---
 

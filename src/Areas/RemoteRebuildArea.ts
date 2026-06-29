@@ -55,14 +55,14 @@ export default class RemoteRebuildArea extends BaseArea {
     const harvesterInTransit = this.creeps.filter(c => c.memory.role === "Harvester").length;
     const harvesterInRemote = remoteRoom ? this.getRemoteHarvesterCount(remoteRoom) : 0;
     if (harvesterInTransit + harvesterInRemote < 3 && this.flag.color === COLOR_WHITE) {
-      tasks.push(this.createHarvester(cap));
+      tasks.push(this.createHarvester());
     }
 
     const upgraderInTransit = this.creeps.filter(c => c.memory.role === "Upgrader").length;
     const remoteController = remoteRoom?.controller;
     const upgraderInRemote = remoteController ? this.getRemoteAreaCount("UpgradeArea", remoteController.id) : 0;
     if (upgraderInTransit + upgraderInRemote < 2 && this.flag.color === COLOR_WHITE) {
-      tasks.push(this.createUpgrader(cap));
+      tasks.push(this.createUpgrader());
     }
 
     return tasks;
@@ -132,10 +132,10 @@ export default class RemoteRebuildArea extends BaseArea {
 
   /**
    * Constructor body: mirrors ConstructionArea.createCreepForThisArea.
-   * Pattern: n×WORK + n×CARRY + n×MOVE, n capped at 7 (1400 energy max).
+   * Pattern: n×WORK + n×CARRY + n×MOVE, n capped at 5 (1200 energy max).
    */
   private createConstructor(energyCapacity: number): SpawnTask {
-    const n = Math.max(1, Math.min(7, Math.floor(energyCapacity / 200)));
+    const n = Math.max(1, Math.min(5, Math.floor(energyCapacity / 200)));
     const body: BodyPartConstant[] = [];
     for (let i = 0; i < n; i++) body.push(WORK);
     for (let i = 0; i < n; i++) body.push(CARRY);
@@ -163,14 +163,14 @@ export default class RemoteRebuildArea extends BaseArea {
 
   /**
    * Harvester body: mirrors SourceArea.createCreepForThisArea (no-link, no-container path).
-   * Pattern: n×WORK + n×CARRY + n×MOVE, n capped at 4 (800 energy max).
+   * Pattern: 5×WORK + 1×MOVE + 5×CARRY (800 energy max).
    */
-  private createHarvester(energyCapacity: number): SpawnTask {
-    const n = Math.max(1, Math.min(4, Math.floor(energyCapacity / 200)));
+  private createHarvester(): SpawnTask {
+    const segments = 5;
     const body: BodyPartConstant[] = [];
-    for (let i = 0; i < n; i++) body.push(WORK);
-    for (let i = 0; i < n; i++) body.push(MOVE);
-    for (let i = 0; i < n; i++) body.push(CARRY);
+    for (let i = 0; i < segments; i++) body.push(WORK);
+    for (let i = 0; i < 1; i++) body.push(MOVE);
+    for (let i = 0; i < segments; i++) body.push(CARRY);
     return new SpawnTask(
       CreepType.Harvester,
       this.areaId,
@@ -182,14 +182,14 @@ export default class RemoteRebuildArea extends BaseArea {
 
   /**
    * Upgrader body: mirrors UpgradeArea.createCreepForThisArea.
-   * Pattern: n×WORK + n×CARRY + n×MOVE, n capped at 16 (≤ 48 parts).
+   * Pattern: 5×WORK + 1×MOVE + 5×CARRY (800 energy max).
    */
-  private createUpgrader(energyCapacity: number): SpawnTask {
-    const n = Math.max(1, Math.min(16, Math.floor(energyCapacity / 200)));
+  private createUpgrader(): SpawnTask {
+    const segments = 5;
     const body: BodyPartConstant[] = [];
-    for (let i = 0; i < n; i++) body.push(WORK);
-    for (let i = 0; i < n; i++) body.push(CARRY);
-    for (let i = 0; i < n; i++) body.push(MOVE);
+    for (let i = 0; i < segments; i++) body.push(WORK);
+    for (let i = 0; i < 1; i++) body.push(MOVE);
+    for (let i = 0; i < segments; i++) body.push(CARRY);
     return new SpawnTask(CreepType.Upgrader, this.areaId, body, this, `RemoteRebuild-Upgrader-${this.remoteRoomName}`);
   }
 }

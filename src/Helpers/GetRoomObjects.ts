@@ -3,6 +3,7 @@
 
 export class GetRoomObjects {
   public static readonly ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
+  public static readonly REROUTE_FLAG_PATTERN = /^ReRoute-([WE]\d+[NS]\d+)-From-([WE]\d+[NS]\d+)(?:-.+)?$/;
 
   // --------------------------
   // Get All Functions
@@ -82,6 +83,32 @@ export class GetRoomObjects {
       roomsWithSpawns.push(spawnRoom);
     }
     return roomsWithSpawns;
+  }
+
+  /**
+   * Returns the next room to route through for a specific (target, from) pair.
+   *
+   * Flag format:
+   * ReRoute-<TargetRoom>-From-<CurrentRoom>[-AnySuffix]
+   *
+   * The reroute room is the room where the flag is physically placed.
+   */
+  public static getReRouteRoom(targetRoomName: string, fromRoomName: string): string | undefined {
+    const flags = _.filter(Game.flags, flag => flag.name === "ReRoute" || flag.name.startsWith("ReRoute-"));
+
+    for (const flag of flags) {
+      const match = this.REROUTE_FLAG_PATTERN.exec(flag.name);
+      if (!match) continue;
+
+      const targetFromName = match[1];
+      const routeFromName = match[2];
+
+      if (targetFromName === targetRoomName && routeFromName === fromRoomName) {
+        return flag.pos.roomName;
+      }
+    }
+
+    return undefined;
   }
 
   // --------------------------
@@ -247,6 +274,11 @@ export class GetRoomObjects {
     return structure instanceof StructureLink ? structure : null;
   }
 
+  public static getWithinRangeExtensions(pos: RoomPosition, range: number): StructureExtension[] {
+    const structures = pos.findInRange(FIND_STRUCTURES, range, { filter: { structureType: STRUCTURE_EXTENSION } });
+    return structures.length > 0 ? (structures as StructureExtension[]) : [];
+  }
+
   // --------------------------
   // Get Closest By Path Functions
   // Functions to return objects which are closest by path from position
@@ -311,12 +343,20 @@ export class GetRoomObjects {
       for (let i = 0.00001; i < 1 && !structure; i *= 2) {
         structure = pos.findClosestByRange(FIND_STRUCTURES, {
           filter: structure =>
-            (structure.structureType !== STRUCTURE_RAMPART && structure.hits < structure.hitsMax * i) ||
-            (structure.structureType === STRUCTURE_RAMPART && structure.hits < structure.hitsMax * i * 300) // Ramparts are 300 times smaller than wall
+            (structure.structureType !== STRUCTURE_RAMPART &&
+              structure.hits < structure.hitsMax * i * this.getDistanceToCenterOfRoom(structure.pos)) ||
+            (structure.structureType === STRUCTURE_RAMPART &&
+              structure.hits < structure.hitsMax * i * 300 * this.getDistanceToCenterOfRoom(structure.pos)) // Distance from center of room, as walls are more important the closer they are to the center of the room
         });
       }
     }
     return structure;
+  }
+
+  private static getDistanceToCenterOfRoom(pos: RoomPosition): number {
+    const dx = pos.x - 25;
+    const dy = pos.y - 25;
+    return Math.sqrt(dx * dx + dy * dy);
   }
 
   // public static getStructureToRepairByRange(

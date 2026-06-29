@@ -2,7 +2,7 @@ import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { Helper } from "Helpers/Helper";
 import { CreepBase } from "../CreepBase";
 
-export default class SourceArea {
+export default class BaseArea {
   memoryType: string;
   areaId: string;
   areaPos: RoomPosition;
@@ -94,7 +94,7 @@ export default class SourceArea {
 
   getNumberOfDyingCreeps(): number {
     return this.creeps.filter(function (creep) {
-      return creep.ticksToLive && creep.ticksToLive < 75;
+      return creep.ticksToLive && creep.ticksToLive < 100;
     }).length;
   }
 }

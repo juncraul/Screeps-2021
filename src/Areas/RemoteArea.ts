@@ -113,6 +113,9 @@ export default class RemoteArea extends BaseArea {
         this.carriersPerRoom = 2;
       }
     }
+    if (this.baseRoom.controller && this.baseRoom.controller.level < 3) {
+      this.claimersPerRoom = 0;
+    }
   }
 
   public handleSpawnTasks(): SpawnTask[] {

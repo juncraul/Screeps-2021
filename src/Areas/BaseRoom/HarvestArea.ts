@@ -57,7 +57,17 @@ export default abstract class HarvestArea extends BaseArea {
 
   protected handleSetup() {
     if (!this.containerNextToHarvestArea && !this.containerConstructionSiteNextToHarvestArea) {
-      const positionForContainer = Helper.getFreeAdjacentPositions(this.harvestPosition, this.room)[0];
+      const potentialPositionsNextToHarvestArea = Helper.getFreeAdjacentPositions(this.harvestPosition, this.room);
+      // TODO: Need to work more on this logic, in case container gets destroyed and we already have extensions, a different place might be chosen.
+      let maxPositionFound = -1;
+      let positionForContainer: RoomPosition | null = null;
+      for (const position of potentialPositionsNextToHarvestArea) {
+        const possibleExtensionsForFuture = Helper.getFreeAdjacentPositions(position, this.room).length - 1; // -1 because we leave one empty for pathing to the harvest area
+        if (possibleExtensionsForFuture > maxPositionFound) {
+          maxPositionFound = possibleExtensionsForFuture;
+          positionForContainer = position;
+        }
+      }
       if (positionForContainer) {
         this.room.createConstructionSite(positionForContainer, STRUCTURE_CONTAINER);
       }
