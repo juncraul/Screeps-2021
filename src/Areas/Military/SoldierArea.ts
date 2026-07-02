@@ -3,6 +3,7 @@ import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./../BaseArea";
 import { CreepBase } from "../../CreepBase";
+import { GetRoomObjects } from "Helpers/GetRoomObjects";
 
 const SQUAD_SIZE = 5;
 const ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
@@ -12,7 +13,8 @@ enum PrimaryColor {
   RED = COLOR_RED, // Melee
   GREEN = COLOR_GREEN, // Ranged
   BLUE = COLOR_BLUE, // Healer
-  PURPLE = COLOR_PURPLE // Split (half Melee, half Ranged)
+  PURPLE = COLOR_PURPLE, // Split (half Melee, half Ranged)
+  YELLOW = COLOR_YELLOW // Dismantle (1 Dismantler, rest Healers)
 }
 
 enum SecondaryColor {
@@ -141,6 +143,8 @@ export default class SoldierArea extends BaseArea {
     y += 0.6;
     visual.text("  PURPLE -> Split squad (half Melee, half Ranged)", x, y, plain);
     y += 0.8;
+    visual.text("  YELLOW -> Dismantle squad (1 Dismantler, rest Healers)", x, y, plain);
+    y += 0.8;
 
     visual.text("Secondary color (flag dot):", x, y, header);
     y += 0.7;
@@ -189,7 +193,8 @@ export default class SoldierArea extends BaseArea {
   // Instance: per-flag creep handling
 
   public handleThisArea(): void {
-    this.runHealerSupport();
+    this.runHealerPassiveEffect();
+    this.runDismantlerPassiveEffect();
 
     const formationMovementApplied = this.shouldUseFormationMovement() && this.tryMoveAsFormation();
 
@@ -201,7 +206,11 @@ export default class SoldierArea extends BaseArea {
         continue;
       }
 
-      if (creep.creepType !== CreepType.Healer) {
+      if (creep.creepType === CreepType.Healer) {
+        if (!formationMovementApplied) {
+          creep.addTask(new CreepTask(Activity.Move, this.flag.position));
+        }
+      } else {
         const combatAssigned = this.assignCombatTask(creep, this.flag.secondaryColor);
         if (!combatAssigned && !formationMovementApplied) {
           creep.addTask(new CreepTask(Activity.Move, this.flag.position));
@@ -277,6 +286,9 @@ export default class SoldierArea extends BaseArea {
     if (primaryColor === PrimaryColor.PURPLE) {
       return existingCountInFlag < Math.ceil(squadSize / 2) ? CreepType.Melee : CreepType.Ranged;
     }
+    if (primaryColor === PrimaryColor.YELLOW) {
+      return existingCountInFlag === 0 ? CreepType.Dismantler : CreepType.Healer;
+    }
     return CreepType.Melee;
   }
 
@@ -322,6 +334,9 @@ export default class SoldierArea extends BaseArea {
       case CreepType.Healer:
         bodyPartConstants = this.createHealerBody(this.flag.bodySegments ?? 1);
         break;
+      case CreepType.Dismantler:
+        bodyPartConstants = this.createDismantlerBody(this.flag.bodySegments ?? 1);
+        break;
       default:
         return null;
     }
@@ -331,32 +346,60 @@ export default class SoldierArea extends BaseArea {
 
   private createMeleeBody(segments: number): BodyPartConstant[] {
     const body: BodyPartConstant[] = [];
-    for (let i = 0; i < segments; i++) body.push(ATTACK, MOVE); // ATTACK-80; MOVE-50 plain=1  road=1  swamp=5
+    for (let i = 0; i < segments; i++) body.push(ATTACK); // ATTACK-80; MOVE-50 plain=1  road=1  swamp=5
+    for (let i = 0; i < segments; i++) body.push(MOVE); // ATTACK-80; MOVE-50 plain=1  road=1  swamp=5
     return body;
   }
 
   private createRangedBody(segments: number): BodyPartConstant[] {
     const body: BodyPartConstant[] = [];
-    for (let i = 0; i < segments; i++) body.push(RANGED_ATTACK, MOVE); // RANGED_ATTACK-150; Move-50 plain=1  road=1  swamp=5
+    for (let i = 0; i < segments; i++) body.push(RANGED_ATTACK); // RANGED_ATTACK-150; Move-50 plain=1  road=1  swamp=5
+    for (let i = 0; i < segments; i++) body.push(MOVE); // RANGED_ATTACK-150; Move-50 plain=1  road=1  swamp=5
     return body;
   }
 
   private createHealerBody(segments: number): BodyPartConstant[] {
+    if (segments === 0) segments = 6; // 0 is used for maximum segments.
     const body: BodyPartConstant[] = [];
-    for (let i = 0; i < segments; i++) body.push(HEAL, MOVE); // HEAL-200; MOVE-50  plain=1  road=1  swamp=5
+    for (let i = 0; i < segments; i++) body.push(MOVE); // HEAL-200; MOVE-50  plain=1  road=1  swamp=5
+    for (let i = 0; i < segments; i++) body.push(HEAL); // HEAL-200; MOVE-50  plain=1  road=1  swamp=5
     return body;
   }
 
-  private runHealerSupport(): void {
+  private createDismantlerBody(segments: number): BodyPartConstant[] {
+    if (segments === 0) segments = 6; // 0 is used for maximum segments.
+    const body: BodyPartConstant[] = [];
+    for (let i = 0; i < segments; i++) body.push(TOUGH); // TOUGH-10; WORK-100; MOVE-50  plain=1  road=1  swamp=5
+    for (let i = 0; i < segments; i++) body.push(WORK); // TOUGH-10; WORK-100; MOVE-50  plain=1  road=1  swamp=5
+    for (let i = 0; i < segments * 2; i++) body.push(MOVE); // TOUGH-10; WORK-100; MOVE-50  plain=1  road=1  swamp=5
+    return body;
+  }
+
+  private runHealerPassiveEffect(): void {
     const healers = this.creeps.filter(creep => creep.creepType === CreepType.Healer);
     for (const healer of healers) {
       this.healMostDamagedTarget(healer);
     }
   }
 
+  private runDismantlerPassiveEffect(): void {
+    // TODO: It does not work properly, it should distroy all the roads in the path without affecting move.
+    if (this.flag.secondaryColor === SecondaryColor.WHITE) return;
+    const dismantlers = this.creeps.filter(
+      creep => creep.creepType === CreepType.Dismantler && creep.pos.roomName === this.flag.targetRoom
+    );
+    for (const dismantler of dismantlers) {
+      // Find strcture to dismantle at range 1
+      const target = GetRoomObjects.getWithinRangeStructures(dismantler.pos, 1, STRUCTURE_ROAD);
+      if (target.length > 0) {
+        dismantler.dismantle(target[0]);
+      }
+    }
+  }
+
   private healMostDamagedTarget(healer: CreepBase): void {
     const candidates = this.getHealerTargets();
-    if (candidates.length === 0) return;
+    if (candidates.length === 0) candidates.push(healer.creep); // Do self-heal
 
     const target = candidates.sort((a, b) => {
       const missingA = a.hitsMax - a.hits;
@@ -779,13 +822,13 @@ export default class SoldierArea extends BaseArea {
       .find(FIND_HOSTILE_STRUCTURES)
       .filter(structure => structure.owner && !EXCEPTION_PLAYER_NAMES.includes(structure.owner.username));
     if (enemyCreeps.length > 0) {
-      const target = creep.pos.findClosestByRange(enemyCreeps);
+      const target = creep.pos.findClosestByPath(enemyCreeps);
       if (target) {
         creep.addTask(new CreepTask(Activity.Attack, target.pos, null, target.id));
         return true;
       }
     } else if (enemyStructures.length > 0) {
-      const target = creep.pos.findClosestByRange(enemyStructures);
+      const target = this.flag.position.findClosestByPath(enemyStructures);
       if (target) {
         creep.addTask(new CreepTask(Activity.Attack, target.pos, null, target.id));
         return true;
@@ -799,9 +842,14 @@ export default class SoldierArea extends BaseArea {
       .find(FIND_HOSTILE_STRUCTURES)
       .filter(structure => structure.owner && !EXCEPTION_PLAYER_NAMES.includes(structure.owner.username));
     if (enemyStructures.length > 0) {
-      const target = creep.pos.findClosestByRange(enemyStructures);
+      const target = this.flag.position.findClosestByPath(enemyStructures);
       if (target) {
-        creep.addTask(new CreepTask(Activity.Attack, target.pos, null, target.id));
+        const creepHasWork = creep.creep.body.some(part => part.type === WORK);
+        if (creepHasWork) {
+          creep.addTask(new CreepTask(Activity.Dismantle, target.pos, null, target.id));
+        } else {
+          creep.addTask(new CreepTask(Activity.Attack, target.pos, null, target.id));
+        }
         return true;
       }
     }
@@ -813,7 +861,7 @@ export default class SoldierArea extends BaseArea {
       .find(FIND_HOSTILE_CREEPS)
       .filter(creep => !EXCEPTION_PLAYER_NAMES.includes(creep.owner.username));
     if (enemyCreeps.length > 0) {
-      const target = creep.pos.findClosestByRange(enemyCreeps);
+      const target = creep.pos.findClosestByPath(enemyCreeps);
       if (target) {
         creep.addTask(new CreepTask(Activity.Attack, target.pos, null, target.id));
         return true;

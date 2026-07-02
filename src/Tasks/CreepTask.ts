@@ -4,18 +4,21 @@ export default class CreepTask implements ICreepTask {
   targetPlaceSecond: RoomPosition | null;
   taskDone: boolean;
   targetId: string | null;
+  silent: boolean;
 
   constructor(
     activity: number,
     targetPlace: RoomPosition,
     targetPlaceSecond: RoomPosition | null = null,
-    targetId: string | null = null
+    targetId: string | null = null,
+    silent = false
   ) {
     this.activity = activity;
     this.targetPlace = targetPlace;
     this.taskDone = false;
     this.targetId = targetId;
     this.targetPlaceSecond = targetPlaceSecond;
+    this.silent = silent;
   }
 
   public static getSourceFromTarget(target: RoomPosition): Source | null {
@@ -40,6 +43,10 @@ export default class CreepTask implements ICreepTask {
 
   public static getStructureFromTarget(target: RoomPosition): Structure | null {
     return new RoomPosition(target.x, target.y, target.roomName).findInRange(FIND_STRUCTURES, 0)[0];
+  }
+
+  public static getStructuresFromTarget(target: RoomPosition): Structure[] {
+    return new RoomPosition(target.x, target.y, target.roomName).findInRange(FIND_STRUCTURES, 0);
   }
 
   public static getResourceFromTarget(target: RoomPosition): Resource | null {
@@ -91,5 +98,7 @@ export enum Activity {
   Heal = 14,
   HarvestMineral = 15,
   DepositMineral = 16,
-  CollectMineral = 17
+  CollectMineral = 17,
+  Drop = 18,
+  Dismantle = 19
 }

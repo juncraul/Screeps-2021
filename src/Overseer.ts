@@ -17,6 +17,7 @@ import SoldierArea from "./Areas/Military/SoldierArea";
 import DefenseArea from "./Areas/Military/DefenseArea";
 import LooterArea from "./Areas/Military/LooterArea";
 import SourceKeeperArea from "./Areas/Military/SourceKeeperArea";
+import StationaryFillerArea from "Areas/BaseRoom/StationaryFillerArea";
 
 export default class Overseer implements IOverseer {
   public refresh(): void {
@@ -36,6 +37,8 @@ export default class Overseer implements IOverseer {
   }
 
   private overseeRoom(room: Room): SpawnTask[] {
+    // Used for debugging wall repair order
+    // GetRoomObjects.getClosestWallRampartToRepairAll(room);
     const roomsToReserve = GetRoomObjects.getAllRoomsToReserve(room);
     const roomsToClaim = GetRoomObjects.getAllRoomsToClaim(room);
     const harvest = this.handleHarvestArea(room);
@@ -44,6 +47,7 @@ export default class Overseer implements IOverseer {
     const construction = this.handleConstructionArea(room);
     const repair = this.handleRepairArea(room);
     const utility = this.handleUtilityArea(room);
+    const stationaryfiller = this.handleStationaryFillerArea(room);
     const defense = this.handleDefenseArea(room);
     const soldierTasks = this.handleSoldierArea(room);
     const looterTasks = this.handleLooterArea(room);
@@ -77,6 +81,10 @@ export default class Overseer implements IOverseer {
     const spawnOrder: CreepType[] = [
       CreepType.Harvester,
       CreepType.Carrier,
+      CreepType.StationaryFiller,
+      CreepType.StationaryFiller,
+      CreepType.StationaryFiller,
+      CreepType.StationaryFiller,
       CreepType.Harvester,
       CreepType.Upgrader,
       CreepType.Carrier,
@@ -85,14 +93,16 @@ export default class Overseer implements IOverseer {
     const existing: Record<number, number> = {
       [CreepType.Harvester]: harvest.existing,
       [CreepType.Carrier]: carry.existing,
-      [CreepType.Upgrader]: upgrade.existing
+      [CreepType.Upgrader]: upgrade.existing,
+      [CreepType.StationaryFiller]: stationaryfiller.existing
     };
     const taskBuckets: Record<number, SpawnTask[]> = {
       [CreepType.Harvester]: [...harvest.tasks],
       [CreepType.Carrier]: [...carry.tasks],
       [CreepType.Upgrader]: [...upgrade.tasks],
       [CreepType.Constructor]: [...construction.tasks],
-      [CreepType.Repairer]: [...repair.tasks]
+      [CreepType.Repairer]: [...repair.tasks],
+      [CreepType.StationaryFiller]: [...stationaryfiller.tasks]
     };
     const ordered: SpawnTask[] = [];
     for (const type of spawnOrder) {
@@ -112,6 +122,7 @@ export default class Overseer implements IOverseer {
       ...(taskBuckets[CreepType.Upgrader] ?? []),
       ...(taskBuckets[CreepType.Constructor] ?? []),
       ...(taskBuckets[CreepType.Repairer] ?? []),
+      ...stationaryfiller.tasks,
       ...utility.tasks,
       ...soldierTasks,
       ...sourceKeeperTasks,
@@ -129,6 +140,7 @@ export default class Overseer implements IOverseer {
       RepairArea: { existing: repair.existing, queued: repair.tasks.length },
       UpgradeArea: { existing: upgrade.existing, queued: upgrade.tasks.length },
       UtilityArea: { existing: utility.existing, queued: utility.tasks.length },
+      StationaryFillerArea: { existing: stationaryfiller.existing, queued: stationaryfiller.tasks.length },
       DefenseArea: { existing: defense.existing, queued: defense.tasks.length }
     });
 
@@ -284,6 +296,16 @@ export default class Overseer implements IOverseer {
     const tasks = utilityArea.handleSpawnTasks();
     const existing = utilityArea.creeps.length;
     utilityArea.handleThisArea();
+    return { tasks, existing };
+  }
+
+  private handleStationaryFillerArea(room: Room): { tasks: SpawnTask[]; existing: number } {
+    if (!StationaryFillerArea.createThisAreaForRoom(room)) return { tasks: [], existing: 0 };
+
+    const stationaryFillerArea: StationaryFillerArea = new StationaryFillerArea(room);
+    const tasks = stationaryFillerArea.handleSpawnTasks();
+    const existing = stationaryFillerArea.creeps.length;
+    stationaryFillerArea.handleThisArea();
     return { tasks, existing };
   }
 

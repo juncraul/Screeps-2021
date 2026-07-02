@@ -284,7 +284,7 @@ export default class RemoteArea extends BaseArea {
       if (this.room && this.mineral && !this.mineralContainer) {
         const site = GetRoomObjects.getWithinRangeConstructionSite(this.mineral.pos, 2, STRUCTURE_CONTAINER);
         if (!site) {
-          const pos = Helper.getFreeAdjacentPositions(this.mineral.pos, this.room)[0];
+          const pos = Helper.getFreeAdjacentPositions(this.mineral.pos)[0];
           if (pos) this.room.createConstructionSite(pos, STRUCTURE_CONTAINER);
         }
       }
@@ -300,7 +300,7 @@ export default class RemoteArea extends BaseArea {
       const constructionSite = GetRoomObjects.getWithinRangeConstructionSite(source.pos, 1, STRUCTURE_CONTAINER);
 
       if (!container && !constructionSite) {
-        const positionForContainer = Helper.getFreeAdjacentPositions(source.pos, this.room)[0];
+        const positionForContainer = Helper.getFreeAdjacentPositions(source.pos)[0];
         if (positionForContainer) {
           this.room.createConstructionSite(positionForContainer, STRUCTURE_CONTAINER);
         }
@@ -604,7 +604,7 @@ export default class RemoteArea extends BaseArea {
       return;
     }
 
-    const criticalStructure = GetRoomObjects.getClosestStructureToRepairByRange(creep.pos, 0.4);
+    const criticalStructure = GetRoomObjects.getClosestStructureToRepairByPath(creep.pos, 0.4);
     if (criticalStructure) {
       creep.addTask(new CreepTask(Activity.Repair, criticalStructure.pos));
       return;
@@ -616,15 +616,21 @@ export default class RemoteArea extends BaseArea {
       return;
     }
 
-    const nonCriticalStructure = GetRoomObjects.getClosestStructureToRepairByRange(creep.pos, 0.7);
+    const nonCriticalStructure = GetRoomObjects.getClosestStructureToRepairByPath(creep.pos, 0.7);
     if (nonCriticalStructure) {
       creep.addTask(new CreepTask(Activity.Repair, nonCriticalStructure.pos));
       return;
     }
 
-    const anyDamagedStructure = GetRoomObjects.getClosestStructureToRepairByRange(creep.pos, 1, true);
+    const anyDamagedStructure = GetRoomObjects.getClosestStructureToRepairByPath(creep.pos, 0.9);
     if (anyDamagedStructure) {
       creep.addTask(new CreepTask(Activity.Repair, anyDamagedStructure.pos));
+      return;
+    }
+
+    const anyWallsOrRamparts = GetRoomObjects.getClosestWallRampartToRepairByPath(creep.pos);
+    if (anyWallsOrRamparts) {
+      creep.addTask(new CreepTask(Activity.Repair, anyWallsOrRamparts.pos));
     }
   }
 

@@ -31,13 +31,13 @@ export class Helper {
     Memory.Keys[key] = value;
   }
 
-  public static getFreeAdjacentPositions(pos: RoomPosition, room: Room, minRange = 1, maxRange = 1): RoomPosition[] {
+  public static getFreeAdjacentPositions(pos: RoomPosition, minRange = 1, maxRange = 1): RoomPosition[] {
     const adjacentPositions: RoomPosition[] = [];
     for (let x = -maxRange; x <= maxRange; x++) {
       for (let y = -maxRange; y <= maxRange; y++) {
         const range = Math.max(Math.abs(x), Math.abs(y));
         if (range < minRange || range > maxRange) continue;
-        const adjacentPos = new RoomPosition(pos.x + x, pos.y + y, room.name);
+        const adjacentPos = new RoomPosition(pos.x + x, pos.y + y, pos.roomName);
         if (adjacentPos.x < 0 || adjacentPos.x > 49 || adjacentPos.y < 0 || adjacentPos.y > 49) continue;
         if (adjacentPos.lookFor(LOOK_TERRAIN)[0] === "wall") continue;
         if (adjacentPos.lookFor(LOOK_STRUCTURES).length > 0) continue;

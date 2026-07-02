@@ -1,6 +1,8 @@
 // Flags: Primary - Secondary
 // PURPLE - PURPLE Reserve this room
 
+import { Helper } from "./Helper";
+
 export class GetRoomObjects {
   public static readonly ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
   public static readonly REROUTE_FLAG_PATTERN = /^ReRoute-([WE]\d+[NS]\d+)-From-([WE]\d+[NS]\d+)(?:-.+)?$/;
@@ -235,8 +237,7 @@ export class GetRoomObjects {
   }
 
   // --------------------------
-  // Get Within Range Functions
-  // Functions to return objects within a certain range from position
+  // Get Within Range construction site
   // --------------------------
   public static getWithinRangeConstructionSite(
     pos: RoomPosition,
@@ -247,6 +248,20 @@ export class GetRoomObjects {
       filter: (structure: any) => structure.structureType === structureType
     })[0];
     return construnctionSite;
+  }
+
+  // --------------------------
+  // Get Within Range construction sites
+  // --------------------------
+  public static getWithinRangeConstructionSites(
+    pos: RoomPosition,
+    range: number,
+    structureType: StructureConstant
+  ): ConstructionSite[] {
+    const construnctionSites = pos.findInRange(FIND_CONSTRUCTION_SITES, range, {
+      filter: (structure: any) => structure.structureType === structureType
+    });
+    return construnctionSites;
   }
 
   public static getWithinRangeStructures(
@@ -267,6 +282,11 @@ export class GetRoomObjects {
   public static getWithinRangeContainer(pos: RoomPosition, range: number): StructureContainer | null {
     const structure = pos.findInRange(FIND_STRUCTURES, range, { filter: { structureType: STRUCTURE_CONTAINER } })[0];
     return structure instanceof StructureContainer ? structure : null;
+  }
+
+  public static getWithinRangeContainers(pos: RoomPosition, range: number): StructureContainer[] {
+    const structures = pos.findInRange(FIND_STRUCTURES, range, { filter: { structureType: STRUCTURE_CONTAINER } });
+    return structures.length > 0 ? (structures as StructureContainer[]) : [];
   }
 
   public static getWithinRangeLink(pos: RoomPosition, range: number): StructureLink | null {
@@ -321,36 +341,100 @@ export class GetRoomObjects {
 
   // --------------------------
   // Get Closest By Range Functions
-  // Functions to return objects which are closest by path from position
+  // Functions to return objects which are closest by range from position
   // --------------------------
-  public static getClosestStructureToRepairByRange(
-    pos: RoomPosition,
-    damageProportionForNonWallRamp: number,
-    includeRampartsWalls = false
-  ): Structure | null {
+  public static getClosestStructureToRepairByRange(pos: RoomPosition, damageProportion: number): Structure | null {
     let structure = pos.findClosestByRange(FIND_STRUCTURES, {
       filter: structure => structure.structureType === STRUCTURE_RAMPART && structure.hits < 5000 // Just choose low life ramparts first, as they degrade quickly
     });
     if (!structure) {
       structure = pos.findClosestByRange(FIND_STRUCTURES, {
         filter: structure =>
-          structure.hits < structure.hitsMax * damageProportionForNonWallRamp &&
+          structure.hits < structure.hitsMax * damageProportion &&
           structure.structureType !== STRUCTURE_WALL &&
           structure.structureType !== STRUCTURE_RAMPART
       });
     }
-    if (!structure && includeRampartsWalls) {
-      for (let i = 0.00001; i < 1 && !structure; i *= 2) {
-        structure = pos.findClosestByRange(FIND_STRUCTURES, {
-          filter: structure =>
-            (structure.structureType !== STRUCTURE_RAMPART &&
-              structure.hits < structure.hitsMax * i * this.getDistanceToCenterOfRoom(structure.pos)) ||
-            (structure.structureType === STRUCTURE_RAMPART &&
-              structure.hits < structure.hitsMax * i * 300 * this.getDistanceToCenterOfRoom(structure.pos)) // Distance from center of room, as walls are more important the closer they are to the center of the room
-        });
-      }
+    return structure;
+  }
+
+  // --------------------------
+  // Get Closest By Range Functions
+  // Functions to return objects which are closest by range from position
+  // --------------------------
+  public static getClosestWallRampartToRepairByRange(pos: RoomPosition): Structure | null {
+    let structure: AnyStructure | null = null;
+
+    for (let i = 0.00001; i < 1 && !structure; i *= 2) {
+      structure = pos.findClosestByRange(FIND_STRUCTURES, {
+        filter: structure =>
+          (structure.structureType !== STRUCTURE_RAMPART &&
+            structure.hits < (structure.hitsMax * i * this.getDistanceToCenterOfRoom(structure.pos)) / 2) ||
+          (structure.structureType === STRUCTURE_RAMPART &&
+            structure.hits < (structure.hitsMax * i * 30 * this.getDistanceToCenterOfRoom(structure.pos)) / 2) // Distance from center of room, as walls are more important the closer they are to the center of the room
+      });
     }
     return structure;
+  }
+
+  // --------------------------
+  // Get Closest By Path Functions
+  // Functions to return objects which are closest by path from position
+  // --------------------------
+  public static getClosestStructureToRepairByPath(pos: RoomPosition, damageProportion: number): Structure | null {
+    let structure = pos.findClosestByPath(FIND_STRUCTURES, {
+      filter: structure => structure.structureType === STRUCTURE_RAMPART && structure.hits < 5000 // Just choose low life ramparts first, as they degrade quickly
+    });
+    if (!structure) {
+      structure = pos.findClosestByPath(FIND_STRUCTURES, {
+        filter: structure =>
+          structure.hits < structure.hitsMax * damageProportion &&
+          structure.structureType !== STRUCTURE_WALL &&
+          structure.structureType !== STRUCTURE_RAMPART
+      });
+    }
+    return structure;
+  }
+
+  // --------------------------
+  // Get Closest By Path Functions
+  // Functions to return objects which are closest by path from position
+  // --------------------------
+  public static getClosestWallRampartToRepairByPath(pos: RoomPosition): Structure | null {
+    let structure: AnyStructure | null = null;
+
+    for (let i = 0.00001; i < 1 && !structure; i *= 2) {
+      structure = pos.findClosestByPath(FIND_STRUCTURES, {
+        filter: structure =>
+          (structure.structureType !== STRUCTURE_RAMPART &&
+            structure.hits < (structure.hitsMax * i * this.getDistanceToCenterOfRoom(structure.pos)) / 2) ||
+          (structure.structureType === STRUCTURE_RAMPART &&
+            structure.hits < (structure.hitsMax * i * 30 * this.getDistanceToCenterOfRoom(structure.pos)) / 2) // Distance from center of room, as walls are more important the closer they are to the center of the room
+      });
+    }
+    return structure;
+  }
+
+  // Used for debugging, to see all walls and ramparts in the room, and their order of repair
+  public static getClosestWallRampartToRepairAll(room: Room): Structure[] {
+    let structures: AnyStructure[] = [];
+
+    for (let i = 0.00001; i < 1; i *= 2) {
+      structures = room.find(FIND_STRUCTURES, {
+        filter: structure =>
+          (structure.structureType === STRUCTURE_WALL &&
+            structure.hits < (structure.hitsMax * i * this.getDistanceToCenterOfRoom(structure.pos)) / 2) ||
+          (structure.structureType === STRUCTURE_RAMPART &&
+            structure.hits < (structure.hitsMax * i * 30 * this.getDistanceToCenterOfRoom(structure.pos)) / 2) // Distance from center of room, as walls are more important the closer they are to the center of the room
+      });
+    }
+    console.log(JSON.stringify(structures.map(s => ({ id: s.id, hits: s.hits, hitsMax: s.hitsMax, pos: s.pos }))));
+    // Use room visual to draw index on each structure
+    for (let i = 0; i < structures.length; i++) {
+      const structure = structures[i];
+      room.visual.text(i.toString(), structure.pos.x, structure.pos.y, { color: "red", font: 0.5 });
+    }
+    return structures;
   }
 
   private static getDistanceToCenterOfRoom(pos: RoomPosition): number {
@@ -358,34 +442,6 @@ export class GetRoomObjects {
     const dy = pos.y - 25;
     return Math.sqrt(dx * dx + dy * dy);
   }
-
-  // public static getStructureToRepairByRange(
-  //   room: Room,
-  //   damageProportionForNonWallRamp: number,
-  //   includeRampartsWalls = false
-  // ): Structure | null {
-  //   let structure = room.find(FIND_STRUCTURES, {
-  //     filter: structure => structure.structureType === STRUCTURE_RAMPART && structure.hits < 5000 // Just choose low life ramparts first, as they degrade quickly
-  //   });
-  //   if (!structure) {
-  //     structure = room.find(FIND_STRUCTURES, {
-  //       filter: structure =>
-  //         structure.hits < structure.hitsMax * damageProportionForNonWallRamp &&
-  //         structure.structureType !== STRUCTURE_WALL &&
-  //         structure.structureType !== STRUCTURE_RAMPART
-  //     });
-  //   }
-  //   if (!structure && includeRampartsWalls) {
-  //     for (let i = 0.00001; i < 1 && !structure; i *= 2) {
-  //       structure = room.find(FIND_STRUCTURES, {
-  //         filter: structure =>
-  //           (structure.structureType !== STRUCTURE_RAMPART && structure.hits < structure.hitsMax * i) ||
-  //           (structure.structureType === STRUCTURE_RAMPART && structure.hits < structure.hitsMax * i * 300) // Ramparts are 300 times smaller than wall
-  //       });
-  //     }
-  //   }
-  //   return structure;
-  // }
 
   public static getClosestEnemyByRange(fromThis: RoomPosition, containsBodyPart?: BodyPartConstant): Creep | null {
     if (containsBodyPart) {
@@ -398,6 +454,21 @@ export class GetRoomObjects {
 
   public static getClosestByRangeDamagedUnit(pos: RoomPosition): Creep | null {
     return pos.findClosestByRange(FIND_MY_CREEPS, { filter: creep => creep.hits < creep.hitsMax });
+  }
+
+  public static usesLayoutFixedExtension(room: Room): boolean {
+    // Check if this room uses LayoutFixedExtension by checking the build plans
+    const buildData = Helper.getCashedMemory(`Base-Build-Plans-${room.name}`, {
+      plans: [],
+      ramparts: []
+    });
+
+    if (!buildData || !buildData.plans) {
+      return false;
+    }
+
+    // LayoutFixedExtension is associated with COLOR_YELLOW secondary color
+    return buildData.plans.some((plan: any) => plan.secondaryColor === COLOR_YELLOW);
   }
 
   // public static getSources(room: Room, onlyActive: boolean = false): Source[] {

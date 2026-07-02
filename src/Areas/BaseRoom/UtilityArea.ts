@@ -3,7 +3,7 @@ import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "../BaseArea";
 
-export default class CarryArea extends BaseArea {
+export default class UtilityArea extends BaseArea {
   maxWorkerCount: number;
   storage: StructureStorage;
   terminal: StructureTerminal | null;
@@ -20,6 +20,8 @@ export default class CarryArea extends BaseArea {
   }
 
   public handleSpawnTasks(): SpawnTask[] {
+    if (GetRoomObjects.usesLayoutFixedExtension(this.room)) return []; // We don't need utility if we have stationary fillers, they will handle the energy transfer.
+
     const tasksForThisArea: SpawnTask[] = [];
     if (
       this.creeps.length <

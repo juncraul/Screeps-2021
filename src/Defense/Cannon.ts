@@ -75,7 +75,7 @@ export class Cannon {
     }
 
     if (Game.time % 100 > 5) return;
-    structure = GetRoomObjects.getClosestStructureToRepairByRange(this.pos, 0.8, true);
+    structure = GetRoomObjects.getClosestWallRampartToRepairByRange(this.pos);
     if (structure) {
       this.repair(structure);
     }

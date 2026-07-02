@@ -75,8 +75,7 @@ export class CreepBase {
           this.harvest(source);
         }
         if (this.carryCapacity > 0 && this.carryCapacity === this.carryCurrent) {
-          this.creep.say("Har Done");
-          this.task.taskDone = true;
+          this.completeTask("Har Done");
         }
         break;
       }
@@ -88,8 +87,7 @@ export class CreepBase {
           this.build(constructionSite);
         }
         if (this.carryCurrent === 0 || !constructionSite) {
-          this.creep.say("Con Done");
-          this.task.taskDone = true;
+          this.completeTask("Con Done");
         }
         break;
       }
@@ -98,11 +96,9 @@ export class CreepBase {
         if (structure) {
           const result = this.transfer(structure, RESOURCE_ENERGY);
           if (result === OK) {
-            this.creep.say("Transf Done");
-            this.task.taskDone = true;
+            this.completeTask("Transf Done");
           } else if (result === ERR_FULL) {
-            this.creep.say("Str Full");
-            this.task.taskDone = true;
+            this.completeTask("Str Full");
           }
         }
         // if (
@@ -112,8 +108,8 @@ export class CreepBase {
         //   structure instanceof StructureLink
         // ) {
         //   if (structure.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
-        //     this.creep.say("Str Full");
-        //     this.task.taskDone = true;
+        //     this.completeTask("Str Full");
+        //
         //   }
         // } else if (
         //   structure instanceof StructureContainer ||
@@ -121,18 +117,17 @@ export class CreepBase {
         //   structure instanceof StructureTerminal
         // ) {
         //   if (structure.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
-        //     this.creep.say("Str Full");
-        //     this.task.taskDone = true;
+        //     this.completeTask("Str Full");
+        //
         //   }
         // } else if (structure instanceof StructureLab) {
         //   if (structure.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
-        //     this.creep.say("Str Full");
-        //     this.task.taskDone = true;
+        //     this.completeTask("Str Full");
+        //
         //   }
         // }
         if (this.carryCurrent === 0) {
-          this.creep.say("Dep Done");
-          this.task.taskDone = true;
+          this.completeTask("Dep Done");
         }
         break;
       }
@@ -140,8 +135,7 @@ export class CreepBase {
         const roomPosition = CreepTask.getRoomPositionFromTarget(this.task.targetPlace);
         this.goTo(roomPosition);
         if (Helper.isSamePosition(this.pos, roomPosition)) {
-          this.creep.say("Move Done");
-          this.task.taskDone = true;
+          this.completeTask("Move Done");
         }
         break;
       }
@@ -158,15 +152,13 @@ export class CreepBase {
         if (!targetCollect) {
           targetCollect = CreepTask.getRuinFromTarget(this.task.targetPlace);
           if (!targetCollect) {
-            this.creep.say("Col Done"); // Target must have dissappeared.
-            this.task.taskDone = true;
+            this.completeTask("Col Done"); // Target must have dissappeared.
           }
         }
         if (targetCollect) {
           const result = this.withdraw(targetCollect, RESOURCE_ENERGY);
           if (result === OK) {
-            this.creep.say("Col Done");
-            this.task.taskDone = true;
+            this.completeTask("Col Done");
           }
         }
         if (
@@ -178,8 +170,7 @@ export class CreepBase {
           targetCollect instanceof Tombstone
         ) {
           if (targetCollect.store.energy === 0) {
-            this.creep.say("Col Done");
-            this.task.taskDone = true;
+            this.completeTask("Col Done");
           }
         } else if (
           targetCollect instanceof StructureLink ||
@@ -188,18 +179,15 @@ export class CreepBase {
           targetCollect instanceof StructureTower
         ) {
           if (targetCollect.store.energy === 0) {
-            this.creep.say("Col Done");
-            this.task.taskDone = true;
+            this.completeTask("Col Done");
           }
         } else if (targetCollect instanceof Resource) {
           if (targetCollect.amount === 0) {
-            this.creep.say("Col Done");
-            this.task.taskDone = true;
+            this.completeTask("Col Done");
           }
         }
         if (this.carryCurrent === this.carryCapacity) {
-          this.creep.say("Col Done");
-          this.task.taskDone = true;
+          this.completeTask("Col Done");
         }
         break;
       }
@@ -210,8 +198,7 @@ export class CreepBase {
           this.upgradeController(controller);
         }
         if (this.carryCurrent === 0) {
-          this.creep.say("Upg Done");
-          this.task.taskDone = true;
+          this.completeTask("Upg Done");
         }
         break;
       }
@@ -220,13 +207,11 @@ export class CreepBase {
         if (targetPickup) {
           const result = this.pickup(targetPickup);
           if (result === OK) {
-            this.creep.say("Pick up Done");
-            this.task.taskDone = true;
+            this.completeTask("Pick up Done");
           }
         }
         if (!targetPickup || this.carryCurrent === this.carryCapacity) {
-          this.creep.say("Pick up Done");
-          this.task.taskDone = true;
+          this.completeTask("Pick up Done");
         }
         break;
       }
@@ -238,8 +223,7 @@ export class CreepBase {
             `Claiming controller in room ${controller2.room.name} with creep ${this.name}, result: ${result}`
           );
           if (result === OK) {
-            this.creep.say("Claim Done");
-            this.task.taskDone = true;
+            this.completeTask("Claim Done");
           }
         }
         break;
@@ -258,15 +242,17 @@ export class CreepBase {
         this.goTo(moveTarget);
 
         if (targetPos.roomName === this.room.name) {
-          this.creep.say("Move Done");
-          this.task.taskDone = true;
+          this.completeTask("Move Done");
         }
         break;
       }
       case Activity.Reserve: {
         const controller3: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
         if (controller3) {
-          if (controller3.reservation && controller3.reservation.username !== Helper.getUserName()) {
+          if (
+            (controller3.reservation && controller3.reservation.username !== Helper.getUserName()) ||
+            !controller3.my
+          ) {
             this.attackController(controller3);
           } else {
             this.reserve(controller3);
@@ -299,21 +285,22 @@ export class CreepBase {
         break;
       }
       case Activity.Repair: {
-        let structure3: Structure | null = CreepTask.getStructureFromTarget(this.task.targetPlace);
-        if (structure3) {
-          const result = this.repair(structure3);
-          if (result === OK && structure3.hits === structure3.hitsMax) {
-            // If the structure is fully repaired, check if there is a non-road, non-rampart structure at the same position to repair instead.
-            const nonRoadStructure = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
-            if (nonRoadStructure) {
-              structure3 = nonRoadStructure;
-              this.repair(structure3);
-            }
+        const structures: Structure[] = CreepTask.getStructuresFromTarget(this.task.targetPlace);
+        const structureRampart = structures.find(s => s.structureType === STRUCTURE_RAMPART);
+        let foundSomethingToRepair = false;
+        for (let i = 0; i < structures.length; i++) {
+          if (structures[i].structureType !== STRUCTURE_RAMPART && structures[i].hits < structures[i].hitsMax) {
+            this.repair(structures[i]);
+            foundSomethingToRepair = true;
+            break;
           }
         }
-        if (this.carryCurrent === 0 || !structure3 || structure3.hits === structure3.hitsMax) {
-          this.creep.say("Rep Done");
-          this.task.taskDone = true;
+        if (!foundSomethingToRepair && structureRampart && structureRampart.hits < structureRampart.hitsMax) {
+          this.repair(structureRampart);
+          foundSomethingToRepair = true;
+        }
+        if (this.carryCurrent === 0 || !foundSomethingToRepair) {
+          this.completeTask("Rep Done");
         }
         break;
       }
@@ -327,15 +314,14 @@ export class CreepBase {
         // If enemy flee in another room, remove task
         if (entityToAttack) {
           if (entityToAttack.pos.roomName !== this.room.name) {
-            this.task.taskDone = true;
-            this.creep.say("Enemy fled");
+            this.completeTask("Enemy fled");
+            this.completeTask("Enemy fled");
             break;
           }
           this.attack(entityToAttack);
         }
         if (!entityToAttack || entityToAttack.hits === 0) {
-          this.task.taskDone = true;
-          this.creep.say("Enemy dead");
+          this.completeTask("Enemy dead");
         }
         break;
       }
@@ -359,8 +345,7 @@ export class CreepBase {
         }
         // Task done when mineral is exhausted or container is full.
         if (!mineralAtPos || mineralAtPos.mineralAmount === 0) {
-          this.creep.say("Min Done");
-          this.task.taskDone = true;
+          this.completeTask("Min Done");
         }
         break;
       }
@@ -373,17 +358,14 @@ export class CreepBase {
           if (resourceType) {
             const result = this.transfer(storageStruct, resourceType);
             if (result === OK || result === ERR_FULL) {
-              this.creep.say("Min Dep Done");
-              this.task.taskDone = true;
+              this.completeTask("Min Dep Done");
             }
           } else {
-            this.creep.say("No min");
-            this.task.taskDone = true;
+            this.completeTask("No min");
           }
         }
         if (this.store.getUsedCapacity() === 0) {
-          this.creep.say("Min Dep Done");
-          this.task.taskDone = true;
+          this.completeTask("Min Dep Done");
         }
         break;
       }
@@ -403,8 +385,38 @@ export class CreepBase {
 
         const amountLeft = this.getCollectMineralAmountLeft(collectTarget, specificMineral);
         if (this.store.getFreeCapacity() === 0 || !collectTarget || amountLeft === 0) {
-          this.creep.say("Min Col Done");
-          this.task.taskDone = true;
+          this.completeTask("Min Col Done");
+        }
+        break;
+      }
+      case Activity.Drop: {
+        // Drop all carried resources on the ground.
+        for (const resourceType in this.store) {
+          if ((this.store[resourceType as ResourceConstant] ?? 0) > 0) {
+            this.drop(resourceType as ResourceConstant);
+          }
+        }
+        if (this.store.getUsedCapacity() === 0) {
+          this.completeTask("Drop Done");
+        }
+        break;
+      }
+      case Activity.Dismantle: {
+        if (!this.task.targetId) {
+          break;
+        }
+        const entityToAttack: Structure | null = Game.getObjectById(this.task.targetId as Id<Structure>);
+        // If enemy flee in another room, remove task
+        if (entityToAttack) {
+          if (entityToAttack.pos.roomName !== this.room.name) {
+            this.completeTask("Enemy fled");
+            this.completeTask("Enemy fled");
+            break;
+          }
+          this.dismantle(entityToAttack);
+        }
+        if (!entityToAttack || entityToAttack.hits === 0) {
+          this.completeTask("Enemy dead");
         }
         break;
       }
@@ -433,6 +445,15 @@ export class CreepBase {
     }
 
     this.creep.memory.lastTickEnergy = currentEnergy;
+  }
+
+  private completeTask(message?: string) {
+    if (message && !this.task?.silent) {
+      this.creep.say(message);
+    }
+    if (this.task) {
+      this.task.taskDone = true;
+    }
   }
 
   private getCollectMineralTarget(
@@ -737,6 +758,14 @@ export class CreepBase {
     }
     // Always move towards the target.
     this.goTo(creep.pos);
+    return result;
+  }
+
+  public dismantle(structure: Structure) {
+    let result = this.creep.dismantle(structure);
+    if (result === ERR_NOT_IN_RANGE) {
+      this.goTo(structure.pos);
+    }
     return result;
   }
 

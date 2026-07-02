@@ -28,7 +28,7 @@ export default abstract class HarvestArea extends BaseArea {
       1,
       STRUCTURE_CONTAINER
     );
-    this.maxEmptySpaceAroundHarvestArea = Helper.getFreeAdjacentPositions(this.harvestPosition, this.room).length;
+    this.maxEmptySpaceAroundHarvestArea = Helper.getFreeAdjacentPositions(this.harvestPosition).length;
   }
 
   public handleSpawnTasks(): SpawnTask[] {
@@ -57,12 +57,12 @@ export default abstract class HarvestArea extends BaseArea {
 
   protected handleSetup() {
     if (!this.containerNextToHarvestArea && !this.containerConstructionSiteNextToHarvestArea) {
-      const potentialPositionsNextToHarvestArea = Helper.getFreeAdjacentPositions(this.harvestPosition, this.room);
+      const potentialPositionsNextToHarvestArea = Helper.getFreeAdjacentPositions(this.harvestPosition);
       // TODO: Need to work more on this logic, in case container gets destroyed and we already have extensions, a different place might be chosen.
       let maxPositionFound = -1;
       let positionForContainer: RoomPosition | null = null;
       for (const position of potentialPositionsNextToHarvestArea) {
-        const possibleExtensionsForFuture = Helper.getFreeAdjacentPositions(position, this.room).length - 1; // -1 because we leave one empty for pathing to the harvest area
+        const possibleExtensionsForFuture = Helper.getFreeAdjacentPositions(position).length - 1; // -1 because we leave one empty for pathing to the harvest area
         if (possibleExtensionsForFuture > maxPositionFound) {
           maxPositionFound = possibleExtensionsForFuture;
           positionForContainer = position;

@@ -27,7 +27,9 @@ export default class CarryArea extends BaseArea {
     this.controllerLevel = controller.level;
     this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 2);
     this.spawns = GetRoomObjects.getRoomSpawns(controller.room, true);
-    this.extensions = GetRoomObjects.getRoomExtensions(controller.room, true);
+    this.extensions = GetRoomObjects.usesLayoutFixedExtension(controller.room)
+      ? []
+      : GetRoomObjects.getRoomExtensions(controller.room, true);
     this.depositToGeneralStore = this.getGeneralDeposits();
     this.depositToLimitedStore = this.getLimitedDeposits();
     this.collectFromGeneralStore = this.getGeneralStoreToCollectFrom();
@@ -137,18 +139,22 @@ export default class CarryArea extends BaseArea {
       return;
     }
 
-    const collectFromGeneralStoreSorted = this.collectFromGeneralStore.sort(
-      (a, b) => a.pos.getRangeTo(creep.pos.x, creep.pos.y) - b.pos.getRangeTo(creep.pos.x, creep.pos.y)
+    // TODO: I have noticed that sometimes when there is 2000 energy in container and 300 resource dropped on the ground, creeps will go for the dropped resource instead of the container.
+    const firstDroppedResource = creep.pos.findClosestByPath(
+      this.droppedResourcesToCollectFrom.filter(resource => resource.amount > creep.carryCapacity / 2)
     );
-    for (let j = 0; j < collectFromGeneralStoreSorted.length; j++) {
-      if (collectFromGeneralStoreSorted[j].store.energy < creep.carryCapacity / 2) continue;
-      creep.addTask(new CreepTask(Activity.Collect, collectFromGeneralStoreSorted[j].pos));
+    if (firstDroppedResource) {
+      creep.addTask(new CreepTask(Activity.Pickup, firstDroppedResource.pos));
       return;
     }
-    // TODO: I have noticed that sometimes when there is 2000 energy in container and 300 resource dropped on the ground, creeps will go for the dropped resource instead of the container.
-    for (let j = 0; j < this.droppedResourcesToCollectFrom.length; j++) {
-      if (this.droppedResourcesToCollectFrom[j].amount < creep.carryCapacity / 2) continue;
-      creep.addTask(new CreepTask(Activity.Pickup, this.droppedResourcesToCollectFrom[j].pos));
+
+    const firstContainer = creep.pos.findClosestByPath(
+      this.collectFromGeneralStore.filter(
+        store => store.store.getUsedCapacity(RESOURCE_ENERGY) > creep.carryCapacity / 2
+      )
+    );
+    if (firstContainer) {
+      creep.addTask(new CreepTask(Activity.Collect, firstContainer.pos));
       return;
     }
   }
@@ -203,9 +209,11 @@ export default class CarryArea extends BaseArea {
   }
 
   private depositToFirstGeneralStore(creep: CreepBase): boolean {
-    for (let j = 0; j < this.depositToGeneralStore.length; j++) {
-      if (this.depositToGeneralStore[j].store.getFreeCapacity(RESOURCE_ENERGY) < 1000) continue;
-      creep.addTask(new CreepTask(Activity.Deposit, this.depositToGeneralStore[j].pos));
+    const deposit = creep.pos.findClosestByPath(
+      this.depositToGeneralStore.filter(store => store.store.getFreeCapacity(RESOURCE_ENERGY) > 500)
+    );
+    if (deposit) {
+      creep.addTask(new CreepTask(Activity.Deposit, deposit.pos));
       return true;
     }
     return false;
@@ -214,6 +222,16 @@ export default class CarryArea extends BaseArea {
   private getGeneralDeposits(): StructureContainer[] {
     const structures: StructureContainer[] = [];
     if (this.containerNextToController) structures.push(this.containerNextToController);
+    const spawn = GetRoomObjects.getRoomSpawns(this.room, true)[0];
+    if (spawn) {
+      const potentialContainers = GetRoomObjects.getWithinRangeContainers(spawn.pos, 4);
+      structures.push(...potentialContainers);
+    }
+    const storage = GetRoomObjects.getRoomStorage(this.room);
+    if (storage) {
+      const potentialContainers = GetRoomObjects.getWithinRangeContainers(storage.pos, 4);
+      structures.push(...potentialContainers);
+    }
     return structures;
   }
 

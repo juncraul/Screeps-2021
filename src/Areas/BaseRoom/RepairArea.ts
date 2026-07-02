@@ -53,7 +53,7 @@ export default class RepairArea extends BaseArea {
         structure.structureType !== STRUCTURE_RAMPART &&
         structure.hits < structure.hitsMax * 0.9
     }).length;
-    const wallOrRampToRepair = GetRoomObjects.getClosestStructureToRepairByRange(this.controller.pos, 0.9, true);
+    const wallOrRampToRepair = GetRoomObjects.getClosestWallRampartToRepairByRange(this.controller.pos);
 
     if (damagedNonWallCount === 0 && !wallOrRampToRepair) {
       return 0;
@@ -67,25 +67,25 @@ export default class RepairArea extends BaseArea {
   }
 
   private getClosestStructureToRepair(pos: RoomPosition): Structure | null {
-    let structure = GetRoomObjects.getClosestStructureToRepairByRange(pos, 0.5);
+    let structure = GetRoomObjects.getClosestStructureToRepairByPath(pos, 0.5);
     if (structure) {
       return structure;
     }
 
-    structure = GetRoomObjects.getClosestStructureToRepairByRange(pos, 0.9);
+    structure = GetRoomObjects.getClosestStructureToRepairByPath(pos, 0.8);
     if (structure) {
       return structure;
     }
 
-    return GetRoomObjects.getClosestStructureToRepairByRange(pos, 0.9, true);
+    return GetRoomObjects.getClosestWallRampartToRepairByPath(pos);
 
     // TODO: This needs more testing, it almost lost me a room
-    // structure = GetRoomObjects.getClosestStructureToRepairByRange(pos, 0.9, true);
+    // structure = GetRoomObjects.getClosestStructureToRepairByPath(pos, 0.9, true);
     // if (structure) {
     //   return structure;
     // }
 
-    // return GetRoomObjects.getClosestStructureToRepairByRange(pos, 1); // In case all walls are ramparts are full, or we don't have any.
+    // return GetRoomObjects.getClosestStructureToRepairByPath(pos, 1); // In case all walls are ramparts are full, or we don't have any.
   }
 
   private getClosestEnergyTarget(

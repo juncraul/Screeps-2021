@@ -63,6 +63,10 @@ export default class SpawnTask {
         return "DefenseHealer";
       case CreepType.DefenseRanger:
         return "DefenseRanger";
+      case CreepType.StationaryFiller:
+        return "StationaryFiller";
+      case CreepType.Dismantler:
+        return "Dismantler";
     }
   }
 

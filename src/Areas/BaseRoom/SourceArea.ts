@@ -41,20 +41,21 @@ export default class SourceArea extends HarvestArea {
       .map(source => GetRoomObjects.getWithinRangeLink(source.pos, 2))
       .filter(link => link !== null) as StructureLink[];
 
-    // TODO: This does not work properly it gives [null, null] when there are no construction sites next to sources in the room, need to fix this.
-    const linksConstructionSitesNextToSourcesInRoom = sourcesInRoom
-      .map(source => GetRoomObjects.getWithinRangeConstructionSite(source.pos, 2, STRUCTURE_LINK))
-      .filter(constructionSite => constructionSite !== null) as ConstructionSite[];
+    const linksConstructionSitesNextToSource = GetRoomObjects.getWithinRangeConstructionSites(
+      this.source.pos,
+      2,
+      STRUCTURE_LINK
+    );
 
     if (!this.linkNextToSource && !this.linkConstructionSiteNextToSource && this.containerNextToHarvestArea) {
       const canCreateLink =
         this.controllerLevel >= 7 || // At level 7 we can create another link at the second source, the link for level 6 is for the controller.
-        (this.controllerLevel === 5 && // At level 5 we create only one link at the source and one at the base.
-          linksNextToSourcesInRoom.length + linksConstructionSitesNextToSourcesInRoom.length < 1 &&
+        (this.controllerLevel <= 6 && // At level 5/6 we create only one link at the source and one at the base.
+          linksNextToSourcesInRoom.length + linksConstructionSitesNextToSource.length < 1 &&
           this.isFurthestSourceInRoom());
 
       if (canCreateLink) {
-        const positionForLink = Helper.getFreeAdjacentPositions(this.containerNextToHarvestArea.pos, this.room)[0];
+        const positionForLink = Helper.getFreeAdjacentPositions(this.containerNextToHarvestArea.pos)[0];
         if (positionForLink) {
           this.room.createConstructionSite(positionForLink, STRUCTURE_LINK);
         } else {
@@ -75,7 +76,11 @@ export default class SourceArea extends HarvestArea {
           );
         }
         if (this.containerNextToHarvestArea) {
-          this.creeps[i].addTask(new CreepTask(Activity.Deposit, this.containerNextToHarvestArea.pos));
+          if (this.containerNextToHarvestArea.store.getFreeCapacity() > 0) {
+            this.creeps[i].addTask(new CreepTask(Activity.Deposit, this.containerNextToHarvestArea.pos));
+          } else {
+            this.creeps[i].addTask(new CreepTask(Activity.Drop, this.containerNextToHarvestArea.pos));
+          }
         }
       } else {
         if (this.containerConstructionSiteNextToHarvestArea) {
@@ -92,7 +97,7 @@ export default class SourceArea extends HarvestArea {
           if (!Helper.isSamePosition(this.containerNextToHarvestArea.pos, this.creeps[i].pos)) {
             this.creeps[i].addTask(new CreepTask(Activity.Move, this.containerNextToHarvestArea.pos));
           } else {
-            this.creeps[i].addTask(new CreepTask(Activity.Harvest, this.source.pos));
+            this.creeps[i].addTask(new CreepTask(Activity.HarvestAndDeposit, this.source.pos));
           }
         }
       }
@@ -113,8 +118,10 @@ export default class SourceArea extends HarvestArea {
       return;
     }
 
-    if (this.linkForStorage && this.linkForStorage.store.energy === 0) return;
-    this.linkNextToSource.transferEnergy(this.linkForStorage as StructureLink);
+    if (this.linkForStorage && this.linkForStorage.store.energy === 0) {
+      this.linkNextToSource.transferEnergy(this.linkForStorage);
+      return;
+    }
   }
 
   private isFurthestSourceInRoom(): boolean {
@@ -191,6 +198,9 @@ export default class SourceArea extends HarvestArea {
       } else if (segments >= 5) {
         // 800 energy - This is the ideal creep with 10 energy collected per tick, enough for source refresh.
         bodyPartConstants = [WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE, MOVE];
+      }
+      if (GetRoomObjects.getWithinRangeExtensions(this.containerNextToHarvestArea.pos, 1).length > 0) {
+        bodyPartConstants.push(CARRY); // If we have extensions next to the container, we can add a carry part to the creep to help with energy transfer.
       }
     } else {
       let segments = Math.floor(this.room.energyCapacityAvailable / 200); // Work-100; Move-50; Carry-50

@@ -55,7 +55,7 @@ export default class UpgradeArea extends BaseArea {
 
   private handleSetup() {
     if (!this.containerNextToController && !this.containerConstructionSiteNextToController) {
-      const positionForContainer = Helper.getFreeAdjacentPositions(this.controller.pos, this.room, 2, 2)[0];
+      const positionForContainer = Helper.getFreeAdjacentPositions(this.controller.pos, 2, 2)[0];
       if (positionForContainer) {
         this.room.createConstructionSite(positionForContainer, STRUCTURE_CONTAINER);
       } else {
@@ -66,7 +66,7 @@ export default class UpgradeArea extends BaseArea {
     if (this.controllerLevel < 6) return;
 
     if (!this.linkNextToController && !this.linkConstructionSiteNextToController && this.containerNextToController) {
-      const positionForLink = Helper.getFreeAdjacentPositions(this.containerNextToController.pos, this.room, 2, 2)[0];
+      const positionForLink = Helper.getFreeAdjacentPositions(this.containerNextToController.pos, 2, 2)[0];
       if (positionForLink) {
         this.room.createConstructionSite(positionForLink, STRUCTURE_LINK);
       } else {

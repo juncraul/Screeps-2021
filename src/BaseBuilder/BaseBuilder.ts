@@ -184,6 +184,7 @@ export class BaseBuilder {
 
     for (const roomName in Game.rooms) {
       this.executeBuildPlans(roomName, this.getBaseBuildData(roomName).plans);
+      this.createExtensionsAroundSources(Game.rooms[roomName]);
     }
 
     const deleteStructuresFlag = Game.flags.DeleteStructures;
@@ -228,7 +229,7 @@ export class BaseBuilder {
     });
   }
 
-  private static getBaseBuildData(roomName: string): BaseBuildData {
+  public static getBaseBuildData(roomName: string): BaseBuildData {
     const cachedData = Helper.getCashedMemory(this.getBaseBuildPlanMemoryKey(roomName), {
       plans: [],
       ramparts: []
@@ -719,5 +720,26 @@ export class BaseBuilder {
 
     flag.memory.baseBuilder.autoPlaced = true;
     return true;
+  }
+
+  private static createExtensionsAroundSources(room: Room) {
+    const sources = room.find(FIND_SOURCES);
+    for (const source of sources) {
+      const container = GetRoomObjects.getWithinRangeContainer(source.pos, 1);
+      if (!container) continue;
+      const surroundingPositions = Helper.getFreeAdjacentPositions(container.pos);
+      const linkNextToSource = GetRoomObjects.getWithinRangeLink(source.pos, 2);
+      let leftOneFreeForLink = linkNextToSource ? true : false;
+      for (const pos of surroundingPositions) {
+        if (linkNextToSource && pos.isEqualTo(linkNextToSource.pos)) continue;
+        if (pos.lookFor(LOOK_STRUCTURES).filter(structure => structure.structureType !== STRUCTURE_ROAD)) {
+          if (!leftOneFreeForLink) {
+            leftOneFreeForLink = true;
+            continue;
+          }
+          room.createConstructionSite(pos.x, pos.y, STRUCTURE_EXTENSION);
+        }
+      }
+    }
   }
 }
