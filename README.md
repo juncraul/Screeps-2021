@@ -67,6 +67,7 @@ All current flags are documented here so you only need this section.
 | `SourceKeeper-SpawnRoom` | `SourceKeeper-E29S25` | Source Keeper hunting squad | Required from name (`SpawnRoom`) |
 | `Looter-SpawnRoom` | `Looter-E29S25` | Looter carrier unit | Required from name (`SpawnRoom`) |
 | `Defense-RoomName` | `Defense-E29S25` | Emergency in-room defense team | Auto-placed by SafeMode logic |
+| `Market-Sell-Energy-Amount-PriceModeOrValue` | `Market-Sell-Energy-10000-MarketValue` | Creates and tracks sell orders from terminal stock | Uses room where the flag is placed |
 | `ReRoute-TargetRoom-From-CurrentRoom[-AnyText]` | `ReRoute-E29S25-From-E30S25` | Forces cross-room movement through the flag room | N/A (movement helper) |
 | `Season[-SquadSize]` | `Season-5` | Creates 5 collectors | Spawns from the room where the flag is placed in |
 
@@ -185,6 +186,39 @@ DefenseArea behavior:
 
 Example:
 - `Defense-E29S25` (typically auto-created; manual placement also works if room name matches).
+
+---
+
+### `Market-Sell-Energy-Amount-PriceModeOrValue`
+
+- File source: `src/Areas/BaseRoom/MarketArea.ts`
+- Prefix: `Market`.
+- Current supported operation/resource pair: `Sell` + `Energy`.
+- Parsed format:
+1. `Market`
+2. `Sell`
+3. `Energy`
+4. `Amount` (positive integer)
+5. Price mode/value (`MarketValue`, `Undercut`, or fixed numeric price)
+
+Examples:
+- `Market-Sell-Energy-10000-MarketValue`
+- `Market-Sell-Energy-10000-Undercut`
+- `Market-Sell-Energy-10000-0.25`
+
+Behavior:
+1. Terminal energy baseline is maintained at `10000` whenever possible (clerk will refill from storage).
+2. If terminal energy is below `Amount`, a market clerk creep will move energy from storage to terminal.
+3. If terminal already has enough energy, transfer step is skipped.
+4. Once terminal has enough, a `ORDER_SELL` market order is created and the flag turns `COLOR_YELLOW`.
+5. While the order is active, the flag stays `COLOR_YELLOW`.
+6. When the order is fully completed (or no longer exists), the flag turns `COLOR_GREEN`.
+7. Green market flags are automatically removed after `10000` ticks.
+
+Price behavior:
+1. `MarketValue`: uses latest market history average price.
+2. `Undercut`: uses lowest competing sell order minus `0.001` (with floor protection).
+3. Fixed numeric value: uses the provided number (minimum `0.001`).
 
 ---
 

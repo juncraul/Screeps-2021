@@ -1,5 +1,5 @@
 import { Helper } from "Helpers/Helper";
-import { GetRoomObjects } from "Helpers/GetRoomObjects";
+import { GetRoomObjects, RemoteRoomMode } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
@@ -21,7 +21,7 @@ export default class RemoteArea extends BaseArea {
   harvestersPerSource: number;
   carriersPerRoom: number;
   repairersPerRoom: number;
-  claimThisRoom: boolean;
+  remoteMode: RemoteRoomMode;
   mineralOnly: boolean;
   mineral: Mineral | null;
   mineralContainer: StructureContainer | null;
@@ -57,7 +57,7 @@ export default class RemoteArea extends BaseArea {
     return economy[roomName] ?? { energyCollected: 0, energySpent: 0 };
   }
 
-  constructor(roomName: string, claimThisRoom: boolean, baseRoomName?: string, mineralOnly = false) {
+  constructor(roomName: string, remoteMode: RemoteRoomMode, baseRoomName?: string, mineralOnly = false) {
     super("RemoteArea", roomName, new RoomPosition(25, 25, roomName), Game.rooms[roomName]);
     this.roomName = roomName;
     this.baseRoom = this.findBaseRoom(baseRoomName);
@@ -79,7 +79,7 @@ export default class RemoteArea extends BaseArea {
     this.harvestersPerSource = 1; // Default value, can be adjusted based on strategy
     this.carriersPerRoom = 1;
     this.repairersPerRoom = 1;
-    this.claimThisRoom = claimThisRoom;
+    this.remoteMode = remoteMode;
     this.mineralOnly = mineralOnly;
     this.mineral = null;
     this.mineralContainer = null;
@@ -97,9 +97,13 @@ export default class RemoteArea extends BaseArea {
       }
     }
 
-    if (claimThisRoom) {
+    if (remoteMode === RemoteRoomMode.Claim) {
       this.claimersPerRoom = this.room.controller?.owner ? 0 : 1;
       this.carriersPerRoom = 0;
+    } else if (remoteMode === RemoteRoomMode.ReserveAttack) {
+      this.harvestersPerSource = 0;
+      this.carriersPerRoom = 0;
+      this.repairersPerRoom = 0;
     } else if (mineralOnly) {
       this.claimersPerRoom = 0;
       this.harvestersPerSource = 0;
@@ -138,16 +142,9 @@ export default class RemoteArea extends BaseArea {
     }
 
     // Handle Claimer spawning
-    if (
-      !this.controller ||
-      !this.controller.reservation ||
-      this.controller.reservation.username !== Helper.getUserName() ||
-      this.controller.reservation.ticksToEnd < 1000
-    ) {
-      const claimerCount = this.getCreepCountByType(CreepType.Claimer);
-      if (claimerCount < this.claimersPerRoom) {
-        tasksForThisArea.push(this.createClaimer());
-      }
+    const claimerCount = this.getCreepCountByType(CreepType.Claimer);
+    if (claimerCount < this.claimersPerRoom && this.shouldSpawnClaimer()) {
+      tasksForThisArea.push(this.createClaimer());
     }
 
     if (
@@ -253,6 +250,8 @@ export default class RemoteArea extends BaseArea {
       y += 0.7;
       visual.text("Mineral: " + (this.mineralType ?? "unknown"), x, y, plain);
     } else {
+      visual.text("Mode: " + this.remoteMode, x, y, plain);
+      y += 0.7;
       visual.text("Claimers " + this.getCreepCountByType(CreepType.Claimer) + "/" + this.claimersPerRoom, x, y, plain);
       y += 0.7;
       visual.text(
@@ -509,12 +508,37 @@ export default class RemoteArea extends BaseArea {
     if (creep.pos.roomName !== this.roomName) {
       creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.roomName)));
     } else if (this.controller) {
-      if (this.claimThisRoom) {
+      if (this.remoteMode === RemoteRoomMode.Claim) {
         creep.addTask(new CreepTask(Activity.Claim, this.controller.pos));
+      } else if (this.remoteMode === RemoteRoomMode.ReserveAttack) {
+        creep.addTask(new CreepTask(Activity.AttackController, this.controller.pos));
       } else {
         creep.addTask(new CreepTask(Activity.Reserve, this.controller.pos));
       }
     }
+  }
+
+  private shouldSpawnClaimer(): boolean {
+    if (!this.controller) {
+      return true;
+    }
+
+    if (this.remoteMode === RemoteRoomMode.Claim) {
+      return !this.controller.my;
+    }
+
+    if (this.remoteMode === RemoteRoomMode.ReserveAttack) {
+      return Boolean(
+        (this.controller.owner && this.controller.owner.username !== Helper.getUserName()) ||
+          (this.controller.reservation && this.controller.reservation.username !== Helper.getUserName())
+      );
+    }
+
+    return (
+      !this.controller.reservation ||
+      this.controller.reservation.username !== Helper.getUserName() ||
+      this.controller.reservation.ticksToEnd < 1000
+    );
   }
 
   private handleHarvester(creep: CreepBase) {
@@ -855,7 +879,10 @@ export default class RemoteArea extends BaseArea {
 
   private createClaimer(): SpawnTask {
     const bodyPartConstants: BodyPartConstant[] = [];
-    const segments = this.claimThisRoom ? 1 : Math.min(3, Math.floor(this.baseRoom.energyCapacityAvailable / 650));
+    const segments =
+      this.remoteMode === RemoteRoomMode.Claim
+        ? 1
+        : Math.min(3, Math.floor(this.baseRoom.energyCapacityAvailable / 650));
     for (let i = 0; i < segments; i++) bodyPartConstants.push(CLAIM);
     for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
 

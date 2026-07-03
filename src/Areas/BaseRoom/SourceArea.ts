@@ -111,14 +111,14 @@ export default class SourceArea extends HarvestArea {
     const storage = GetRoomObjects.getRoomStorage(this.room);
     if (
       linkForController &&
-      linkForController.store.energy === 0 &&
+      linkForController.store.energy <= 100 &&
       ((storage && storage.store.energy > 30000) || !storage)
     ) {
       this.linkNextToSource.transferEnergy(linkForController);
       return;
     }
 
-    if (this.linkForStorage && this.linkForStorage.store.energy === 0) {
+    if (this.linkForStorage && this.linkForStorage.store.energy <= 100) {
       this.linkNextToSource.transferEnergy(this.linkForStorage);
       return;
     }

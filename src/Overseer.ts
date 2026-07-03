@@ -6,7 +6,7 @@ import CarryArea from "Areas/BaseRoom/CarryArea";
 import ConstructionArea from "Areas/BaseRoom/ConstructionArea";
 import { Cannon } from "Defense/Cannon";
 import { SafeMode } from "Defense/SafeMode";
-import { GetRoomObjects } from "Helpers/GetRoomObjects";
+import { GetRoomObjects, RemoteRoomMode } from "Helpers/GetRoomObjects";
 import { BaseBuilder } from "BaseBuilder/BaseBuilder";
 import RemoteArea from "Areas/RemoteArea";
 import RemoteRebuildArea from "Areas/RemoteRebuildArea";
@@ -18,6 +18,7 @@ import DefenseArea from "./Areas/Military/DefenseArea";
 import LooterArea from "./Areas/Military/LooterArea";
 import SourceKeeperArea from "./Areas/Military/SourceKeeperArea";
 import StationaryFillerArea from "Areas/BaseRoom/StationaryFillerArea";
+import MarketArea from "Areas/BaseRoom/MarketArea";
 
 export default class Overseer implements IOverseer {
   public refresh(): void {
@@ -39,13 +40,13 @@ export default class Overseer implements IOverseer {
   private overseeRoom(room: Room): SpawnTask[] {
     // Used for debugging wall repair order
     // GetRoomObjects.getClosestWallRampartToRepairAll(room);
-    const roomsToReserve = GetRoomObjects.getAllRoomsToReserve(room);
-    const roomsToClaim = GetRoomObjects.getAllRoomsToClaim(room);
+    const remoteRooms = GetRoomObjects.getAllRoomsToRemote(room);
     const harvest = this.handleHarvestArea(room);
     const carry = this.handleCarryArea(room);
     const upgrade = this.handleUpgradeArea(room);
     const construction = this.handleConstructionArea(room);
     const repair = this.handleRepairArea(room);
+    const market = this.handleMarketArea(room);
     const utility = this.handleUtilityArea(room);
     const stationaryfiller = this.handleStationaryFillerArea(room);
     const defense = this.handleDefenseArea(room);
@@ -57,13 +58,10 @@ export default class Overseer implements IOverseer {
       seasonTasks = this.handleSeasonArea(room);
     }
     let remoteTasks: SpawnTask[] = [];
-    for (const roomToReserve of roomsToReserve) {
+    for (const remoteRoom of remoteRooms) {
       remoteTasks = remoteTasks.concat(
-        this.handleRemoteArea(roomToReserve.roomName, false, roomToReserve.baseRoomName, roomToReserve.mineralOnly)
+        this.handleRemoteArea(remoteRoom.roomName, remoteRoom.mode, remoteRoom.baseRoomName, remoteRoom.mineralOnly)
       );
-    }
-    for (const roomToClaim of roomsToClaim) {
-      remoteTasks = remoteTasks.concat(this.handleRemoteArea(roomToClaim.roomName, true, roomToClaim.baseRoomName));
     }
 
     const remoteRebuildTasks: SpawnTask[] = [];
@@ -123,6 +121,7 @@ export default class Overseer implements IOverseer {
       ...(taskBuckets[CreepType.Constructor] ?? []),
       ...(taskBuckets[CreepType.Repairer] ?? []),
       ...stationaryfiller.tasks,
+      ...market.tasks,
       ...utility.tasks,
       ...soldierTasks,
       ...sourceKeeperTasks,
@@ -140,6 +139,7 @@ export default class Overseer implements IOverseer {
       RepairArea: { existing: repair.existing, queued: repair.tasks.length },
       UpgradeArea: { existing: upgrade.existing, queued: upgrade.tasks.length },
       UtilityArea: { existing: utility.existing, queued: utility.tasks.length },
+      MarketArea: { existing: market.existing, queued: market.tasks.length },
       StationaryFillerArea: { existing: stationaryfiller.existing, queued: stationaryfiller.tasks.length },
       DefenseArea: { existing: defense.existing, queued: defense.tasks.length }
     });
@@ -276,12 +276,12 @@ export default class Overseer implements IOverseer {
 
   private handleRemoteArea(
     roomName: string,
-    claimThisRoom = false,
+    remoteMode: RemoteRoomMode = RemoteRoomMode.Reserve,
     baseRoomName?: string,
     mineralOnly = false
   ): SpawnTask[] {
     let tasks: SpawnTask[] = [];
-    const remoteArea: RemoteArea = new RemoteArea(roomName, claimThisRoom, baseRoomName, mineralOnly);
+    const remoteArea: RemoteArea = new RemoteArea(roomName, remoteMode, baseRoomName, mineralOnly);
     tasks = tasks.concat(remoteArea.handleSpawnTasks());
     remoteArea.handleThisArea();
     return tasks;
@@ -296,6 +296,19 @@ export default class Overseer implements IOverseer {
     const tasks = utilityArea.handleSpawnTasks();
     const existing = utilityArea.creeps.length;
     utilityArea.handleThisArea();
+    return { tasks, existing };
+  }
+
+  private handleMarketArea(room: Room): { tasks: SpawnTask[]; existing: number } {
+    const storage: StructureStorage | null = GetRoomObjects.getRoomStorage(room);
+    if (!storage) {
+      return { tasks: [], existing: 0 };
+    }
+
+    const marketArea: MarketArea = new MarketArea(storage);
+    const tasks = marketArea.handleSpawnTasks();
+    const existing = marketArea.creeps.length;
+    marketArea.handleThisArea();
     return { tasks, existing };
   }
 

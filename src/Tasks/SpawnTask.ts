@@ -67,6 +67,8 @@ export default class SpawnTask {
         return "StationaryFiller";
       case CreepType.Dismantler:
         return "Dismantler";
+      case CreepType.Clerk:
+        return "Clerk";
     }
   }
 

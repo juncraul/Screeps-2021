@@ -1,7 +1,23 @@
 // Flags: Primary - Secondary
 // PURPLE - PURPLE Reserve this room
+// PURPLE - BLUE Reserve this room for mineral-only harvesting
+// BLUE - any Claim this room
+// any - any ReserveAttack this room when the flag name starts with ReserveAttack
 
 import { Helper } from "./Helper";
+
+export enum RemoteRoomMode {
+  Reserve = "Reserve",
+  Claim = "Claim",
+  ReserveAttack = "ReserveAttack"
+}
+
+export interface RemoteRoomTarget {
+  roomName: string;
+  baseRoomName?: string;
+  mineralOnly: boolean;
+  mode: RemoteRoomMode;
+}
 
 export class GetRoomObjects {
   public static readonly ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
@@ -15,39 +31,44 @@ export class GetRoomObjects {
     return _.filter(Game.creeps, creep => creep.spawning === includingSpawning);
   }
 
-  public static getAllRoomsToReserve(
-    baseRoom?: Room
-  ): { roomName: string; baseRoomName?: string; mineralOnly: boolean }[] {
-    const flags = _.filter(Game.flags, flag => flag.color === COLOR_PURPLE && flag.name.startsWith("Reserve"));
-    const roomNames: { roomName: string; baseRoomName?: string; mineralOnly: boolean }[] = [];
+  public static getAllRoomsToRemote(baseRoom?: Room): RemoteRoomTarget[] {
+    const flags = _.filter(Game.flags, flag => flag.name.startsWith("Reserve"));
+    const roomTargets: RemoteRoomTarget[] = [];
     flags.forEach(flag => {
+      const mode = this.getRemoteRoomModeFromFlag(flag);
+      if (!mode) {
+        return;
+      }
+
       const baseRoomNameFlag = this.getBaseRoomNameFromReserveFlag(flag.name);
       if (baseRoom && baseRoomNameFlag !== baseRoom.name) {
         return;
       }
-      roomNames.push({
+
+      roomTargets.push({
         roomName: flag.pos.roomName,
         baseRoomName: baseRoomNameFlag,
-        mineralOnly: flag.secondaryColor === COLOR_BLUE
+        mineralOnly: mode === RemoteRoomMode.Reserve && flag.secondaryColor === COLOR_BLUE,
+        mode
       });
     });
-    return roomNames;
+    return roomTargets;
   }
 
-  public static getAllRoomsToClaim(baseRoom?: Room): { roomName: string; baseRoomName?: string }[] {
-    const flags = _.filter(Game.flags, flag => flag.color === COLOR_BLUE && flag.name.startsWith("Reserve"));
-    const roomNames: { roomName: string; baseRoomName?: string }[] = [];
-    flags.forEach(flag => {
-      const baseRoomNameFlag = this.getBaseRoomNameFromReserveFlag(flag.name);
-      if (baseRoom && baseRoomNameFlag !== baseRoom.name) {
-        return;
-      }
-      roomNames.push({
-        roomName: flag.pos.roomName,
-        baseRoomName: baseRoomNameFlag
-      });
-    });
-    return roomNames;
+  private static getRemoteRoomModeFromFlag(flag: Flag): RemoteRoomMode | null {
+    if (flag.color === COLOR_RED) {
+      return RemoteRoomMode.ReserveAttack;
+    }
+
+    if (flag.color === COLOR_BLUE) {
+      return RemoteRoomMode.Claim;
+    }
+
+    if (flag.color === COLOR_PURPLE) {
+      return RemoteRoomMode.Reserve;
+    }
+
+    return null;
   }
 
   private static getBaseRoomNameFromReserveFlag(flagName: string): string | undefined {

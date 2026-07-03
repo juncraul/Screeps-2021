@@ -249,14 +249,7 @@ export class CreepBase {
       case Activity.Reserve: {
         const controller3: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
         if (controller3) {
-          if (
-            (controller3.reservation && controller3.reservation.username !== Helper.getUserName()) ||
-            !controller3.my
-          ) {
-            this.attackController(controller3);
-          } else {
-            this.reserve(controller3);
-          }
+          this.reserve(controller3);
         }
         break;
       }
@@ -417,6 +410,13 @@ export class CreepBase {
         }
         if (!entityToAttack || entityToAttack.hits === 0) {
           this.completeTask("Enemy dead");
+        }
+        break;
+      }
+      case Activity.AttackController: {
+        const controller3: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
+        if (controller3) {
+          this.attackController(controller3);
         }
         break;
       }
@@ -762,7 +762,7 @@ export class CreepBase {
   }
 
   public dismantle(structure: Structure) {
-    let result = this.creep.dismantle(structure);
+    const result = this.creep.dismantle(structure);
     if (result === ERR_NOT_IN_RANGE) {
       this.goTo(structure.pos);
     }

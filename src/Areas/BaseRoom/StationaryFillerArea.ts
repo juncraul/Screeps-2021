@@ -59,9 +59,17 @@ export default class StationaryFillerArea extends BaseArea {
 
       // Handle energy collection and deposit
       if (this.creeps[i].isEmpty()) {
-        const container = this.creeps[i].pos.findClosestByPath(this.containers);
+        const container = this.creeps[i].pos.findInRange(this.containers, 1)[0];
         if (container && container.store.energy > 0) {
           this.creeps[i].addTask(new CreepTask(Activity.Collect, container.pos, null, null, true));
+        } else {
+          const middleExtensions = this.getMiddleExtensionsThatWeCanCollectFrom();
+          if (middleExtensions.length > 0) {
+            const closestMiddleExtension = this.creeps[i].pos.findInRange(middleExtensions, 1)[0];
+            if (closestMiddleExtension) {
+              this.creeps[i].addTask(new CreepTask(Activity.Collect, closestMiddleExtension.pos, null, null, true));
+            }
+          }
         }
       } else {
         const structureToDeposit = this.getNearbyExtensionOrSpawn(this.creeps[i].pos);
@@ -81,17 +89,8 @@ export default class StationaryFillerArea extends BaseArea {
     // For LayoutFixedExtension, containers are at hardcoded positions relative to the base anchor
     // The layout has containers at (1,3) and (5,3) relative to anchor at (3,3)
     // We'll use the container at (1,3) for now
-    const buildData = Helper.getCashedMemory(`Base-Build-Plans-${this.room.name}`, {
-      plans: [],
-      ramparts: []
-    });
-
-    if (!buildData || !buildData.plans || buildData.plans.length === 0) {
-      return [];
-    }
-
-    // Get the anchor position from the first build plan
-    const plan = buildData.plans[0];
+    const plan = this.getFixedExtensionBuildPlan();
+    if (!plan) return [];
     const planStartX = plan.x - 3;
     const planStartY = plan.y - 3;
 
@@ -109,16 +108,8 @@ export default class StationaryFillerArea extends BaseArea {
   private getStationaryPositions(): RoomPosition[] {
     // Hardcoded position where the creep should stand
     // For LayoutFixedExtension, we'll place the filler at position (2,3) relative to anchor
-    const buildData = Helper.getCashedMemory(`Base-Build-Plans-${this.room.name}`, {
-      plans: [],
-      ramparts: []
-    });
-
-    if (!buildData || !buildData.plans || buildData.plans.length === 0) {
-      return [];
-    }
-
-    const plan = buildData.plans[0];
+    const plan = this.getFixedExtensionBuildPlan();
+    if (!plan) return [];
     const planStartX = plan.x - 3;
     const planStartY = plan.y - 3;
 
@@ -134,6 +125,29 @@ export default class StationaryFillerArea extends BaseArea {
     });
 
     return stationaryPositions;
+  }
+
+  private getMiddleExtensionsThatWeCanCollectFrom(): (StructureExtension | StructureSpawn)[] {
+    const plan = this.getFixedExtensionBuildPlan();
+    if (!plan) return [];
+
+    // eslint-disable-next-line prettier/prettier
+    const middleExtensionPos = [[plan.x, plan.y - 2], [plan.x, plan.y - 1], [plan.x, plan.y], [plan.x, plan.y + 1], [plan.x, plan.y + 2]]; // relative positions of middle extensions
+    const extensions = this.room.find(FIND_MY_STRUCTURES, {
+      filter: structure =>
+        structure.structureType === STRUCTURE_EXTENSION &&
+        structure.store.getUsedCapacity(RESOURCE_ENERGY) > 0 &&
+        middleExtensionPos.some(pos => structure.pos.isEqualTo(new RoomPosition(pos[0], pos[1], this.room.name)))
+    }) as StructureExtension[];
+
+    const spawns = this.room.find(FIND_MY_STRUCTURES, {
+      filter: structure =>
+        structure.structureType === STRUCTURE_SPAWN &&
+        structure.store.getUsedCapacity(RESOURCE_ENERGY) > 0 &&
+        middleExtensionPos.some(pos => structure.pos.isEqualTo(new RoomPosition(pos[0], pos[1], this.room.name)))
+    }) as StructureSpawn[];
+
+    return [...extensions, ...spawns];
   }
 
   private getNearbyExtensionOrSpawn(currentPosition: RoomPosition): StructureExtension | StructureSpawn | null {
@@ -158,6 +172,20 @@ export default class StationaryFillerArea extends BaseArea {
 
     // Return the closest structure
     return currentPosition.findClosestByRange(nearbyStructures);
+  }
+
+  private getFixedExtensionBuildPlan(): any {
+    const buildData = Helper.getCashedMemory(`Base-Build-Plans-${this.room.name}`, {
+      plans: [],
+      ramparts: []
+    });
+
+    if (!buildData || !buildData.plans || buildData.plans.length === 0) {
+      return [];
+    }
+
+    // TODO: we need to find the correct build plan, not take the first one.
+    return buildData.plans[0];
   }
 
   private createCreepForThisArea(): SpawnTask | null {

@@ -100,5 +100,6 @@ export enum Activity {
   DepositMineral = 16,
   CollectMineral = 17,
   Drop = 18,
-  Dismantle = 19
+  Dismantle = 19,
+  AttackController = 20
 }
