@@ -1,5 +1,7 @@
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 
+const DEFENSE_TEST_FLAG_PREFIX = "Defense-Test";
+
 export class Cannon {
   energy: number;
   energyCapacity: number;
@@ -35,6 +37,12 @@ export class Cannon {
     const defenseCreep = this.getDefenseAreaDamagedCreep();
     if (defenseCreep) {
       this.heal(defenseCreep);
+      return;
+    }
+
+    const testFlags = this.getDefenseTestFlags();
+    if (testFlags.length > 0 && this.tower.room.find(FIND_HOSTILE_CREEPS).length === 0) {
+      this.visualizeTestFlagTargets(testFlags);
       return;
     }
 
@@ -136,5 +144,20 @@ export class Cannon {
     if (range >= falloffRange) return minDamage;
     const falloffPct = (range - optimalRange) / (falloffRange - optimalRange);
     return Math.floor(maxDamage * (1 - TOWER_FALLOFF * falloffPct));
+  }
+
+  private getDefenseTestFlags(): Flag[] {
+    return _.filter(
+      Game.flags,
+      flag =>
+        (flag.name === DEFENSE_TEST_FLAG_PREFIX || flag.name.startsWith(`${DEFENSE_TEST_FLAG_PREFIX}-`)) &&
+        flag.pos.roomName === this.tower.room.name
+    );
+  }
+
+  private visualizeTestFlagTargets(testFlags: Flag[]): void {
+    for (const flag of testFlags) {
+      this.tower.room.visual.line(this.pos, flag.pos, { color: "red", opacity: 0.85, width: 0.15 });
+    }
   }
 }

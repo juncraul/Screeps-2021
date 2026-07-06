@@ -142,8 +142,16 @@ export default class RemoteArea extends BaseArea {
     }
 
     // Handle Claimer spawning
+    const claimers = this.creeps.filter(creep => creep.creepType === CreepType.Claimer);
+    const extraClaimers =
+      this.remoteMode === RemoteRoomMode.ReserveAttack &&
+      claimers.length === 1 &&
+      claimers[0].ticksToLive &&
+      claimers[0].ticksToLive < 300
+        ? 1
+        : 0;
     const claimerCount = this.getCreepCountByType(CreepType.Claimer);
-    if (claimerCount < this.claimersPerRoom && this.shouldSpawnClaimer()) {
+    if (claimerCount < this.claimersPerRoom + extraClaimers && this.shouldSpawnClaimer()) {
       tasksForThisArea.push(this.createClaimer());
     }
 
@@ -511,7 +519,11 @@ export default class RemoteArea extends BaseArea {
       if (this.remoteMode === RemoteRoomMode.Claim) {
         creep.addTask(new CreepTask(Activity.Claim, this.controller.pos));
       } else if (this.remoteMode === RemoteRoomMode.ReserveAttack) {
-        creep.addTask(new CreepTask(Activity.AttackController, this.controller.pos));
+        if (this.controller.owner && this.controller.owner.username !== Helper.getUserName()) {
+          creep.addTask(new CreepTask(Activity.AttackController, this.controller.pos)); // Attack the controller if it's owned by someone else
+        } else {
+          creep.addTask(new CreepTask(Activity.Claim, this.controller.pos)); // Claim the controller if it's unowned or reserved by us
+        }
       } else {
         creep.addTask(new CreepTask(Activity.Reserve, this.controller.pos));
       }
@@ -655,6 +667,13 @@ export default class RemoteArea extends BaseArea {
     const anyWallsOrRamparts = GetRoomObjects.getClosestWallRampartToRepairByPath(creep.pos);
     if (anyWallsOrRamparts) {
       creep.addTask(new CreepTask(Activity.Repair, anyWallsOrRamparts.pos));
+      return;
+    }
+
+    const anyDamageBearlyScrached = GetRoomObjects.getClosestStructureToRepairByPath(creep.pos, 1.0);
+    if (anyDamageBearlyScrached) {
+      creep.addTask(new CreepTask(Activity.Repair, anyDamageBearlyScrached.pos));
+      return;
     }
   }
 

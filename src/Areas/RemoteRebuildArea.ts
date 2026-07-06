@@ -48,7 +48,12 @@ export default class RemoteRebuildArea extends BaseArea {
 
     const carrierInTransit = this.creeps.filter(c => c.memory.role === "Carrier").length;
     const carrierInRemote = this.getRemoteAreaCount("CarryArea", this.remoteRoomName);
-    if (carrierInTransit + carrierInRemote < 3 && (this.flag.color === COLOR_WHITE || this.flag.color === COLOR_GREY)) {
+    const containersInRemote = remoteRoom ? GetRoomObjects.getRoomContainers(remoteRoom).length : 0;
+    if (
+      carrierInTransit + carrierInRemote < 3 &&
+      containersInRemote > 2 && // We need more than 2 containers in the remote room before we start sending carriers. 2 containers for source and 1 container for other stuff.
+      (this.flag.color === COLOR_WHITE || this.flag.color === COLOR_GREY)
+    ) {
       tasks.push(this.createCarrier(cap));
     }
 

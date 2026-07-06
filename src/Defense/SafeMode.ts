@@ -1,3 +1,5 @@
+import { DEFENSE_TEST_FLAG_PREFIX } from "Areas/Military/DefenseArea";
+
 export class SafeMode {
   public static run(room: Room, towers: StructureTower[]): void {
     const controller = room.controller;
@@ -36,6 +38,7 @@ export class SafeMode {
     let breachDetected = previousState.breachDetected;
     if (hostilePlayers.length > 0 && wallsDestroyed) {
       breachDetected = true;
+      this.removeDefenseTestFlags(room);
     }
 
     const shouldActivateSafeMode =
@@ -177,6 +180,14 @@ export class SafeMode {
     if (towersOutOfEnergy) {
       y += 0.6;
       room.visual.text("TOWERS OUT OF ENERGY", x, y, danger);
+    }
+  }
+
+  private static removeDefenseTestFlags(room: Room): void {
+    const flag = _.filter(Game.flags, f => f.name.startsWith(DEFENSE_TEST_FLAG_PREFIX) && f.pos.roomName === room.name);
+    for (const f of flag) {
+      f.remove();
+      console.log(`DefenseArea: Removed test flag ${f.name} from ${room.name}`);
     }
   }
 }

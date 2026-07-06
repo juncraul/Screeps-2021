@@ -50,6 +50,12 @@ export default class ConstructionArea extends BaseArea {
         if (!foundSomewhereToCollectFrom && this.storage && this.storage.store.energy > 200) {
           this.creeps[i].addTask(new CreepTask(Activity.Collect, this.storage.pos)); // TODO:Add Energy type in here.
         }
+        if (!foundSomewhereToCollectFrom) {
+          const sources = this.room.find(FIND_SOURCES);
+          if (sources.length > 0) {
+            this.creeps[i].addTask(new CreepTask(Activity.Harvest, sources[0].pos));
+          }
+        }
       }
       if (!this.creeps[i].isEmpty() && this.creeps[i].isFree()) {
         const constructionArea = this.getConstructionClosestByPoint(this.creeps[i].pos);

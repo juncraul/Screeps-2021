@@ -59,6 +59,8 @@ export default class StationaryFillerArea extends BaseArea {
 
       // Handle energy collection and deposit
       if (this.creeps[i].isEmpty()) {
+        this.creeps[i].memory.lastCollectedFromExtensionOrSpawnId = null;
+
         const container = this.creeps[i].pos.findInRange(this.containers, 1)[0];
         if (container && container.store.energy > 0) {
           this.creeps[i].addTask(new CreepTask(Activity.Collect, container.pos, null, null, true));
@@ -67,12 +69,16 @@ export default class StationaryFillerArea extends BaseArea {
           if (middleExtensions.length > 0) {
             const closestMiddleExtension = this.creeps[i].pos.findInRange(middleExtensions, 1)[0];
             if (closestMiddleExtension) {
+              this.creeps[i].memory.lastCollectedFromExtensionOrSpawnId = closestMiddleExtension.id;
               this.creeps[i].addTask(new CreepTask(Activity.Collect, closestMiddleExtension.pos, null, null, true));
             }
           }
         }
       } else {
-        const structureToDeposit = this.getNearbyExtensionOrSpawn(this.creeps[i].pos);
+        const structureToDeposit = this.getNearbyExtensionOrSpawn(
+          this.creeps[i].pos,
+          this.creeps[i].memory.lastCollectedFromExtensionOrSpawnId
+        );
         if (structureToDeposit) {
           this.creeps[i].addTask(new CreepTask(Activity.Deposit, structureToDeposit.pos, null, null, true));
         }
@@ -86,17 +92,17 @@ export default class StationaryFillerArea extends BaseArea {
   }
 
   private getContainers(): StructureContainer[] {
-    // For LayoutFixedExtension, containers are at hardcoded positions relative to the base anchor
-    // The layout has containers at (1,3) and (5,3) relative to anchor at (3,3)
-    // We'll use the container at (1,3) for now
-    const plan = this.getFixedExtensionBuildPlan();
-    if (!plan) return [];
-    const planStartX = plan.x - 3;
-    const planStartY = plan.y - 3;
+    const plans = this.getFixedExtensionBuildPlans();
+    if (plans.length === 0) return [];
 
     const containerPositions: RoomPosition[] = [];
-    containerPositions.push(new RoomPosition(planStartX + 1, planStartY + 3, this.room.name));
-    containerPositions.push(new RoomPosition(planStartX + 5, planStartY + 3, this.room.name));
+    for (const plan of plans) {
+      const planStartX = plan.x - 3;
+      const planStartY = plan.y - 3;
+
+      containerPositions.push(new RoomPosition(planStartX + 1, planStartY + 3, this.room.name));
+      containerPositions.push(new RoomPosition(planStartX + 5, planStartY + 3, this.room.name));
+    }
 
     const structures = this.room.find(FIND_STRUCTURES, {
       filter: s => s.structureType === STRUCTURE_CONTAINER && containerPositions.some(pos => s.pos.isEqualTo(pos))
@@ -106,18 +112,29 @@ export default class StationaryFillerArea extends BaseArea {
   }
 
   private getStationaryPositions(): RoomPosition[] {
-    // Hardcoded position where the creep should stand
-    // For LayoutFixedExtension, we'll place the filler at position (2,3) relative to anchor
-    const plan = this.getFixedExtensionBuildPlan();
-    if (!plan) return [];
-    const planStartX = plan.x - 3;
-    const planStartY = plan.y - 3;
+    const plans = this.getFixedExtensionBuildPlans();
+    if (plans.length === 0) return [];
 
     const stationaryPositions: RoomPosition[] = [];
-    stationaryPositions.push(new RoomPosition(planStartX + 2, planStartY + 4, this.room.name));
-    stationaryPositions.push(new RoomPosition(planStartX + 4, planStartY + 4, this.room.name));
-    stationaryPositions.push(new RoomPosition(planStartX + 2, planStartY + 2, this.room.name));
-    stationaryPositions.push(new RoomPosition(planStartX + 4, planStartY + 2, this.room.name));
+    const seen = new Set<string>();
+
+    for (const plan of plans) {
+      const planStartX = plan.x - 3;
+      const planStartY = plan.y - 3;
+      const positions = [
+        new RoomPosition(planStartX + 2, planStartY + 4, this.room.name),
+        new RoomPosition(planStartX + 4, planStartY + 4, this.room.name),
+        new RoomPosition(planStartX + 2, planStartY + 2, this.room.name),
+        new RoomPosition(planStartX + 4, planStartY + 2, this.room.name)
+      ];
+
+      for (const pos of positions) {
+        const key = `${pos.x}:${pos.y}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        stationaryPositions.push(pos);
+      }
+    }
 
     // visualize the stationary position for debugging
     stationaryPositions.forEach(stationaryPos => {
@@ -128,29 +145,39 @@ export default class StationaryFillerArea extends BaseArea {
   }
 
   private getMiddleExtensionsThatWeCanCollectFrom(): (StructureExtension | StructureSpawn)[] {
-    const plan = this.getFixedExtensionBuildPlan();
-    if (!plan) return [];
+    const plans = this.getFixedExtensionBuildPlans();
+    if (plans.length === 0) return [];
 
-    // eslint-disable-next-line prettier/prettier
-    const middleExtensionPos = [[plan.x, plan.y - 2], [plan.x, plan.y - 1], [plan.x, plan.y], [plan.x, plan.y + 1], [plan.x, plan.y + 2]]; // relative positions of middle extensions
+    const middleExtensionPosKeys = new Set<string>();
+    for (const plan of plans) {
+      middleExtensionPosKeys.add(`${plan.x}:${plan.y - 2}`);
+      middleExtensionPosKeys.add(`${plan.x}:${plan.y - 1}`);
+      middleExtensionPosKeys.add(`${plan.x}:${plan.y}`);
+      middleExtensionPosKeys.add(`${plan.x}:${plan.y + 1}`);
+      middleExtensionPosKeys.add(`${plan.x}:${plan.y + 2}`);
+    }
+
     const extensions = this.room.find(FIND_MY_STRUCTURES, {
       filter: structure =>
         structure.structureType === STRUCTURE_EXTENSION &&
         structure.store.getUsedCapacity(RESOURCE_ENERGY) > 0 &&
-        middleExtensionPos.some(pos => structure.pos.isEqualTo(new RoomPosition(pos[0], pos[1], this.room.name)))
+        middleExtensionPosKeys.has(`${structure.pos.x}:${structure.pos.y}`)
     }) as StructureExtension[];
 
     const spawns = this.room.find(FIND_MY_STRUCTURES, {
       filter: structure =>
         structure.structureType === STRUCTURE_SPAWN &&
         structure.store.getUsedCapacity(RESOURCE_ENERGY) > 0 &&
-        middleExtensionPos.some(pos => structure.pos.isEqualTo(new RoomPosition(pos[0], pos[1], this.room.name)))
+        middleExtensionPosKeys.has(`${structure.pos.x}:${structure.pos.y}`)
     }) as StructureSpawn[];
 
     return [...extensions, ...spawns];
   }
 
-  private getNearbyExtensionOrSpawn(currentPosition: RoomPosition): StructureExtension | StructureSpawn | null {
+  private getNearbyExtensionOrSpawn(
+    currentPosition: RoomPosition,
+    excludeStructureId?: string | null
+  ): StructureExtension | StructureSpawn | null {
     const extensions = this.room.find(FIND_MY_STRUCTURES, {
       filter: structure =>
         structure.structureType === STRUCTURE_EXTENSION && structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0
@@ -166,15 +193,24 @@ export default class StationaryFillerArea extends BaseArea {
     // Filter to only nearby structures (within range 1)
     const nearbyStructures = structures.filter(structure => currentPosition.getRangeTo(structure.pos) <= 1);
 
+    const candidateStructures = excludeStructureId
+      ? nearbyStructures.filter(structure => structure.id !== excludeStructureId)
+      : nearbyStructures;
+
+    if (candidateStructures.length > 0) {
+      // Prefer a different target than the one just drained.
+      return currentPosition.findClosestByRange(candidateStructures);
+    }
+
     if (nearbyStructures.length === 0) {
       return null;
     }
 
-    // Return the closest structure
+    // Fallback: if no alternative exists, refill the original nearby target to avoid idle creeps.
     return currentPosition.findClosestByRange(nearbyStructures);
   }
 
-  private getFixedExtensionBuildPlan(): any {
+  private getFixedExtensionBuildPlans(): any[] {
     const buildData = Helper.getCashedMemory(`Base-Build-Plans-${this.room.name}`, {
       plans: [],
       ramparts: []
@@ -184,8 +220,7 @@ export default class StationaryFillerArea extends BaseArea {
       return [];
     }
 
-    // TODO: we need to find the correct build plan, not take the first one.
-    return buildData.plans[0];
+    return buildData.plans.filter((plan: any) => plan.secondaryColor === COLOR_YELLOW);
   }
 
   private createCreepForThisArea(): SpawnTask | null {

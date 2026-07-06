@@ -1,8 +1,10 @@
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "../BaseArea";
 import { CreepBase } from "CreepBase";
+import { GetRoomObjects } from "Helpers/GetRoomObjects";
 
 export const DEFENSE_FLAG_PREFIX = "Defense";
+export const DEFENSE_TEST_FLAG_PREFIX = "Defense-Test";
 
 export interface DefenseFlagConfig {
   name: string;
@@ -25,7 +27,10 @@ export default class DefenseArea extends BaseArea {
   public static detectAllFlags(): DefenseFlagConfig[] {
     return _.filter(
       Game.flags,
-      flag => flag.name === DEFENSE_FLAG_PREFIX || flag.name.startsWith(`${DEFENSE_FLAG_PREFIX}-`)
+      flag =>
+        flag.name === DEFENSE_FLAG_PREFIX ||
+        flag.name.startsWith(`${DEFENSE_FLAG_PREFIX}`) ||
+        DefenseArea.isTestFlagName(flag.name)
     ).map(flag => ({
       name: flag.name,
       roomName: flag.pos.roomName
@@ -64,11 +69,18 @@ export default class DefenseArea extends BaseArea {
     const room = Game.rooms[this.flag.roomName];
     if (!room) return;
 
-    const hostiles = room.find(FIND_HOSTILE_CREEPS, {
-      filter: creep => creep.owner !== null
-    });
+    const hostiles = room
+      .find(FIND_HOSTILE_CREEPS, {
+        filter: creep => creep.owner !== null
+      })
+      .map(h => h.pos);
 
-    if (hostiles.length === 0) return;
+    const testFlag = this.getTestFlag(room);
+    if (testFlag) hostiles.push(testFlag.pos);
+
+    if (hostiles.length === 0) {
+      return;
+    }
 
     // Healers act every tick regardless of task state (mirrors SoldierArea healer pattern).
     for (const creep of this.creeps) {
@@ -86,6 +98,10 @@ export default class DefenseArea extends BaseArea {
       } else if (creep.creepType === CreepType.DefenseHealer) {
         this.handleHealerMovement(creep, room);
       }
+    }
+
+    if (this.isTestMode()) {
+      this.handleTestDefense(room);
     }
   }
 
@@ -116,8 +132,9 @@ export default class DefenseArea extends BaseArea {
 
   /** Move healer to a rampart within ranged-heal distance (≤3) of the defender. */
   private handleHealerMovement(healer: CreepBase, room: Room): void {
-    const fighter = this.creeps.find(c => c.creepType === CreepType.Defender)
-      ?? this.creeps.find(c => c.creepType === CreepType.DefenseRanger);
+    const fighter =
+      this.creeps.find(c => c.creepType === CreepType.Defender) ??
+      this.creeps.find(c => c.creepType === CreepType.DefenseRanger);
     if (!fighter) return;
 
     const target = this.findBestHealerRampart(fighter.pos, healer, room);
@@ -129,34 +146,76 @@ export default class DefenseArea extends BaseArea {
   // ─── Fighters (Melee + Ranger) ──────────────────────────────────────────
 
   /** Move fighter to a rampart near the closest enemy; attack while holding rampart. */
-  private handleFighter(creep: CreepBase, hostiles: Creep[], room: Room, ranged: boolean): void {
+  private handleFighter(creep: CreepBase, hostilePositions: RoomPosition[], room: Room, ranged: boolean): void {
     // Pick the closest hostile as the primary target.
-    const target = hostiles.reduce<Creep | null>((best, h) => {
+    const target = hostilePositions.reduce<RoomPosition | null>((best, h) => {
       if (!best) return h;
-      return creep.pos.getRangeTo(h.pos) < creep.pos.getRangeTo(best.pos) ? h : best;
+      return creep.pos.getRangeTo(h) < creep.pos.getRangeTo(best) ? h : best;
     }, null);
 
     if (!target) return;
 
+    const creeps = target.lookFor(LOOK_CREEPS);
+    const creepTarget = creeps.length > 0 ? creeps[0] : null;
+    const isSimulatedTarget = target.lookFor(LOOK_FLAGS).some(f => DefenseArea.isTestFlagName(f.name));
+
+    if (!isSimulatedTarget && !creepTarget) return;
+
     if (ranged) {
-      const nearestInRange = hostiles
-        .filter(h => creep.pos.getRangeTo(h.pos) <= 3)
-        .sort((a, b) => creep.pos.getRangeTo(a.pos) - creep.pos.getRangeTo(b.pos))[0];
-      if (nearestInRange) {
-        creep.creep.rangedAttack(nearestInRange);
+      const inRangeAttack = creep.pos.getRangeTo(target) <= 3;
+      if (inRangeAttack) {
+        if (isSimulatedTarget) {
+          creep.creep.say("⚔️");
+        } else if (creepTarget) {
+          creep.creep.rangedAttack(creepTarget);
+        }
       }
     } else {
-      const adjacent = hostiles.find(h => creep.pos.getRangeTo(h.pos) <= 1);
+      const adjacent = hostilePositions.find(h => creep.pos.getRangeTo(h) <= 1);
       if (adjacent) {
-        creep.creep.attack(adjacent);
+        if (isSimulatedTarget) {
+          creep.creep.say("⚔️");
+        } else if (creepTarget) {
+          creep.creep.attack(creepTarget);
+        }
       }
     }
 
     // Re-evaluate every tick: enemy can reposition, so we may need a different rampart.
-    const targetRampart = this.findBestDefenderRampart(target.pos, creep, room);
+    const targetRampart = this.findBestDefenderRampart(target, creep, room);
     if (targetRampart && !this.isPosEqual(creep.pos, targetRampart.pos)) {
       this.moveThroughDefensiveRoute(creep.creep, targetRampart.pos, room);
     }
+  }
+
+  /** Test mode: treat Defense-Test like a hostile target without spending attack energy. */
+  private handleTestDefense(room: Room): void {
+    const targetPos = this.flagPos;
+    const towers = GetRoomObjects.getRoomTowers(room);
+
+    let totalAttack = 0;
+
+    for (const creep of this.creeps) {
+      if (creep.creepType === CreepType.Defender) {
+        totalAttack += this.getMeleeAttackPower(creep, targetPos);
+        room.visual.line(creep.pos, targetPos, { color: "red", opacity: 0.8, width: 0.15 });
+      } else if (creep.creepType === CreepType.DefenseRanger) {
+        totalAttack += this.getRangedAttackPower(creep, targetPos);
+        room.visual.line(creep.pos, targetPos, { color: "red", opacity: 0.8, width: 0.15 });
+      }
+    }
+
+    for (const tower of towers) {
+      totalAttack += this.getTowerAttackPower(tower, targetPos);
+      room.visual.line(tower.pos, targetPos, { color: "red", opacity: 0.8, width: 0.15 });
+    }
+
+    room.visual.text(`${totalAttack}`, targetPos.x + 1, targetPos.y - 1, {
+      align: "left",
+      color: "#ff3333",
+      font: 0.7,
+      opacity: 1
+    });
   }
 
   // ─── Rampart helpers ─────────────────────────────────────────────────────
@@ -243,6 +302,7 @@ export default class DefenseArea extends BaseArea {
     creep.moveTo(target, {
       range: 0,
       reusePath: 0,
+      visualizePathStyle: { stroke: "#ff3333", opacity: 0.5, lineStyle: "dashed" },
       costCallback: (roomName: string, matrix: CostMatrix) => {
         if (roomName !== room.name) {
           return matrix;
@@ -252,21 +312,19 @@ export default class DefenseArea extends BaseArea {
     });
   }
 
-  private buildDefenseCostMatrix(room: Room): CostMatrix {
+  private buildDefenseCostMatrix(room: Room, visualizeMatrix = false): CostMatrix {
     const matrix = new PathFinder.CostMatrix();
+    const terrain = room.getTerrain();
+    const friendlyRamparts = new Set<string>();
 
-    // Penalize border-near tiles to avoid outside-wall paths.
-    for (let x = 0; x < 50; x++) {
-      for (let y = 0; y < 50; y++) {
-        if (x <= 2 || x >= 47 || y <= 2 || y >= 47) {
-          matrix.set(x, y, 50);
-        }
-        // TODO: This is not enough, we also need to check if the current tile is outside of a rampart.
+    const structures = room.find(FIND_STRUCTURES);
+    for (const structure of structures) {
+      if (structure.structureType === STRUCTURE_RAMPART && structure.my) {
+        friendlyRamparts.add(`${structure.pos.x}:${structure.pos.y}`);
       }
     }
 
     // Strongly prefer friendly ramparts and block walls/hostile ramparts.
-    const structures = room.find(FIND_STRUCTURES);
     for (const structure of structures) {
       if (structure.structureType === STRUCTURE_RAMPART) {
         matrix.set(structure.pos.x, structure.pos.y, structure.my ? 1 : 255);
@@ -275,14 +333,83 @@ export default class DefenseArea extends BaseArea {
       }
     }
 
+    // Penalize border-near tiles and tiles that sit outside the friendly rampart ring.
+    for (let x = 0; x < 50; x++) {
+      for (let y = 0; y < 50; y++) {
+        if (terrain.get(x, y) === TERRAIN_MASK_WALL) {
+          matrix.set(x, y, 255);
+          continue;
+        }
+
+        if (x <= 2 || x >= 47 || y <= 2 || y >= 47) {
+          matrix.set(x, y, 50);
+          continue;
+        }
+
+        const key = `${x}:${y}`;
+        if (friendlyRamparts.has(key)) {
+          matrix.set(x, y, 1);
+        }
+
+        // We need to set 255 for where unwalkable structure and other creeps are.
+        if (
+          room
+            .lookForAt(LOOK_STRUCTURES, x, y)
+            .some(s => s.structureType !== STRUCTURE_RAMPART && s.structureType !== STRUCTURE_ROAD) ||
+          room.lookForAt(LOOK_CREEPS, x, y).length > 0
+        ) {
+          matrix.set(x, y, 255);
+        }
+      }
+    }
+
     // Toggle this if you want to visualize the cost matrix for debugging.
-    // for (let x = 0; x < 50; x++) {
-    //   for (let y = 0; y < 50; y++) {
-    //     room.visual.text(matrix.get(x, y).toString(), x, y, { font: 0.5, color: "orange" });
-    //   }
-    // }
+    if (visualizeMatrix) {
+      for (let x = 0; x < 50; x++) {
+        for (let y = 0; y < 50; y++) {
+          room.visual.text(matrix.get(x, y).toString(), x, y, { font: 0.5, color: "orange" });
+        }
+      }
+    }
 
     return matrix;
+  }
+
+  private getTestFlag(room: Room): Flag | null {
+    const flag = Game.flags[this.flag.name];
+    return flag && flag.pos.roomName === room.name && DefenseArea.isTestFlagName(flag.name) ? flag : null;
+  }
+
+  private get flagPos(): RoomPosition {
+    return this.flag.name in Game.flags ? Game.flags[this.flag.name].pos : new RoomPosition(25, 25, this.flag.roomName);
+  }
+
+  private getMeleeAttackPower(creep: CreepBase, targetPos: RoomPosition): number {
+    const range = creep.pos.getRangeTo(targetPos);
+    if (range > 1) return 0;
+    return creep.creep.getActiveBodyparts(ATTACK) * ATTACK_POWER;
+  }
+
+  private getRangedAttackPower(creep: CreepBase, targetPos: RoomPosition): number {
+    const range = creep.pos.getRangeTo(targetPos);
+    if (range > 3) return 0;
+    const activeParts = creep.creep.getActiveBodyparts(RANGED_ATTACK);
+    return activeParts * RANGED_ATTACK_POWER;
+  }
+
+  private getTowerAttackPower(tower: StructureTower, targetPos: RoomPosition): number {
+    const range = tower.pos.getRangeTo(targetPos);
+    if (range <= TOWER_OPTIMAL_RANGE) {
+      return TOWER_POWER_ATTACK;
+    }
+
+    const minDamage = Math.floor(TOWER_POWER_ATTACK * (1 - TOWER_FALLOFF));
+    if (range >= TOWER_FALLOFF_RANGE) {
+      return minDamage;
+    }
+
+    const falloffPct = (range - TOWER_OPTIMAL_RANGE) / (TOWER_FALLOFF_RANGE - TOWER_OPTIMAL_RANGE);
+    return Math.floor(TOWER_POWER_ATTACK - (TOWER_POWER_ATTACK - minDamage) * falloffPct);
   }
 
   private getDefensivePathInfo(
@@ -327,9 +454,12 @@ export default class DefenseArea extends BaseArea {
 
   /** TOUGH + ATTACK + MOVE — one segment = 140 energy, capped at 16 segments. */
   private createDefenderCreep(): SpawnTask {
+    if (this.isTestMode()) {
+      return new SpawnTask(CreepType.Defender, this.areaId, [ATTACK, MOVE], this);
+    }
     const room = Game.rooms[this.flag.roomName];
     const energy = room?.energyCapacityAvailable ?? 550;
-    let segments = Math.max(1, Math.min(16, Math.floor(energy / 140)));
+    const segments = Math.max(1, Math.min(16, Math.floor(energy / 140)));
     const body: BodyPartConstant[] = [];
     // segments = 1;
     for (let i = 0; i < segments; i++) body.push(ATTACK);
@@ -339,9 +469,12 @@ export default class DefenseArea extends BaseArea {
 
   /** HEAL + MOVE — one segment = 300 energy, capped at 10 segments. */
   private createHealerCreep(): SpawnTask {
+    if (this.isTestMode()) {
+      return new SpawnTask(CreepType.DefenseHealer, this.areaId, [HEAL, MOVE], this);
+    }
     const room = Game.rooms[this.flag.roomName];
     const energy = room?.energyCapacityAvailable ?? 300;
-    let segments = Math.max(1, Math.min(10, Math.floor(energy / 300)));
+    const segments = Math.max(1, Math.min(10, Math.floor(energy / 300)));
     const body: BodyPartConstant[] = [];
     // segments = 1;
     for (let i = 0; i < segments; i++) body.push(HEAL);
@@ -351,13 +484,24 @@ export default class DefenseArea extends BaseArea {
 
   /** TOUGH + RANGED_ATTACK + MOVE — one segment = 210 energy, capped at 5 segments. */
   private createRangerCreep(): SpawnTask {
+    if (this.isTestMode()) {
+      return new SpawnTask(CreepType.DefenseRanger, this.areaId, [RANGED_ATTACK, MOVE], this);
+    }
     const room = Game.rooms[this.flag.roomName];
     const energy = room?.energyCapacityAvailable ?? 550;
-    let segments = Math.max(1, Math.min(6, Math.floor(energy / 210)));
+    const segments = Math.max(1, Math.min(6, Math.floor(energy / 210)));
     const body: BodyPartConstant[] = [];
     // segments = 1;
     for (let i = 0; i < segments; i++) body.push(RANGED_ATTACK);
     for (let i = 0; i < segments / 2; i++) body.push(MOVE);
     return new SpawnTask(CreepType.DefenseRanger, this.areaId, body, this);
+  }
+
+  private isTestMode(): boolean {
+    return DefenseArea.isTestFlagName(this.flag.name);
+  }
+
+  private static isTestFlagName(name: string): boolean {
+    return name === DEFENSE_TEST_FLAG_PREFIX || name.startsWith(`${DEFENSE_TEST_FLAG_PREFIX}-`);
   }
 }

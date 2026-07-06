@@ -13,6 +13,8 @@ import { GetRoomObjects } from "./../Helpers/GetRoomObjects";
 import "./DistanceTransform";
 import "./FloodFill";
 
+export { BaseBuildPlan, BaseBuildData };
+
 interface BaseBuildPlan {
   flagName: string;
   x: number;

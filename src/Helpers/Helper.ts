@@ -13,7 +13,7 @@ export class Helper {
     );
   }
 
-  public static getCashedMemory(key: string, defaultValue: any): any {
+  public static getCashedMemory<T>(key: string, defaultValue: T): T {
     if (!Memory.Keys || typeof Memory.Keys !== "object") {
       Memory.Keys = {};
     }
@@ -24,7 +24,7 @@ export class Helper {
     return obj;
   }
 
-  public static setCashedMemory(key: string, value: any) {
+  public static setCashedMemory<T>(key: string, value: T) {
     if (!Memory.Keys || typeof Memory.Keys !== "object") {
       Memory.Keys = {};
     }

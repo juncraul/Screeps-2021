@@ -11,10 +11,28 @@ interface CreepMemory {
   currentMineralType?: string | null;
   willSuicideAtTick?: number | undefined;
   sourceKeeperRecovering?: boolean;
+  lastCollectedFromExtensionOrSpawnId?: string | null;
+  baseRoomCollectIntentCategory?: string;
+  baseRoomSpendIntentCategory?: string;
   lastTickEnergy: number;
 }
 
 interface RemoteRoomEconomy {
+  energyCollected: number;
+  energySpent: number;
+}
+
+interface BaseRoomEnergyStats {
+  energyCollected: number;
+  energySpent: number;
+  collectedByCategory: Record<string, number>;
+  spentByCategory: Record<string, number>;
+  snapshots: BaseRoomEnergySnapshot[];
+  lastUpdatedTick: number;
+}
+
+interface BaseRoomEnergySnapshot {
+  tick: number;
   energyCollected: number;
   energySpent: number;
 }
@@ -45,6 +63,7 @@ interface Memory {
   soldierFlagState?: SoldierFlagState;
   soldierFlagStates?: Record<string, SoldierFlagState>;
   remoteRoomEconomy?: Record<string, RemoteRoomEconomy>;
+  baseRoomStats?: Record<string, BaseRoomEnergyStats>;
   roomDefenseStates?: Record<string, RoomDefenseState>;
 }
 

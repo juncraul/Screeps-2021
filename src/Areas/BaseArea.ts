@@ -18,7 +18,7 @@ export default class BaseArea {
   }
 
   public handleNewCreepMemory(creepName: string): string {
-    const creepNames = Helper.getCashedMemory(`${this.memoryType}-${this.areaId}`, []);
+    const creepNames = Helper.getCashedMemory<string[]>(`${this.memoryType}-${this.areaId}`, []);
     creepNames.push(creepName);
     Helper.setCashedMemory(`${this.memoryType}-${this.areaId}`, creepNames);
     return creepName;

@@ -97,6 +97,17 @@ export class GetRoomObjects {
     return targets;
   }
 
+  public static getAllClaimedRooms(): Room[] {
+    const claimedRooms: Room[] = [];
+    for (const roomName in Game.rooms) {
+      const room = Game.rooms[roomName];
+      if (room.controller && room.controller.my) {
+        claimedRooms.push(room);
+      }
+    }
+    return claimedRooms;
+  }
+
   public static getAllRoomsWithSpawns(): Room[] {
     const mySpawns = Object.getOwnPropertyNames(Game.spawns);
     const roomsWithSpawns: Room[] = [];
@@ -490,6 +501,13 @@ export class GetRoomObjects {
 
     // LayoutFixedExtension is associated with COLOR_YELLOW secondary color
     return buildData.plans.some((plan: any) => plan.secondaryColor === COLOR_YELLOW);
+  }
+
+  public static getRoomContainers(room: Room): StructureContainer[] {
+    const containers = room.find(FIND_STRUCTURES, {
+      filter: structure => structure.structureType === STRUCTURE_CONTAINER
+    });
+    return containers as StructureContainer[];
   }
 
   // public static getSources(room: Room, onlyActive: boolean = false): Source[] {

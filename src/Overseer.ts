@@ -19,10 +19,11 @@ import LooterArea from "./Areas/Military/LooterArea";
 import SourceKeeperArea from "./Areas/Military/SourceKeeperArea";
 import StationaryFillerArea from "Areas/BaseRoom/StationaryFillerArea";
 import MarketArea from "Areas/BaseRoom/MarketArea";
+import BaseRoomStats from "Areas/BaseRoom/BaseRoomStats";
 
 export default class Overseer implements IOverseer {
   public refresh(): void {
-    const roomsWithSpawns = GetRoomObjects.getAllRoomsWithSpawns();
+    const roomsWithSpawns = GetRoomObjects.getAllClaimedRooms();
     roomsWithSpawns.forEach(roomWithSpawn => {
       let tasks: SpawnTask[] = [];
       const towers: StructureTower[] = GetRoomObjects.getRoomTowers(roomWithSpawn);
@@ -33,6 +34,7 @@ export default class Overseer implements IOverseer {
         cannon.cannonLogic();
       });
       SafeMode.run(roomWithSpawn, towers);
+      BaseRoomStats.drawRoomVisual(roomWithSpawn);
       BaseBuilder.logicCreateConstructionSites();
     });
   }
@@ -79,6 +81,10 @@ export default class Overseer implements IOverseer {
     const spawnOrder: CreepType[] = [
       CreepType.Harvester,
       CreepType.Carrier,
+      CreepType.StationaryFiller,
+      CreepType.StationaryFiller,
+      CreepType.StationaryFiller,
+      CreepType.StationaryFiller,
       CreepType.StationaryFiller,
       CreepType.StationaryFiller,
       CreepType.StationaryFiller,
@@ -439,12 +445,13 @@ export default class Overseer implements IOverseer {
         if (spawn.spawnCreep(task.bodyPartConstant, creepName) === OK) {
           theNewCreep = Game.creeps[creepName];
           theNewCreep.memory.role = roleName;
+          const spentEnergy = task.bodyPartConstant.reduce((sum, bodyPart) => sum + BODYPART_COST[bodyPart], 0);
+          BaseRoomStats.addSpent(room.name, spentEnergy, `spawn:${roleName}`);
           if (task.spawnRoomName) {
             theNewCreep.memory.seasonSpawnRoom = task.spawnRoomName;
           }
           if (task.area.memoryType.startsWith("Remote")) {
             theNewCreep.memory.remoteRoomName = task.area.areaId;
-            const spentEnergy = task.bodyPartConstant.reduce((sum, bodyPart) => sum + BODYPART_COST[bodyPart], 0);
             RemoteArea.addRemoteRoomExpense(task.area.areaId, spentEnergy);
           }
           task.area.handleNewCreepMemory(creepName);

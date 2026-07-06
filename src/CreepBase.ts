@@ -2,8 +2,11 @@ import { Helper } from "Helpers/Helper";
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import { CreepType } from "CreepType";
+import BaseRoomStats from "Areas/BaseRoom/BaseRoomStats";
 
 export class CreepBase {
+  private static readonly HARVEST_DIRECT_COLLECT_INTENT = "__harvest_direct__";
+
   public creep: Creep; // The creep that this wrapper class will control
   public body: BodyPartDefinition[]; // These properties are all wrapped from this.creep.* to this.*
   public store: StoreDefinition; // |
@@ -438,13 +441,27 @@ export class CreepBase {
     }
 
     const currentEnergy = this.creep.store.getUsedCapacity(RESOURCE_ENERGY);
-    const gained = Math.max(0, currentEnergy - this.creep.memory.lastTickEnergy ?? 0);
+    const delta = currentEnergy - this.creep.memory.lastTickEnergy;
+    const gained = Math.max(0, delta);
+    const spent = Math.max(0, -delta);
 
     if (gained > 0) {
+      const collectIntent = this.creep.memory.baseRoomCollectIntentCategory;
+      if (collectIntent !== CreepBase.HARVEST_DIRECT_COLLECT_INTENT) {
+        const collectedCategory = collectIntent ?? `deltaCollect:${this.getEnergyStatsRole()}`;
+        BaseRoomStats.addCollected(this.room.name, gained, collectedCategory);
+      }
       this.trackRemoteEnergyCollected(gained);
     }
 
+    if (spent > 0) {
+      const spentCategory = this.creep.memory.baseRoomSpendIntentCategory ?? `deltaSpend:${this.getEnergyStatsRole()}`;
+      BaseRoomStats.addSpent(this.room.name, spent, spentCategory);
+    }
+
     this.creep.memory.lastTickEnergy = currentEnergy;
+    delete this.creep.memory.baseRoomCollectIntentCategory;
+    delete this.creep.memory.baseRoomSpendIntentCategory;
   }
 
   private completeTask(message?: string) {
@@ -536,6 +553,9 @@ export class CreepBase {
 
   public build(structure: ConstructionSite): ScreepsReturnCode {
     const result = this.creep.build(structure);
+    if (result === OK) {
+      this.markEnergySpendIntent("build");
+    }
     if (result === ERR_NOT_IN_RANGE) {
       this.goTo(structure.pos);
     }
@@ -544,6 +564,9 @@ export class CreepBase {
 
   public repair(structure: Structure): ScreepsReturnCode {
     const result = this.creep.repair(structure);
+    if (result === OK) {
+      this.markEnergySpendIntent("repair");
+    }
     if (result === ERR_NOT_IN_RANGE) {
       this.goTo(structure.pos);
     }
@@ -553,6 +576,14 @@ export class CreepBase {
   public harvest(source: Source | Mineral): ScreepsReturnCode {
     // Don't think will ever have the creep's internal cooldown longer than EXTRACTOR_COOLDOWN
     const result = this.creep.harvest(source);
+    if (result === OK && source instanceof Source) {
+      const estimatedHarvested = this.creep.getActiveBodyparts(WORK) * HARVEST_POWER;
+      if (estimatedHarvested > 0) {
+        BaseRoomStats.addCollected(this.room.name, estimatedHarvested, `harvest:${this.getEnergyStatsRole()}`);
+      }
+      // Harvest is accounted directly above; prevent gain-delta path from double counting it.
+      this.creep.memory.baseRoomCollectIntentCategory = CreepBase.HARVEST_DIRECT_COLLECT_INTENT;
+    }
     if (result === ERR_NOT_IN_RANGE) {
       this.goTo(source.pos);
     }
@@ -613,6 +644,9 @@ export class CreepBase {
         result = this.creep.transfer(target, resourceType);
       }
     }
+    if (result === OK && resourceType === RESOURCE_ENERGY) {
+      this.markEnergySpendIntent(this.getTransferCategory(target));
+    }
     if (result === ERR_NOT_IN_RANGE) {
       this.goTo(target.pos);
     }
@@ -649,6 +683,9 @@ export class CreepBase {
     } else {
       result = this.creep.withdraw(target, resourceType);
     }
+    if (result === OK && resourceType === RESOURCE_ENERGY) {
+      this.markEnergyCollectIntent("withdraw");
+    }
     if (result === ERR_NOT_IN_RANGE) {
       this.goTo(target.pos);
     }
@@ -677,6 +714,9 @@ export class CreepBase {
 
   public pickup(resource: Resource): ScreepsReturnCode {
     const result = this.creep.pickup(resource);
+    if (result === OK && resource.resourceType === RESOURCE_ENERGY) {
+      this.markEnergyCollectIntent("pickup");
+    }
     if (result === ERR_NOT_IN_RANGE) {
       this.goTo(resource.pos);
     }
@@ -709,6 +749,9 @@ export class CreepBase {
       return result;
     }
     const result = this.creep.upgradeController(controller);
+    if (result === OK) {
+      this.markEnergySpendIntent("upgrade");
+    }
     if (result === ERR_NOT_IN_RANGE) {
       this.goTo(controller.pos);
     }
@@ -734,6 +777,8 @@ export class CreepBase {
     const result = this.creep.reserveController(controller);
     if (result === ERR_NOT_IN_RANGE) {
       this.goTo(controller.pos);
+    } else if (result === ERR_INVALID_TARGET) {
+      this.creep.attackController(controller);
     }
     return result;
   }
@@ -748,7 +793,32 @@ export class CreepBase {
 
   public drop(resouce: ResourceConstant): ScreepsReturnCode {
     const result = this.creep.drop(resouce);
+    if (result === OK && resouce === RESOURCE_ENERGY) {
+      this.markEnergySpendIntent("drop");
+    }
     return result;
+  }
+
+  private markEnergyCollectIntent(action: string): void {
+    this.creep.memory.baseRoomCollectIntentCategory = `${action}:${this.getEnergyStatsRole()}`;
+  }
+
+  private markEnergySpendIntent(action: string): void {
+    this.creep.memory.baseRoomSpendIntentCategory = `${action}:${this.getEnergyStatsRole()}`;
+  }
+
+  private getEnergyStatsRole(): string {
+    return CreepType[this.creepType] ?? this.memory.role ?? "Unknown";
+  }
+
+  private getTransferCategory(target: Creep | CreepBase | Structure): string {
+    if (target instanceof CreepBase) {
+      return "transfer:CreepBase";
+    }
+    if (target instanceof Creep) {
+      return "transfer:Creep";
+    }
+    return `transfer:${target.structureType}`;
   }
 
   public attack(creep: Creep | Structure) {

@@ -59,7 +59,8 @@ export default class RepairArea extends BaseArea {
       return 0;
     }
 
-    if (damagedNonWallCount >= 25 && this.room.energyCapacityAvailable >= 1000) {
+    const roomStorage = GetRoomObjects.getRoomStorage(this.room);
+    if (damagedNonWallCount >= 25 && roomStorage && roomStorage.store.getUsedCapacity(RESOURCE_ENERGY) > 30000) {
       return 2;
     }
 

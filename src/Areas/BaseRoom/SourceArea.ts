@@ -3,6 +3,7 @@ import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import HarvestArea from "./HarvestArea";
+import BaseRoomStats from "./BaseRoomStats";
 
 export default class SourceArea extends HarvestArea {
   source: Source;
@@ -114,12 +115,22 @@ export default class SourceArea extends HarvestArea {
       linkForController.store.energy <= 100 &&
       ((storage && storage.store.energy > 30000) || !storage)
     ) {
-      this.linkNextToSource.transferEnergy(linkForController);
+      const energyBefore = this.linkNextToSource.store.getUsedCapacity(RESOURCE_ENERGY);
+      const result = this.linkNextToSource.transferEnergy(linkForController);
+      if (result === OK) {
+        const spentEnergy = Math.max(0, energyBefore - this.linkNextToSource.store.getUsedCapacity(RESOURCE_ENERGY));
+        BaseRoomStats.addSpent(this.room.name, spentEnergy, "linkTransfer:controllerLink");
+      }
       return;
     }
 
     if (this.linkForStorage && this.linkForStorage.store.energy <= 100) {
-      this.linkNextToSource.transferEnergy(this.linkForStorage);
+      const energyBefore = this.linkNextToSource.store.getUsedCapacity(RESOURCE_ENERGY);
+      const result = this.linkNextToSource.transferEnergy(this.linkForStorage);
+      if (result === OK) {
+        const spentEnergy = Math.max(0, energyBefore - this.linkNextToSource.store.getUsedCapacity(RESOURCE_ENERGY));
+        BaseRoomStats.addSpent(this.room.name, spentEnergy, "linkTransfer:storageLink");
+      }
       return;
     }
   }

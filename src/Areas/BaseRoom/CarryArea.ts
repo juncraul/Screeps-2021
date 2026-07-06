@@ -157,6 +157,16 @@ export default class CarryArea extends BaseArea {
       creep.addTask(new CreepTask(Activity.Collect, firstContainer.pos));
       return;
     }
+
+    // Check if this room has stationary fillers, this is because we don't have utilities in these rooms.
+    const stationaryFillers = GetRoomObjects.usesLayoutFixedExtension(this.room);
+    if (stationaryFillers) {
+      const storage = GetRoomObjects.getRoomStorage(this.room);
+      if (storage && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+        creep.addTask(new CreepTask(Activity.Collect, storage.pos));
+        return;
+      }
+    }
   }
 
   private findSomewhereToDeposit(creep: CreepBase): void {
