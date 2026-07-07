@@ -47,6 +47,7 @@ export default class RepairArea extends BaseArea {
   }
 
   private calculateMaxWorkerCount(): number {
+    if (this.controller.level < 3) return 0;
     const damagedNonWallCount = this.room.find(FIND_STRUCTURES, {
       filter: structure =>
         structure.structureType !== STRUCTURE_WALL &&

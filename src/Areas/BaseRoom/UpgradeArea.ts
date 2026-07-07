@@ -13,16 +13,17 @@ export default class UpgradeArea extends BaseArea {
   linkNextToController: StructureLink | null;
   containerConstructionSiteNextToController: ConstructionSite | null;
   linkConstructionSiteNextToController: ConstructionSite | null;
+  upgradePosition: RoomPosition;
 
   constructor(controller: StructureController) {
     super("UpgradeArea", controller.id, controller.pos, controller.room);
     this.controller = controller;
     this.controllerLevel = controller.level;
-    this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 2);
+    this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 3);
     this.linkNextToController = GetRoomObjects.getWithinRangeLink(controller.pos, 2);
     this.containerConstructionSiteNextToController = GetRoomObjects.getWithinRangeConstructionSite(
       controller.pos,
-      2,
+      3,
       STRUCTURE_CONTAINER
     );
     this.maxWorkerCount = this.calculateMaxWorkerCount();
@@ -31,15 +32,12 @@ export default class UpgradeArea extends BaseArea {
       2,
       STRUCTURE_LINK
     );
+    this.upgradePosition = Helper.getFreeAdjacentPositions(controller.pos, 1, 1)[0];
   }
 
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
     if (this.creeps.length < this.maxWorkerCount) {
-      // Diabled this logic, not sure why we don't create an upgrader if there is no container next to the controller, we should still create one and let it upgrade the controller until we have a container built.
-      // if (!this.containerNextToController) {
-      //   return tasksForThisArea; // There is no container next to the controller.
-      // }
       const task: SpawnTask | null = this.createCreepForThisArea();
       if (task) {
         tasksForThisArea.push(task);
@@ -54,8 +52,10 @@ export default class UpgradeArea extends BaseArea {
   }
 
   private handleSetup() {
+    if (this.controllerLevel < 3 && this.creeps.length < 3) return;
+
     if (!this.containerNextToController && !this.containerConstructionSiteNextToController) {
-      const positionForContainer = Helper.getFreeAdjacentPositions(this.controller.pos, 2, 2)[0];
+      const positionForContainer = this.getBestPositionForContainer();
       if (positionForContainer) {
         this.room.createConstructionSite(positionForContainer, STRUCTURE_CONTAINER);
       } else {
@@ -66,7 +66,7 @@ export default class UpgradeArea extends BaseArea {
     if (this.controllerLevel < 6) return;
 
     if (!this.linkNextToController && !this.linkConstructionSiteNextToController && this.containerNextToController) {
-      const positionForLink = Helper.getFreeAdjacentPositions(this.containerNextToController.pos, 2, 2)[0];
+      const positionForLink = this.getBestPositionForContainer();
       if (positionForLink) {
         this.room.createConstructionSite(positionForLink, STRUCTURE_LINK);
       } else {
@@ -77,21 +77,39 @@ export default class UpgradeArea extends BaseArea {
 
   private handleCreeps() {
     for (let i: number = this.creeps.length - 1; i >= 0; i--) {
-      if (!this.creeps[i].isFree()) {
+      const creep = this.creeps[i];
+
+      // Container construction site appeared, cancel the upgrade.
+      if (this.containerConstructionSiteNextToController && creep.task?.activity === Activity.Upgrade) {
+        creep.task.taskDone = true;
+      }
+      if (!creep.isFree()) {
         continue;
       }
 
+      if (this.controller.level < 3) {
+        if (creep.isEmpty()) {
+          creep.addTask(new CreepTask(Activity.MoveCloseBy, this.upgradePosition));
+        } else {
+          if (this.containerConstructionSiteNextToController && this.controller.ticksToDowngrade > 8000) {
+            creep.addTask(new CreepTask(Activity.Construct, this.containerConstructionSiteNextToController.pos));
+          } else {
+            creep.addTask(new CreepTask(Activity.Upgrade, this.controller.pos));
+          }
+        }
+      }
+
       // Find some resources
-      if (!this.creeps[i].isFull()) {
-        this.findSomwhereToCollectEnergyFrom(this.creeps[i]);
+      if (!creep.isFull()) {
+        this.findSomwhereToCollectEnergyFrom(creep);
       }
 
       // Build the construction site(Container) or do the main job, which is upgrade the controller.
-      if (this.creeps[i].isFull()) {
+      if (creep.isFull()) {
         if (this.containerConstructionSiteNextToController && this.controller.ticksToDowngrade > 8000) {
-          this.creeps[i].addTask(new CreepTask(Activity.Construct, this.containerConstructionSiteNextToController.pos));
+          creep.addTask(new CreepTask(Activity.Construct, this.containerConstructionSiteNextToController.pos));
         } else {
-          this.creeps[i].addTask(new CreepTask(Activity.Upgrade, this.controller.pos));
+          creep.addTask(new CreepTask(Activity.Upgrade, this.controller.pos));
         }
       }
     }
@@ -101,6 +119,9 @@ export default class UpgradeArea extends BaseArea {
     // For level 8 there is no point having more than one upgrader.
     if (this.controllerLevel === 8) {
       return 1;
+    }
+    if (this.controllerLevel < 3) {
+      return 7;
     }
 
     const availableUpgradeEnergy = this.getAvailableUpgradeEnergy();
@@ -197,5 +218,21 @@ export default class UpgradeArea extends BaseArea {
         break;
       }
     }
+  }
+
+  private getBestPositionForContainer(): RoomPosition | null {
+    const positions = Helper.getFreeAdjacentPositions(this.controller.pos, 2, 3);
+    let maxFreeAdjacentPositions = 0;
+    let bestPosition: RoomPosition | null = null;
+
+    for (const pos of positions) {
+      const freeAdjacentPositions = Helper.getFreeAdjacentPositions(pos, 1, 2);
+      if (freeAdjacentPositions.length > maxFreeAdjacentPositions) {
+        maxFreeAdjacentPositions = freeAdjacentPositions.length;
+        bestPosition = pos;
+      }
+    }
+
+    return bestPosition;
   }
 }

@@ -1,3 +1,4 @@
+import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { DEFENSE_TEST_FLAG_PREFIX } from "Areas/Military/DefenseArea";
 
 export class SafeMode {
@@ -12,40 +13,50 @@ export class SafeMode {
     const hostilePlayers = room.find(FIND_HOSTILE_CREEPS, {
       filter: creep => creep.owner && creep.owner.username !== "Invader" && creep.owner.username !== "Source Keeper"
     });
+    const towerEnergy = towers.reduce((sum, tower) => sum + tower.store.getUsedCapacity(RESOURCE_ENERGY), 0);
+    const towersOutOfEnergy = towers.length > 0 && towerEnergy === 0;
 
     // Always manage the Defense flag so it is removed when the threat is gone.
     this.updateDefenseFlag(room, hostilePlayers);
+
+    const testFlags = this.getDefenseTestFlags(room);
+    if (testFlags.length > 0) {
+      const testSafeModeTriggered = this.testFlagsHavePathToSpawn(room, testFlags);
+      this.drawDefenseVisuals(
+        room,
+        hostilePlayers.length,
+        testSafeModeTriggered,
+        false,
+        towersOutOfEnergy,
+        false,
+        false,
+        false,
+        towerEnergy,
+        towers.length,
+        testSafeModeTriggered ? "SAFE MODE WOULD TRIGGER (TEST)" : "TEST DEFENSE: spawn path blocked",
+        true
+      );
+      if (testSafeModeTriggered) {
+        this.drawTestFlagHighlights(room, testFlags);
+      }
+    }
 
     if (hostilePlayers.length === 0) {
       return;
     }
 
-    const defenseStates = Memory.roomDefenseStates ?? {};
-    const previousState = defenseStates[room.name] ?? {
-      wallAndRampartCount: this.getWallAndRampartCount(room),
-      breachDetected: false,
-      lastAttackTick: 0
-    };
-
-    const currentWallAndRampartCount = this.getWallAndRampartCount(room);
-    const coreStructureDamaged = this.getCoreStructureDamaged(room);
-    const wallsDestroyed = currentWallAndRampartCount < previousState.wallAndRampartCount;
-
-    const towerEnergy = towers.reduce((sum, tower) => sum + tower.store.getUsedCapacity(RESOURCE_ENERGY), 0);
-    const towersOutOfEnergy = towers.length > 0 && towerEnergy === 0;
+    const spawnReachable = this.hostilesHavePathToSpawn(room, hostilePlayers);
     const strongHostiles = this.hasStrongHostiles(hostilePlayers);
 
-    let breachDetected = previousState.breachDetected;
-    if (hostilePlayers.length > 0 && wallsDestroyed) {
-      breachDetected = true;
+    if (spawnReachable) {
       this.removeDefenseTestFlags(room);
     }
+
+    const breachDetected = spawnReachable;
 
     const shouldActivateSafeMode =
       hostilePlayers.length > 0 &&
       breachDetected &&
-      strongHostiles &&
-      (towersOutOfEnergy || coreStructureDamaged > 0) &&
       controller.safeMode === undefined &&
       controller.safeModeAvailable > 0 &&
       !controller.safeModeCooldown;
@@ -62,35 +73,12 @@ export class SafeMode {
       breachDetected,
       strongHostiles,
       towersOutOfEnergy,
-      coreStructureDamaged > 0,
+      spawnReachable,
       shouldActivateSafeMode,
       safeModeActivated,
       towerEnergy,
       towers.length
     );
-
-    defenseStates[room.name] = {
-      wallAndRampartCount: currentWallAndRampartCount,
-      coreStructureDamaged,
-      breachDetected: hostilePlayers.length > 0 ? breachDetected : false,
-      lastAttackTick: hostilePlayers.length > 0 ? Game.time : previousState.lastAttackTick
-    };
-    Memory.roomDefenseStates = defenseStates;
-  }
-
-  private static getWallAndRampartCount(room: Room): number {
-    return room.find(FIND_STRUCTURES, {
-      filter: structure => structure.structureType === STRUCTURE_WALL || structure.structureType === STRUCTURE_RAMPART
-    }).length;
-  }
-
-  private static getCoreStructureDamaged(room: Room): number {
-    return room.find(FIND_MY_STRUCTURES, {
-      filter: structure =>
-        structure.structureType !== STRUCTURE_RAMPART &&
-        structure.structureType !== STRUCTURE_LINK && // Exclude links because they can be very outside of our main buildings.
-        structure.hits < structure.hitsMax * 0.5
-    }).length;
   }
 
   private static hasStrongHostiles(hostiles: Creep[]): boolean {
@@ -114,6 +102,103 @@ export class SafeMode {
     }
 
     return totalOffense >= 15;
+  }
+
+  private static hostilesHavePathToSpawn(room: Room, hostiles: Creep[]): boolean {
+    const spawns = GetRoomObjects.getRoomSpawns(room, true);
+    if (spawns.length === 0 || hostiles.length === 0) {
+      return false;
+    }
+
+    for (const hostile of hostiles) {
+      for (const spawn of spawns) {
+        const result = PathFinder.search(
+          hostile.pos,
+          { pos: spawn.pos, range: 0 },
+          {
+            maxRooms: 1,
+            plainCost: 2,
+            swampCost: 10,
+            roomCallback: roomName => this.buildSpawnPathMatrix(roomName, room.name)
+          }
+        );
+
+        if (!result.incomplete) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  private static getDefenseTestFlags(room: Room): Flag[] {
+    return _.filter(
+      Game.flags,
+      flag => flag.name.startsWith(DEFENSE_TEST_FLAG_PREFIX) && flag.pos.roomName === room.name
+    );
+  }
+
+  private static testFlagsHavePathToSpawn(room: Room, testFlags: Flag[]): boolean {
+    const spawns = GetRoomObjects.getRoomSpawns(room, true);
+    if (spawns.length === 0 || testFlags.length === 0) {
+      return false;
+    }
+
+    for (const flag of testFlags) {
+      for (const spawn of spawns) {
+        const result = PathFinder.search(
+          flag.pos,
+          { pos: spawn.pos, range: 0 },
+          {
+            maxRooms: 1,
+            plainCost: 2,
+            swampCost: 10,
+            roomCallback: roomName => this.buildSpawnPathMatrix(roomName, room.name)
+          }
+        );
+
+        if (!result.incomplete) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  private static buildSpawnPathMatrix(roomName: string, targetRoomName: string): CostMatrix | false {
+    if (roomName !== targetRoomName) {
+      return false;
+    }
+
+    const matrix = new PathFinder.CostMatrix();
+    const terrain = Game.map.getRoomTerrain(roomName);
+
+    for (let x = 0; x < 50; x++) {
+      for (let y = 0; y < 50; y++) {
+        if (terrain.get(x, y) === TERRAIN_MASK_WALL) {
+          matrix.set(x, y, 255);
+        }
+      }
+    }
+
+    const room = Game.rooms[roomName];
+    if (room) {
+      for (const structure of room.find(FIND_STRUCTURES)) {
+        if (
+          structure.structureType === STRUCTURE_ROAD ||
+          structure.structureType === STRUCTURE_CONTAINER ||
+          structure.structureType === STRUCTURE_RAMPART
+        ) {
+          continue;
+        }
+
+        matrix.set(structure.pos.x, structure.pos.y, 255);
+      }
+    }
+
+    return matrix;
   }
 
   /**
@@ -148,9 +233,11 @@ export class SafeMode {
     shouldActivateSafeMode: boolean,
     safeModeActivated: boolean,
     towerEnergy: number,
-    towerCount: number
+    towerCount: number,
+    safeModeMessage?: string,
+    forceVisual = false
   ): void {
-    if (hostileCount === 0 && !shouldActivateSafeMode && !safeModeActivated) {
+    if (hostileCount === 0 && !shouldActivateSafeMode && !safeModeActivated && !forceVisual) {
       return;
     }
 
@@ -174,7 +261,12 @@ export class SafeMode {
 
     if (shouldActivateSafeMode || safeModeActivated || (breachDetected && strongHostiles)) {
       y += 0.7;
-      room.visual.text(safeModeActivated ? "SAFE MODE ACTIVATED" : "SAFE MODE READY: close to trigger", x, y, danger);
+      room.visual.text(
+        safeModeMessage ?? (safeModeActivated ? "SAFE MODE ACTIVATED" : "SAFE MODE READY: close to trigger"),
+        x,
+        y,
+        danger
+      );
     }
 
     if (towersOutOfEnergy) {
@@ -188,6 +280,23 @@ export class SafeMode {
     for (const f of flag) {
       f.remove();
       console.log(`DefenseArea: Removed test flag ${f.name} from ${room.name}`);
+    }
+  }
+
+  private static drawTestFlagHighlights(room: Room, testFlags: Flag[]): void {
+    const spawns = GetRoomObjects.getRoomSpawns(room, true);
+    if (spawns.length === 0) return;
+
+    for (const flag of testFlags) {
+      for (const spawn of spawns) {
+        room.visual.line(flag.pos, spawn.pos, { color: "#ff3333", opacity: 0.7, width: 0.15 });
+      }
+      room.visual.text("SAFE MODE WOULD TRIGGER", flag.pos.x + 1, flag.pos.y - 1, {
+        align: "left",
+        opacity: 1,
+        font: 0.55,
+        color: "#ff3333"
+      });
     }
   }
 }

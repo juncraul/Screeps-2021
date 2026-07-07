@@ -13,6 +13,12 @@ export class Helper {
     );
   }
 
+  public static isInRange(roomPosition1: RoomPosition, roomPosition2: RoomPosition, range: number) {
+    const dx = roomPosition1.x - roomPosition2.x;
+    const dy = roomPosition1.y - roomPosition2.y;
+    return Math.sqrt(dx * dx + dy * dy) <= range;
+  }
+
   public static getCashedMemory<T>(key: string, defaultValue: T): T {
     if (!Memory.Keys || typeof Memory.Keys !== "object") {
       Memory.Keys = {};

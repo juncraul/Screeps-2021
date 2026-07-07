@@ -72,357 +72,67 @@ export class CreepBase {
   public workTheTask(): void {
     if (!this.task) return;
     switch (this.task.activity) {
-      case Activity.Harvest: {
-        const source: Source | null = CreepTask.getSourceFromTarget(this.task.targetPlace);
-        if (source) {
-          this.harvest(source);
-        }
-        if (this.carryCapacity > 0 && this.carryCapacity === this.carryCurrent) {
-          this.completeTask("Har Done");
-        }
+      case Activity.Harvest: // 0
+        this.activityHarvest();
         break;
-      }
-      case Activity.Construct: {
-        const constructionSite: ConstructionSite | null = CreepTask.getConstructionSiteFromTarget(
-          this.task.targetPlace
-        );
-        if (constructionSite) {
-          this.build(constructionSite);
-        }
-        if (this.carryCurrent === 0 || !constructionSite) {
-          this.completeTask("Con Done");
-        }
+      case Activity.Construct: // 1
+        this.activityConstruct();
         break;
-      }
-      case Activity.Deposit: {
-        const structure: Structure | null = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
-        if (structure) {
-          const result = this.transfer(structure, RESOURCE_ENERGY);
-          if (result === OK) {
-            this.completeTask("Transf Done");
-          } else if (result === ERR_FULL) {
-            this.completeTask("Str Full");
-          }
-        }
-        // if (
-        //   structure instanceof StructureSpawn ||
-        //   structure instanceof StructureExtension ||
-        //   structure instanceof StructureTower ||
-        //   structure instanceof StructureLink
-        // ) {
-        //   if (structure.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
-        //     this.completeTask("Str Full");
-        //
-        //   }
-        // } else if (
-        //   structure instanceof StructureContainer ||
-        //   structure instanceof StructureStorage ||
-        //   structure instanceof StructureTerminal
-        // ) {
-        //   if (structure.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
-        //     this.completeTask("Str Full");
-        //
-        //   }
-        // } else if (structure instanceof StructureLab) {
-        //   if (structure.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
-        //     this.completeTask("Str Full");
-        //
-        //   }
-        // }
-        if (this.carryCurrent === 0) {
-          this.completeTask("Dep Done");
-        }
+      case Activity.Deposit: // 2
+        this.activityDeposit();
         break;
-      }
-      case Activity.Move: {
-        const roomPosition = CreepTask.getRoomPositionFromTarget(this.task.targetPlace);
-        this.goTo(roomPosition);
-        if (Helper.isSamePosition(this.pos, roomPosition)) {
-          this.completeTask("Move Done");
-        }
+      case Activity.Move: // 3
+        this.activityMove();
         break;
-      }
-      case Activity.Collect: {
-        let targetCollect: Structure | Tombstone | Ruin | null = CreepTask.getStructureFromTargetNoRoadNoRampart(
-          this.task.targetPlace
-        );
-        if (!targetCollect) {
-          targetCollect = CreepTask.getTombstoneFromTarget(this.task.targetPlace);
-          if (!targetCollect) {
-            targetCollect = CreepTask.getRuinFromTarget(this.task.targetPlace);
-          }
-        }
-        if (!targetCollect) {
-          targetCollect = CreepTask.getRuinFromTarget(this.task.targetPlace);
-          if (!targetCollect) {
-            this.completeTask("Col Done"); // Target must have dissappeared.
-          }
-        }
-        if (targetCollect) {
-          const result = this.withdraw(targetCollect, RESOURCE_ENERGY);
-          if (result === OK) {
-            this.completeTask("Col Done");
-          }
-        }
-        if (
-          targetCollect instanceof StructureContainer ||
-          targetCollect instanceof StructureStorage ||
-          targetCollect instanceof StructureTerminal ||
-          targetCollect instanceof StructureLab ||
-          targetCollect instanceof Ruin ||
-          targetCollect instanceof Tombstone
-        ) {
-          if (targetCollect.store.energy === 0) {
-            this.completeTask("Col Done");
-          }
-        } else if (
-          targetCollect instanceof StructureLink ||
-          targetCollect instanceof StructureExtension ||
-          targetCollect instanceof StructureSpawn ||
-          targetCollect instanceof StructureTower
-        ) {
-          if (targetCollect.store.energy === 0) {
-            this.completeTask("Col Done");
-          }
-        } else if (targetCollect instanceof Resource) {
-          if (targetCollect.amount === 0) {
-            this.completeTask("Col Done");
-          }
-        }
-        if (this.carryCurrent === this.carryCapacity) {
-          this.completeTask("Col Done");
-        }
+      case Activity.Collect: // 4
+        this.activityCollect();
         break;
-      }
       // TODO: There is a tick pause between collection and upgrade.
-      case Activity.Upgrade: {
-        const controller: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
-        if (controller) {
-          this.upgradeController(controller);
-        }
-        if (this.carryCurrent === 0) {
-          this.completeTask("Upg Done");
-        }
+      case Activity.Upgrade: // 5
+        this.activityUpgrade();
         break;
-      }
-      case Activity.Pickup: {
-        const targetPickup: Resource | null = CreepTask.getResourceFromTarget(this.task.targetPlace);
-        if (targetPickup) {
-          const result = this.pickup(targetPickup);
-          if (result === OK) {
-            this.completeTask("Pick up Done");
-          }
-        }
-        if (!targetPickup || this.carryCurrent === this.carryCapacity) {
-          this.completeTask("Pick up Done");
-        }
+      case Activity.Pickup: // 6
+        this.activityPickup();
         break;
-      }
-      case Activity.Claim: {
-        const controller2: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
-        if (controller2) {
-          const result = this.claim(controller2);
-          console.log(
-            `Claiming controller in room ${controller2.room.name} with creep ${this.name}, result: ${result}`
-          );
-          if (result === OK) {
-            this.completeTask("Claim Done");
-          }
-        }
+      case Activity.Claim: // 7
+        this.activityClaim();
         break;
-      }
-      case Activity.MoveDifferentRoom: {
-        const targetPos: RoomPosition = CreepTask.getRoomPositionFromTarget(this.task.targetPlace);
-        const currentRoom = this.room.name;
-        const reRouteRoom = GetRoomObjects.getReRouteRoom(targetPos.roomName, currentRoom);
-
-        // If a ReRoute flag exists for this (target, from) pair, route through that room first.
-        const moveTarget =
-          reRouteRoom && reRouteRoom !== currentRoom && reRouteRoom !== targetPos.roomName
-            ? new RoomPosition(25, 25, reRouteRoom)
-            : targetPos;
-
-        this.goTo(moveTarget);
-
-        if (targetPos.roomName === this.room.name) {
-          this.completeTask("Move Done");
-        }
+      case Activity.MoveDifferentRoom: // 8
+        this.activityMoveDifferentRoom();
         break;
-      }
-      case Activity.Reserve: {
-        const controller3: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
-        if (controller3) {
-          this.reserve(controller3);
-        }
+      case Activity.Reserve: // 9
+        this.activityReserve();
         break;
-      }
-      case Activity.HarvestAndDeposit: {
-        const source2: Source | null = CreepTask.getSourceFromTarget(this.task.targetPlace);
-        if (source2) {
-          this.harvest(source2);
-        }
-        // Deposit to extensions
-        const structureEmptyExtensions = GetRoomObjects.getWithinRangeExtensions(this.creep.pos, 1).find(
-          a => a.store.getFreeCapacity(RESOURCE_ENERGY) > 0
-        );
-        if (structureEmptyExtensions) {
-          if (this.transfer(structureEmptyExtensions, RESOURCE_ENERGY) !== OK) {
-            this.drop(RESOURCE_ENERGY);
-          }
-        } else {
-          // Deposit to link
-          const structureLink = GetRoomObjects.getWithinRangeLink(this.creep.pos, 1);
-          if (structureLink) {
-            if (this.transfer(structureLink, RESOURCE_ENERGY) !== OK) {
-              this.drop(RESOURCE_ENERGY);
-            }
-          }
-        }
+      case Activity.HarvestAndDeposit: // 10
+        this.activityHarvestAndDeposit();
         break;
-      }
-      case Activity.Repair: {
-        const structures: Structure[] = CreepTask.getStructuresFromTarget(this.task.targetPlace);
-        const structureRampart = structures.find(s => s.structureType === STRUCTURE_RAMPART);
-        let foundSomethingToRepair = false;
-        for (let i = 0; i < structures.length; i++) {
-          if (structures[i].structureType !== STRUCTURE_RAMPART && structures[i].hits < structures[i].hitsMax) {
-            this.repair(structures[i]);
-            foundSomethingToRepair = true;
-            break;
-          }
-        }
-        if (!foundSomethingToRepair && structureRampart && structureRampart.hits < structureRampart.hitsMax) {
-          this.repair(structureRampart);
-          foundSomethingToRepair = true;
-        }
-        if (this.carryCurrent === 0 || !foundSomethingToRepair) {
-          this.completeTask("Rep Done");
-        }
+      case Activity.Repair: // 11
+        this.activityRepair();
         break;
-      }
-      case Activity.Attack: {
-        if (!this.task.targetId) {
-          break;
-        }
-        const entityToAttack: Creep | Structure | null = Game.getObjectById(
-          this.task.targetId as Id<Creep | Structure>
-        );
-        // If enemy flee in another room, remove task
-        if (entityToAttack) {
-          if (entityToAttack.pos.roomName !== this.room.name) {
-            this.completeTask("Enemy fled");
-            this.completeTask("Enemy fled");
-            break;
-          }
-          this.attack(entityToAttack);
-        }
-        if (!entityToAttack || entityToAttack.hits === 0) {
-          this.completeTask("Enemy dead");
-        }
+      case Activity.Attack: // 12
+        this.activityAttack();
         break;
-      }
-      case Activity.HarvestMineral: {
-        // targetPlace points at the mineral tile; targetPlaceSecond points at the container to deposit into.
-        const mineralAtPos = CreepTask.getMineralFromTarget(this.task.targetPlace);
-        if (mineralAtPos && mineralAtPos.mineralAmount > 0) {
-          this.harvest(mineralAtPos);
-        }
-        if (this.task.targetPlaceSecond) {
-          const container = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlaceSecond);
-          if (container instanceof StructureContainer && this.store.getUsedCapacity() > 0) {
-            // Deposit any mineral into the container next to the mineral.
-            for (const resourceType in this.store) {
-              if ((this.store[resourceType as ResourceConstant] ?? 0) > 0) {
-                this.transfer(container, resourceType as ResourceConstant);
-                break;
-              }
-            }
-          }
-        }
-        // Task done when mineral is exhausted or container is full.
-        if (!mineralAtPos || mineralAtPos.mineralAmount === 0) {
-          this.completeTask("Min Done");
-        }
+      case Activity.HarvestMineral: // 15
+        this.activityHarvestMineral();
         break;
-      }
-      case Activity.DepositMineral: {
-        // Move minerals from carry to storage; targetPlaceSecond carries the resource type name via targetId.
-        const storageStruct = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task.targetPlace);
-        if (storageStruct) {
-          // Get resource type from creep store
-          const resourceType = Object.keys(this.creep.store)[0] as ResourceConstant | undefined;
-          if (resourceType) {
-            const result = this.transfer(storageStruct, resourceType);
-            if (result === OK || result === ERR_FULL) {
-              this.completeTask("Min Dep Done");
-            }
-          } else {
-            this.completeTask("No min");
-          }
-        }
-        if (this.store.getUsedCapacity() === 0) {
-          this.completeTask("Min Dep Done");
-        }
+      case Activity.DepositMineral: // 16
+        this.activityDepositMineral();
         break;
-      }
-      case Activity.CollectMineral: {
-        // Collect a specific mineral (targetId) or any mineral (non-energy) from resource/store holders at targetPlace.
-        const specificMineral = this.task.targetId as ResourceConstant | null;
-        const collectTarget = this.getCollectMineralTarget(this.task.targetPlace, specificMineral);
-
-        if (collectTarget instanceof Resource) {
-          this.pickup(collectTarget);
-        } else if (collectTarget && "store" in collectTarget) {
-          const targetResource = this.getStoreMineralResourceType(collectTarget, specificMineral);
-          if (targetResource) {
-            this.withdraw(collectTarget, targetResource);
-          }
-        }
-
-        const amountLeft = this.getCollectMineralAmountLeft(collectTarget, specificMineral);
-        if (this.store.getFreeCapacity() === 0 || !collectTarget || amountLeft === 0) {
-          this.completeTask("Min Col Done");
-        }
+      case Activity.CollectMineral: // 17
+        this.activityCollectMineral();
         break;
-      }
-      case Activity.Drop: {
-        // Drop all carried resources on the ground.
-        for (const resourceType in this.store) {
-          if ((this.store[resourceType as ResourceConstant] ?? 0) > 0) {
-            this.drop(resourceType as ResourceConstant);
-          }
-        }
-        if (this.store.getUsedCapacity() === 0) {
-          this.completeTask("Drop Done");
-        }
+      case Activity.Drop: // 18
+        this.activityDrop();
         break;
-      }
-      case Activity.Dismantle: {
-        if (!this.task.targetId) {
-          break;
-        }
-        const entityToAttack: Structure | null = Game.getObjectById(this.task.targetId as Id<Structure>);
-        // If enemy flee in another room, remove task
-        if (entityToAttack) {
-          if (entityToAttack.pos.roomName !== this.room.name) {
-            this.completeTask("Enemy fled");
-            this.completeTask("Enemy fled");
-            break;
-          }
-          this.dismantle(entityToAttack);
-        }
-        if (!entityToAttack || entityToAttack.hits === 0) {
-          this.completeTask("Enemy dead");
-        }
+      case Activity.Dismantle: // 19
+        this.activityDismantle();
         break;
-      }
-      case Activity.AttackController: {
-        const controller3: StructureController | null = CreepTask.getControllerFromTarget(this.task.targetPlace);
-        if (controller3) {
-          this.attackController(controller3);
-        }
+      case Activity.AttackController: // 20
+        this.activityAttackController();
         break;
-      }
+      case Activity.MoveCloseBy: // 21
+        this.activityMoveCloseBy();
+        break;
     }
 
     // Check if needs to suicide
@@ -470,6 +180,335 @@ export class CreepBase {
     }
     if (this.task) {
       this.task.taskDone = true;
+    }
+  }
+
+  private activityHarvest(): void {
+    const source: Source | null = CreepTask.getSourceFromTarget(this.task!.targetPlace);
+    if (source) {
+      this.harvest(source);
+    }
+    if (this.carryCapacity > 0 && this.carryCapacity === this.carryCurrent) {
+      this.completeTask("Har Done");
+    }
+  }
+
+  private activityConstruct(): void {
+    const constructionSite: ConstructionSite | null = CreepTask.getConstructionSiteFromTarget(this.task!.targetPlace);
+    if (constructionSite) {
+      this.build(constructionSite);
+    }
+    if (this.carryCurrent === 0 || !constructionSite) {
+      this.completeTask("Con Done");
+    }
+  }
+
+  private activityDeposit(): void {
+    const structure: Structure | null = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task!.targetPlace);
+    if (structure) {
+      const result = this.transfer(structure, RESOURCE_ENERGY);
+      if (result === OK) {
+        this.completeTask("Transf Done");
+      } else if (result === ERR_FULL) {
+        this.completeTask("Str Full");
+      }
+    } else {
+      const roomPos = new RoomPosition(
+        this.task!.targetPlace.x,
+        this.task!.targetPlace.y,
+        this.task!.targetPlace.roomName
+      );
+      const creep = GetRoomObjects.getClosestMyCreepByRange(roomPos);
+      if (creep) {
+        const result = this.transfer(creep, RESOURCE_ENERGY);
+        if (result === OK) {
+          this.completeTask("Transf Done");
+        }
+      }
+    }
+    if (this.carryCurrent === 0) {
+      this.completeTask("Dep Done");
+    }
+  }
+
+  private activityMove(): void {
+    const roomPosition = CreepTask.getRoomPositionFromTarget(this.task!.targetPlace);
+    this.goTo(roomPosition);
+    if (Helper.isSamePosition(this.pos, roomPosition)) {
+      this.completeTask("Move Done");
+    }
+  }
+
+  private activityCollect(): void {
+    let targetCollect: Structure | Tombstone | Ruin | null = CreepTask.getStructureFromTargetNoRoadNoRampart(
+      this.task!.targetPlace
+    );
+    if (!targetCollect) {
+      targetCollect = CreepTask.getTombstoneFromTarget(this.task!.targetPlace);
+      if (!targetCollect) {
+        targetCollect = CreepTask.getRuinFromTarget(this.task!.targetPlace);
+      }
+    }
+    if (!targetCollect) {
+      targetCollect = CreepTask.getRuinFromTarget(this.task!.targetPlace);
+      if (!targetCollect) {
+        this.completeTask("Col Done"); // Target must have dissappeared.
+      }
+    }
+    if (targetCollect) {
+      const result = this.withdraw(targetCollect, RESOURCE_ENERGY);
+      if (result === OK) {
+        this.completeTask("Col Done");
+      }
+    }
+    if (
+      targetCollect instanceof StructureContainer ||
+      targetCollect instanceof StructureStorage ||
+      targetCollect instanceof StructureTerminal ||
+      targetCollect instanceof StructureLab ||
+      targetCollect instanceof Ruin ||
+      targetCollect instanceof Tombstone
+    ) {
+      if (targetCollect.store.energy === 0) {
+        this.completeTask("Col Done");
+      }
+    } else if (
+      targetCollect instanceof StructureLink ||
+      targetCollect instanceof StructureExtension ||
+      targetCollect instanceof StructureSpawn ||
+      targetCollect instanceof StructureTower
+    ) {
+      if (targetCollect.store.energy === 0) {
+        this.completeTask("Col Done");
+      }
+    } else if (targetCollect instanceof Resource) {
+      if (targetCollect.amount === 0) {
+        this.completeTask("Col Done");
+      }
+    }
+    if (this.carryCurrent === this.carryCapacity) {
+      this.completeTask("Col Done");
+    }
+  }
+
+  private activityUpgrade(): void {
+    const controller: StructureController | null = CreepTask.getControllerFromTarget(this.task!.targetPlace);
+    if (controller) {
+      this.upgradeController(controller);
+    }
+    if (this.carryCurrent === 0) {
+      this.completeTask("Upg Done");
+    }
+  }
+
+  private activityPickup(): void {
+    const targetPickup: Resource | null = CreepTask.getResourceFromTarget(this.task!.targetPlace);
+    if (targetPickup) {
+      const result = this.pickup(targetPickup);
+      if (result === OK) {
+        this.completeTask("Pick up Done");
+      }
+    }
+    if (!targetPickup || this.carryCurrent === this.carryCapacity) {
+      this.completeTask("Pick up Done");
+    }
+  }
+
+  private activityClaim(): void {
+    const controller: StructureController | null = CreepTask.getControllerFromTarget(this.task!.targetPlace);
+    if (controller) {
+      const result = this.claim(controller);
+      console.log(`Claiming controller in room ${controller.room.name} with creep ${this.name}, result: ${result}`);
+      if (result === OK) {
+        this.completeTask("Claim Done");
+      }
+    }
+  }
+
+  private activityMoveDifferentRoom(): void {
+    const targetPos: RoomPosition = CreepTask.getRoomPositionFromTarget(this.task!.targetPlace);
+    const currentRoom = this.room.name;
+    const reRouteRoom = GetRoomObjects.getReRouteRoom(targetPos.roomName, currentRoom);
+
+    // If a ReRoute flag exists for this (target, from) pair, route through that room first.
+    const moveTarget =
+      reRouteRoom && reRouteRoom !== currentRoom && reRouteRoom !== targetPos.roomName
+        ? new RoomPosition(25, 25, reRouteRoom)
+        : targetPos;
+
+    this.goTo(moveTarget);
+
+    if (targetPos.roomName === this.room.name) {
+      this.completeTask("Move Done");
+    }
+  }
+
+  private activityReserve(): void {
+    const controller: StructureController | null = CreepTask.getControllerFromTarget(this.task!.targetPlace);
+    if (controller) {
+      this.reserve(controller);
+    }
+  }
+
+  private activityHarvestAndDeposit(): void {
+    const source: Source | null = CreepTask.getSourceFromTarget(this.task!.targetPlace);
+    if (source) {
+      this.harvest(source);
+    }
+    const structureEmptyExtensions = GetRoomObjects.getWithinRangeExtensions(this.creep.pos, 1).find(
+      a => a.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+    );
+    if (structureEmptyExtensions) {
+      if (this.transfer(structureEmptyExtensions, RESOURCE_ENERGY) !== OK) {
+        this.drop(RESOURCE_ENERGY);
+      }
+    } else {
+      const structureLink = GetRoomObjects.getWithinRangeLink(this.creep.pos, 1);
+      if (structureLink) {
+        if (this.transfer(structureLink, RESOURCE_ENERGY) !== OK) {
+          this.drop(RESOURCE_ENERGY);
+        }
+      }
+    }
+  }
+
+  private activityRepair(): void {
+    const structures: Structure[] = CreepTask.getStructuresFromTarget(this.task!.targetPlace);
+    const structureRampart = structures.find(s => s.structureType === STRUCTURE_RAMPART);
+    let foundSomethingToRepair = false;
+    for (let i = 0; i < structures.length; i++) {
+      if (structures[i].structureType !== STRUCTURE_RAMPART && structures[i].hits < structures[i].hitsMax) {
+        this.repair(structures[i]);
+        foundSomethingToRepair = true;
+        break;
+      }
+    }
+    if (!foundSomethingToRepair && structureRampart && structureRampart.hits < structureRampart.hitsMax) {
+      this.repair(structureRampart);
+      foundSomethingToRepair = true;
+    }
+    if (this.carryCurrent === 0 || !foundSomethingToRepair) {
+      this.completeTask("Rep Done");
+    }
+  }
+
+  private activityAttack(): void {
+    if (!this.task?.targetId) {
+      return;
+    }
+    const entityToAttack: Creep | Structure | null = Game.getObjectById(this.task.targetId as Id<Creep | Structure>);
+    if (entityToAttack) {
+      if (entityToAttack.pos.roomName !== this.room.name) {
+        this.completeTask("Enemy fled");
+        this.completeTask("Enemy fled");
+        return;
+      }
+      this.attack(entityToAttack);
+    }
+    if (!entityToAttack || entityToAttack.hits === 0) {
+      this.completeTask("Enemy dead");
+    }
+  }
+
+  private activityHarvestMineral(): void {
+    const mineralAtPos = CreepTask.getMineralFromTarget(this.task!.targetPlace);
+    if (mineralAtPos && mineralAtPos.mineralAmount > 0) {
+      this.harvest(mineralAtPos);
+    }
+    if (this.task!.targetPlaceSecond) {
+      const container = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task!.targetPlaceSecond);
+      if (container instanceof StructureContainer && this.store.getUsedCapacity() > 0) {
+        for (const resourceType in this.store) {
+          if ((this.store[resourceType as ResourceConstant] ?? 0) > 0) {
+            this.transfer(container, resourceType as ResourceConstant);
+            break;
+          }
+        }
+      }
+    }
+    if (!mineralAtPos || mineralAtPos.mineralAmount === 0) {
+      this.completeTask("Min Done");
+    }
+  }
+
+  private activityDepositMineral(): void {
+    const storageStruct = CreepTask.getStructureFromTargetNoRoadNoRampart(this.task!.targetPlace);
+    if (storageStruct) {
+      const resourceType = Object.keys(this.creep.store)[0] as ResourceConstant | undefined;
+      if (resourceType) {
+        const result = this.transfer(storageStruct, resourceType);
+        if (result === OK || result === ERR_FULL) {
+          this.completeTask("Min Dep Done");
+        }
+      } else {
+        this.completeTask("No min");
+      }
+    }
+    if (this.store.getUsedCapacity() === 0) {
+      this.completeTask("Min Dep Done");
+    }
+  }
+
+  private activityCollectMineral(): void {
+    const specificMineral = this.task!.targetId as ResourceConstant | null;
+    const collectTarget = this.getCollectMineralTarget(this.task!.targetPlace, specificMineral);
+
+    if (collectTarget instanceof Resource) {
+      this.pickup(collectTarget);
+    } else if (collectTarget && "store" in collectTarget) {
+      const targetResource = this.getStoreMineralResourceType(collectTarget, specificMineral);
+      if (targetResource) {
+        this.withdraw(collectTarget, targetResource);
+      }
+    }
+
+    const amountLeft = this.getCollectMineralAmountLeft(collectTarget, specificMineral);
+    if (this.store.getFreeCapacity() === 0 || !collectTarget || amountLeft === 0) {
+      this.completeTask("Min Col Done");
+    }
+  }
+
+  private activityDrop(): void {
+    for (const resourceType in this.store) {
+      if ((this.store[resourceType as ResourceConstant] ?? 0) > 0) {
+        this.drop(resourceType as ResourceConstant);
+      }
+    }
+    if (this.store.getUsedCapacity() === 0) {
+      this.completeTask("Drop Done");
+    }
+  }
+
+  private activityDismantle(): void {
+    if (!this.task?.targetId) {
+      return;
+    }
+    const entityToAttack: Structure | null = Game.getObjectById(this.task.targetId as Id<Structure>);
+    if (entityToAttack) {
+      if (entityToAttack.pos.roomName !== this.room.name) {
+        this.completeTask("Enemy fled");
+        this.completeTask("Enemy fled");
+        return;
+      }
+      this.dismantle(entityToAttack);
+    }
+    if (!entityToAttack || entityToAttack.hits === 0) {
+      this.completeTask("Enemy dead");
+    }
+  }
+
+  private activityAttackController(): void {
+    const controller: StructureController | null = CreepTask.getControllerFromTarget(this.task!.targetPlace);
+    if (controller) {
+      this.attackController(controller);
+    }
+  }
+
+  private activityMoveCloseBy(): void {
+    const roomPosition = CreepTask.getRoomPositionFromTarget(this.task!.targetPlace);
+    this.goTo(roomPosition, { range: 2 });
+    if (Helper.isInRange(this.pos, roomPosition, 3)) {
+      this.completeTask("Move Done");
     }
   }
 
@@ -590,10 +629,8 @@ export class CreepBase {
     return result;
   }
 
-  public goTo(
-    destination: RoomPosition // , movementOption: MovementOption = {}
-  ) {
-    return this.creep.moveTo(destination);
+  public goTo(destination: RoomPosition, movementOption: MoveToOpts = {}) {
+    return this.creep.moveTo(destination, movementOption);
   }
 
   public isEmpty(): boolean {

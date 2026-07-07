@@ -29,6 +29,8 @@ interface BaseRoomEnergyStats {
   spentByCategory: Record<string, number>;
   snapshots: BaseRoomEnergySnapshot[];
   lastUpdatedTick: number;
+  spawnPlacedTick?: number;
+  controllerLevelTicks: Record<number, number>;
 }
 
 interface BaseRoomEnergySnapshot {

@@ -21,23 +21,20 @@ export default abstract class HarvestArea extends BaseArea {
     );
     this.controllerLevel = controller.level;
     this.harvestPosition = harvestPosition;
-    this.maxWorkerCount = 1;
+    this.maxEmptySpaceAroundHarvestArea = Helper.getFreeAdjacentPositions(this.harvestPosition).length;
+    this.maxWorkerCount = Math.min(this.maxEmptySpaceAroundHarvestArea, 3);
     this.containerNextToHarvestArea = GetRoomObjects.getWithinRangeContainer(harvestPosition, 2);
     this.containerConstructionSiteNextToHarvestArea = GetRoomObjects.getWithinRangeConstructionSite(
       harvestPosition,
       1,
       STRUCTURE_CONTAINER
     );
-    this.maxEmptySpaceAroundHarvestArea = Helper.getFreeAdjacentPositions(this.harvestPosition).length;
   }
 
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
-    let allowedWorkerCount =
+    const allowedWorkerCount =
       this.maxWorkerCount + this.getNumberOfDyingCreeps() + (this.doWeNeedToReplaceWeakCreep() ? 1 : 0);
-    allowedWorkerCount = this.containerConstructionSiteNextToHarvestArea
-      ? allowedWorkerCount + this.maxEmptySpaceAroundHarvestArea - 1
-      : allowedWorkerCount;
 
     if (this.creeps.length < allowedWorkerCount) {
       const task: SpawnTask | null = this.createCreepForThisArea();
@@ -56,6 +53,7 @@ export default abstract class HarvestArea extends BaseArea {
   }
 
   protected handleSetup() {
+    if (this.controllerLevel < 2) return;
     if (!this.containerNextToHarvestArea && !this.containerConstructionSiteNextToHarvestArea) {
       const potentialPositionsNextToHarvestArea = Helper.getFreeAdjacentPositions(this.harvestPosition);
       // TODO: Need to work more on this logic, in case container gets destroyed and we already have extensions, a different place might be chosen.

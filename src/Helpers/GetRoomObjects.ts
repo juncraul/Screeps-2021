@@ -484,6 +484,15 @@ export class GetRoomObjects {
     return fromThis.findClosestByRange(FIND_HOSTILE_CREEPS);
   }
 
+  public static getClosestMyCreepByRange(fromThis: RoomPosition, containsBodyPart?: BodyPartConstant): Creep | null {
+    if (containsBodyPart) {
+      return fromThis.findClosestByRange(FIND_MY_CREEPS, {
+        filter: creep => creep.body.find(body => body.type === containsBodyPart) !== undefined
+      });
+    }
+    return fromThis.findClosestByRange(FIND_MY_CREEPS);
+  }
+
   public static getClosestByRangeDamagedUnit(pos: RoomPosition): Creep | null {
     return pos.findClosestByRange(FIND_MY_CREEPS, { filter: creep => creep.hits < creep.hitsMax });
   }

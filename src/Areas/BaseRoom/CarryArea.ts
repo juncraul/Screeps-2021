@@ -41,10 +41,15 @@ export default class CarryArea extends BaseArea {
 
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
-    if (
-      this.creeps.length <
-      this.maxWorkerCount + this.getNumberOfDyingCreeps() + (this.doWeNeedToReplaceWeakCreep() ? 1 : 0)
-    ) {
+    if (this.controllerLevel < 3) {
+      const sources = GetRoomObjects.getRoomSources(this.room);
+      const harvestersInRoom = _.sum(sources, s => Helper.getCreepNamesFromArea("SourceArea", s.id).length);
+      this.maxWorkerCount = Math.min(1, harvestersInRoom);
+    }
+    const allowedWorkerCount =
+      this.maxWorkerCount + this.getNumberOfDyingCreeps() + (this.doWeNeedToReplaceWeakCreep() ? 1 : 0);
+
+    if (this.creeps.length < allowedWorkerCount) {
       const task: SpawnTask | null = this.createCreepForThisArea();
       if (task) {
         tasksForThisArea.push(task);
@@ -62,7 +67,17 @@ export default class CarryArea extends BaseArea {
       if (creep.isEmpty()) {
         // If the creep was last carrying minerals, try to refill with minerals first.
         if (this.tryCollectMineral(creep)) return;
-        this.findSomewhereToCollectFrom(creep);
+        if (!this.findSomewhereToCollectFrom(creep)) {
+          const allDroppedResources = this.room.find(FIND_DROPPED_RESOURCES);
+          const droppedResourcesNextToSources = allDroppedResources.filter(resource => {
+            const sources = this.room.find(FIND_SOURCES);
+            return sources.some(source => resource.pos.isNearTo(source.pos));
+          });
+          const firstDroppedResource = creep.pos.findClosestByPath(droppedResourcesNextToSources);
+          if (firstDroppedResource) {
+            creep.addTask(new CreepTask(Activity.MoveCloseBy, firstDroppedResource.pos));
+          }
+        }
       } else {
         // Creep has something — decide which deposit logic to use based on what it's carrying.
         const mineralResource = this.getCarriedMineralType(creep);
@@ -125,7 +140,7 @@ export default class CarryArea extends BaseArea {
     return result[0] ?? null;
   }
 
-  private findSomewhereToCollectFrom(creep: CreepBase): void {
+  private findSomewhereToCollectFrom(creep: CreepBase): boolean {
     // Disabled, we should never collect from links. This is for Utility creeps to use.
     // for (let j = 0; j < this.collectFromLimitedStore.length; j++) {
     //   if (this.collectFromLimitedStore[j].store.energy < 100) continue;
@@ -136,7 +151,7 @@ export default class CarryArea extends BaseArea {
     const mineralContainer = this.getMineralContainer();
     if (mineralContainer && mineralContainer.container.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
       creep.addTask(new CreepTask(Activity.Collect, mineralContainer.container.pos));
-      return;
+      return true;
     }
 
     // TODO: I have noticed that sometimes when there is 2000 energy in container and 300 resource dropped on the ground, creeps will go for the dropped resource instead of the container.
@@ -145,7 +160,7 @@ export default class CarryArea extends BaseArea {
     );
     if (firstDroppedResource) {
       creep.addTask(new CreepTask(Activity.Pickup, firstDroppedResource.pos));
-      return;
+      return true;
     }
 
     const firstContainer = creep.pos.findClosestByPath(
@@ -155,7 +170,7 @@ export default class CarryArea extends BaseArea {
     );
     if (firstContainer) {
       creep.addTask(new CreepTask(Activity.Collect, firstContainer.pos));
-      return;
+      return true;
     }
 
     // Check if this room has stationary fillers, this is because we don't have utilities in these rooms.
@@ -164,9 +179,10 @@ export default class CarryArea extends BaseArea {
       const storage = GetRoomObjects.getRoomStorage(this.room);
       if (storage && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
         creep.addTask(new CreepTask(Activity.Collect, storage.pos));
-        return;
+        return true;
       }
     }
+    return false;
   }
 
   private findSomewhereToDeposit(creep: CreepBase): void {
@@ -214,6 +230,19 @@ export default class CarryArea extends BaseArea {
       if (depositToLimitedStoreSorted[j].store.getFreeCapacity(RESOURCE_ENERGY) === 0) continue;
       creep.addTask(new CreepTask(Activity.Deposit, depositToLimitedStoreSorted[j].pos));
       return true;
+    }
+
+    // Deposit to creeps in UpgradeArea if we don't have a container next to the controller.
+    const containerNextToController = GetRoomObjects.getWithinRangeContainer(this.controller.pos, 2);
+    if (!containerNextToController) {
+      const upgradeCreepNames = Helper.getCreepNamesFromArea("UpgradeArea", this.controller.id);
+      for (let i = 0; i < upgradeCreepNames.length; i++) {
+        const upgradeCreep = Game.creeps[upgradeCreepNames[i]];
+        if (upgradeCreep && upgradeCreep.store.getUsedCapacity(RESOURCE_ENERGY) < 20) {
+          creep.addTask(new CreepTask(Activity.Deposit, upgradeCreep.pos));
+          return true;
+        }
+      }
     }
     return false;
   }

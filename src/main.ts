@@ -3,6 +3,7 @@ import Overseer from "Overseer";
 import { CreepBase } from "CreepBase";
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import "./Prototypes/RoomVisual"; // Prototypes used in Visualizer class
+import { Helper } from "Helpers/Helper";
 
 // When compiling TS to JS and bundling with rollup, the line numbers and file names in error messages change
 // This utility uses source maps to get the line numbers and file names of the original, TS source code
@@ -34,7 +35,7 @@ export const loop = () => {
   });
 
   // We can generate a pixel when the bucket is full
-  if (!Memory.Keys.IsSeason && Game.cpu.bucket === 10000) {
+  if (Helper.getCashedMemory("IsSeason", false) && Game.cpu.bucket === 10000) {
     Game.cpu.generatePixel();
   }
 };

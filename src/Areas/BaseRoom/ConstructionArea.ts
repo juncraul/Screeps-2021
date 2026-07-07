@@ -50,7 +50,9 @@ export default class ConstructionArea extends BaseArea {
         if (!foundSomewhereToCollectFrom && this.storage && this.storage.store.energy > 200) {
           this.creeps[i].addTask(new CreepTask(Activity.Collect, this.storage.pos)); // TODO:Add Energy type in here.
         }
-        if (!foundSomewhereToCollectFrom) {
+        // If there is no energy to collect from anywhere, then we should send the creep to harvest from a source. Only if there is no spawn, otherwise spawn should create a harvester
+        const spawn = GetRoomObjects.getRoomSpawns(this.room);
+        if (!foundSomewhereToCollectFrom && spawn.length > 0) {
           const sources = this.room.find(FIND_SOURCES);
           if (sources.length > 0) {
             this.creeps[i].addTask(new CreepTask(Activity.Harvest, sources[0].pos));
@@ -83,7 +85,6 @@ export default class ConstructionArea extends BaseArea {
   }
 
   private calculateMaxWorkerCount(): number {
-    if (this.containersToCollectFrom.length === 0) return 0;
     const constructions = this.getConstructionsInRoom(this.room);
     const sumOfConstructionPoint = constructions.reduce(function (accumulator, item) {
       return accumulator + item.progressTotal - item.progress;

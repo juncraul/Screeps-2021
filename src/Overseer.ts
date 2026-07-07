@@ -20,6 +20,7 @@ import SourceKeeperArea from "./Areas/Military/SourceKeeperArea";
 import StationaryFillerArea from "Areas/BaseRoom/StationaryFillerArea";
 import MarketArea from "Areas/BaseRoom/MarketArea";
 import BaseRoomStats from "Areas/BaseRoom/BaseRoomStats";
+import { Helper } from "Helpers/Helper";
 
 export default class Overseer implements IOverseer {
   public refresh(): void {
@@ -56,7 +57,7 @@ export default class Overseer implements IOverseer {
     const looterTasks = this.handleLooterArea(room);
     const sourceKeeperTasks = this.handleSourceKeeperArea(room);
     let seasonTasks: SpawnTask[] = [];
-    if (Memory.Keys.IsSeason) {
+    if (Helper.getCashedMemory("IsSeason", false)) {
       seasonTasks = this.handleSeasonArea(room);
     }
     let remoteTasks: SpawnTask[] = [];
@@ -90,9 +91,7 @@ export default class Overseer implements IOverseer {
       CreepType.StationaryFiller,
       CreepType.StationaryFiller,
       CreepType.Harvester,
-      CreepType.Upgrader,
-      CreepType.Carrier,
-      CreepType.Upgrader
+      CreepType.Carrier
     ];
     const existing: Record<number, number> = {
       [CreepType.Harvester]: harvest.existing,

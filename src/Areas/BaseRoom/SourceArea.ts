@@ -100,6 +100,8 @@ export default class SourceArea extends HarvestArea {
           } else {
             this.creeps[i].addTask(new CreepTask(Activity.HarvestAndDeposit, this.source.pos));
           }
+        } else {
+          this.creeps[i].addTask(new CreepTask(Activity.Harvest, this.source.pos));
         }
       }
     }
@@ -212,6 +214,24 @@ export default class SourceArea extends HarvestArea {
       }
       if (GetRoomObjects.getWithinRangeExtensions(this.containerNextToHarvestArea.pos, 1).length > 0) {
         bodyPartConstants.push(CARRY); // If we have extensions next to the container, we can add a carry part to the creep to help with energy transfer.
+      }
+    } else if (!this.containerNextToHarvestArea && !this.linkNextToSource) {
+      let segments = Math.floor(this.room.energyCapacityAvailable / 150); // Work-100; Move-50
+      segments = buildCheapestCreep ? Math.floor(this.room.energyAvailable / 150) : segments;
+      if (segments < 2) {
+        console.log("SourceArea, containerNextToSource: Something wrong with room capacity");
+      } else if (segments === 2) {
+        // 300 energy
+        bodyPartConstants = [WORK, WORK, MOVE, MOVE];
+      } else if (segments === 3) {
+        // 450 energy
+        bodyPartConstants = [WORK, WORK, WORK, MOVE, MOVE, MOVE];
+      } else if (segments === 4) {
+        // 600 energy
+        bodyPartConstants = [WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE];
+      } else if (segments >= 5) {
+        // 800 energy - This is the ideal creep with 10 energy collected per tick, enough for source refresh.
+        bodyPartConstants = [WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE, MOVE];
       }
     } else {
       let segments = Math.floor(this.room.energyCapacityAvailable / 200); // Work-100; Move-50; Carry-50

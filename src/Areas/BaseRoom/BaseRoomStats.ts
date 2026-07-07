@@ -5,6 +5,8 @@ interface BaseRoomEnergyStats {
   spentByCategory: Record<string, number>;
   snapshots: BaseRoomEnergySnapshot[];
   lastUpdatedTick: number;
+  spawnPlacedTick?: number;
+  controllerLevelTicks: Record<number, number>;
 }
 
 interface BaseRoomEnergySnapshot {
@@ -34,17 +36,18 @@ export default class BaseRoomStats {
     roomStats.lastUpdatedTick = Game.time;
   }
 
-  public static getRoomStats(roomName: string): BaseRoomEnergyStats {
-    const roomStats = this.getOrCreateRoomStats(roomName);
+  public static getRoomStats(room: Room): BaseRoomEnergyStats {
+    const roomStats = this.getOrCreateRoomStats(room.name);
+    this.trackSpawnAndControllerProgress(room, roomStats);
     this.takeSnapshotIfNeeded(roomStats);
     return roomStats;
   }
 
   public static drawRoomVisual(room: Room): void {
-    const roomStats = this.getRoomStats(room.name);
+    const roomStats = this.getRoomStats(room);
 
-    const x = 35;
-    let y = 2;
+    const x = 2;
+    let y = 20;
     const titleStyle: TextStyle = { align: "left", opacity: 0.9, color: "#fff4b3", font: "0.6 Trebuchet MS" };
     const lineStyle: TextStyle = { align: "left", opacity: 0.75, color: "#d8f6d1", font: "0.5 Trebuchet MS" };
 
@@ -66,6 +69,22 @@ export default class BaseRoomStats {
         lineStyle
       );
       y += 0.8;
+    }
+
+    if (roomStats.spawnPlacedTick !== undefined) {
+      room.visual.text(`Spawn placed at: ${roomStats.spawnPlacedTick}`, x, y, lineStyle);
+      y += 0.65;
+
+      const levelDeltas = this.getControllerLevelDeltas(roomStats);
+      room.visual.text(`Tick: ${Game.time}`, x, y, lineStyle);
+      y += 0.65;
+      if (levelDeltas.length > 0) {
+        levelDeltas.forEach(levelDelta => {
+          room.visual.text(levelDelta, x, y, lineStyle);
+          y += 0.6;
+        });
+      }
+      y += 0.2;
     }
 
     const topCollected = this.getTopCategories(roomStats.collectedByCategory, 10);
@@ -96,6 +115,9 @@ export default class BaseRoomStats {
 
     const existing = Memory.baseRoomStats[roomName];
     if (existing) {
+      if (!existing.controllerLevelTicks) {
+        existing.controllerLevelTicks = {};
+      }
       return existing;
     }
 
@@ -105,7 +127,8 @@ export default class BaseRoomStats {
       collectedByCategory: {},
       spentByCategory: {},
       snapshots: [],
-      lastUpdatedTick: Game.time
+      lastUpdatedTick: Game.time,
+      controllerLevelTicks: {}
     };
     created.snapshots.push({ tick: Game.time, energyCollected: 0, energySpent: 0 });
     Memory.baseRoomStats[roomName] = created;
@@ -114,7 +137,9 @@ export default class BaseRoomStats {
 
   private static takeSnapshotIfNeeded(roomStats: BaseRoomEnergyStats): void {
     if (!roomStats.snapshots || roomStats.snapshots.length === 0) {
-      roomStats.snapshots = [{ tick: Game.time, energyCollected: roomStats.energyCollected, energySpent: roomStats.energySpent }];
+      roomStats.snapshots = [
+        { tick: Game.time, energyCollected: roomStats.energyCollected, energySpent: roomStats.energySpent }
+      ];
       return;
     }
 
@@ -157,5 +182,38 @@ export default class BaseRoomStats {
     return Object.entries(categories)
       .sort((a, b) => b[1] - a[1])
       .slice(0, count);
+  }
+
+  private static trackSpawnAndControllerProgress(room: Room, roomStats: BaseRoomEnergyStats): void {
+    const mySpawns = room.find(FIND_MY_SPAWNS);
+    if (roomStats.spawnPlacedTick === undefined && mySpawns.length > 0) {
+      roomStats.spawnPlacedTick = Game.time;
+    }
+
+    const controller = room.controller;
+    if (!controller || !controller.my || roomStats.spawnPlacedTick === undefined) {
+      return;
+    }
+
+    if (!roomStats.controllerLevelTicks[controller.level]) {
+      roomStats.controllerLevelTicks[controller.level] = Game.time;
+    }
+  }
+
+  private static getControllerLevelDeltas(roomStats: BaseRoomEnergyStats): string[] {
+    if (roomStats.spawnPlacedTick === undefined) {
+      return [];
+    }
+
+    const levels = Object.keys(roomStats.controllerLevelTicks)
+      .map(level => parseInt(level, 10))
+      .filter(level => !isNaN(level))
+      .sort((a, b) => a - b);
+
+    return levels.map(level => {
+      const reachedAtTick = roomStats.controllerLevelTicks[level];
+      const delta = reachedAtTick - roomStats.spawnPlacedTick!;
+      return `RCL ${level}: +${delta} ticks (${reachedAtTick})`;
+    });
   }
 }
