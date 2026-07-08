@@ -71,6 +71,7 @@ export class CreepBase {
 
   public workTheTask(): void {
     if (!this.task) return;
+    if (this.task.taskDone) return;
     switch (this.task.activity) {
       case Activity.Harvest: // 0
         this.activityHarvest();
@@ -140,6 +141,7 @@ export class CreepBase {
       this.creep.say(`Dead in ${this.willSuicideAtTick - Game.time}`);
       if (Game.time >= this.willSuicideAtTick) {
         this.creep.say("💀");
+        console.log(`Creep ${this.name} is suiciding at tick ${Game.time} as scheduled.`);
         this.suicide();
       }
     }
@@ -189,7 +191,7 @@ export class CreepBase {
       this.harvest(source);
     }
     if (this.carryCapacity > 0 && this.carryCapacity === this.carryCurrent) {
-      this.completeTask("Har Done");
+      this.completeTask("⛏️✔️");
     }
   }
 
@@ -199,7 +201,7 @@ export class CreepBase {
       this.build(constructionSite);
     }
     if (this.carryCurrent === 0 || !constructionSite) {
-      this.completeTask("Con Done");
+      this.completeTask("🚧✔️");
     }
   }
 
@@ -208,7 +210,7 @@ export class CreepBase {
     if (structure) {
       const result = this.transfer(structure, RESOURCE_ENERGY);
       if (result === OK) {
-        this.completeTask("Transf Done");
+        this.completeTask("✉️✔️");
       } else if (result === ERR_FULL) {
         this.completeTask("Str Full");
       }
@@ -222,12 +224,12 @@ export class CreepBase {
       if (creep) {
         const result = this.transfer(creep, RESOURCE_ENERGY);
         if (result === OK) {
-          this.completeTask("Transf Done");
+          this.completeTask("✉️✔️");
         }
       }
     }
     if (this.carryCurrent === 0) {
-      this.completeTask("Dep Done");
+      this.completeTask("Dep✔️");
     }
   }
 
@@ -235,7 +237,7 @@ export class CreepBase {
     const roomPosition = CreepTask.getRoomPositionFromTarget(this.task!.targetPlace);
     this.goTo(roomPosition);
     if (Helper.isSamePosition(this.pos, roomPosition)) {
-      this.completeTask("Move Done");
+      this.completeTask("👣✔️");
     }
   }
 
@@ -252,13 +254,13 @@ export class CreepBase {
     if (!targetCollect) {
       targetCollect = CreepTask.getRuinFromTarget(this.task!.targetPlace);
       if (!targetCollect) {
-        this.completeTask("Col Done"); // Target must have dissappeared.
+        this.completeTask("📦✔️"); // Target must have dissappeared.
       }
     }
     if (targetCollect) {
       const result = this.withdraw(targetCollect, RESOURCE_ENERGY);
       if (result === OK) {
-        this.completeTask("Col Done");
+        this.completeTask("📦✔️");
       }
     }
     if (
@@ -270,7 +272,7 @@ export class CreepBase {
       targetCollect instanceof Tombstone
     ) {
       if (targetCollect.store.energy === 0) {
-        this.completeTask("Col Done");
+        this.completeTask("📦✔️");
       }
     } else if (
       targetCollect instanceof StructureLink ||
@@ -279,15 +281,15 @@ export class CreepBase {
       targetCollect instanceof StructureTower
     ) {
       if (targetCollect.store.energy === 0) {
-        this.completeTask("Col Done");
+        this.completeTask("📦✔️");
       }
     } else if (targetCollect instanceof Resource) {
       if (targetCollect.amount === 0) {
-        this.completeTask("Col Done");
+        this.completeTask("📦✔️");
       }
     }
     if (this.carryCurrent === this.carryCapacity) {
-      this.completeTask("Col Done");
+      this.completeTask("📦✔️");
     }
   }
 
@@ -297,7 +299,7 @@ export class CreepBase {
       this.upgradeController(controller);
     }
     if (this.carryCurrent === 0) {
-      this.completeTask("Upg Done");
+      this.completeTask("Upg✔️");
     }
   }
 
@@ -306,11 +308,11 @@ export class CreepBase {
     if (targetPickup) {
       const result = this.pickup(targetPickup);
       if (result === OK) {
-        this.completeTask("Pick up Done");
+        this.completeTask("🫳✔️");
       }
     }
     if (!targetPickup || this.carryCurrent === this.carryCapacity) {
-      this.completeTask("Pick up Done");
+      this.completeTask("🫳✔️");
     }
   }
 
@@ -320,7 +322,7 @@ export class CreepBase {
       const result = this.claim(controller);
       console.log(`Claiming controller in room ${controller.room.name} with creep ${this.name}, result: ${result}`);
       if (result === OK) {
-        this.completeTask("Claim Done");
+        this.completeTask("Claim✔️");
       }
     }
   }
@@ -339,7 +341,7 @@ export class CreepBase {
     this.goTo(moveTarget);
 
     if (targetPos.roomName === this.room.name) {
-      this.completeTask("Move Done");
+      this.completeTask("👣✔️");
     }
   }
 
@@ -388,7 +390,7 @@ export class CreepBase {
       foundSomethingToRepair = true;
     }
     if (this.carryCurrent === 0 || !foundSomethingToRepair) {
-      this.completeTask("Rep Done");
+      this.completeTask("Rep✔️");
     }
   }
 
@@ -427,7 +429,7 @@ export class CreepBase {
       }
     }
     if (!mineralAtPos || mineralAtPos.mineralAmount === 0) {
-      this.completeTask("Min Done");
+      this.completeTask("Min✔️");
     }
   }
 
@@ -438,14 +440,14 @@ export class CreepBase {
       if (resourceType) {
         const result = this.transfer(storageStruct, resourceType);
         if (result === OK || result === ERR_FULL) {
-          this.completeTask("Min Dep Done");
+          this.completeTask("Min Dep✔️");
         }
       } else {
         this.completeTask("No min");
       }
     }
     if (this.store.getUsedCapacity() === 0) {
-      this.completeTask("Min Dep Done");
+      this.completeTask("Min Dep✔️");
     }
   }
 
@@ -464,7 +466,7 @@ export class CreepBase {
 
     const amountLeft = this.getCollectMineralAmountLeft(collectTarget, specificMineral);
     if (this.store.getFreeCapacity() === 0 || !collectTarget || amountLeft === 0) {
-      this.completeTask("Min Col Done");
+      this.completeTask("Min Col✔️");
     }
   }
 
@@ -475,7 +477,7 @@ export class CreepBase {
       }
     }
     if (this.store.getUsedCapacity() === 0) {
-      this.completeTask("Drop Done");
+      this.completeTask("Drop✔️");
     }
   }
 
@@ -508,7 +510,7 @@ export class CreepBase {
     const roomPosition = CreepTask.getRoomPositionFromTarget(this.task!.targetPlace);
     this.goTo(roomPosition, { range: 2 });
     if (Helper.isInRange(this.pos, roomPosition, 3)) {
-      this.completeTask("Move Done");
+      this.completeTask("👣✔️");
     }
   }
 

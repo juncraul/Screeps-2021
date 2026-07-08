@@ -730,17 +730,20 @@ export class BaseBuilder {
       const container = GetRoomObjects.getWithinRangeContainer(source.pos, 1);
       if (!container) continue;
       const surroundingPositions = Helper.getFreeAdjacentPositions(container.pos);
-      const linkNextToSource = GetRoomObjects.getWithinRangeLink(source.pos, 2);
-      let leftOneFreeForLink = linkNextToSource ? true : false;
+      let linkNextToSourcePos = GetRoomObjects.getWithinRangeLink(source.pos, 2)?.pos;
+      if (!linkNextToSourcePos) {
+        linkNextToSourcePos = Helper.getFreeAdjacentPositions(container.pos)[0];
+      }
+      let roadFromContainerPos = GetRoomObjects.getWithinRangeStructures(container.pos, 1, STRUCTURE_ROAD)[0]?.pos;
+      if (!roadFromContainerPos) {
+        roadFromContainerPos = GetRoomObjects.getXStepTowardsSpawn(container.pos, 1);
+      }
+      console.log(`Creating extensions around source at ${source.pos}. Link next to source: ${linkNextToSourcePos}, road from container: ${roadFromContainerPos}`);
+
       for (const pos of surroundingPositions) {
-        if (linkNextToSource && pos.isEqualTo(linkNextToSource.pos)) continue;
-        if (pos.lookFor(LOOK_STRUCTURES).filter(structure => structure.structureType !== STRUCTURE_ROAD)) {
-          if (!leftOneFreeForLink) {
-            leftOneFreeForLink = true;
-            continue;
-          }
-          room.createConstructionSite(pos.x, pos.y, STRUCTURE_EXTENSION);
-        }
+        if (linkNextToSourcePos && pos.isEqualTo(linkNextToSourcePos)) continue;
+        if (roadFromContainerPos && pos.isEqualTo(roadFromContainerPos)) continue;
+        room.createConstructionSite(pos.x, pos.y, STRUCTURE_EXTENSION);
       }
     }
   }

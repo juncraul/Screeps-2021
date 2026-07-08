@@ -44,7 +44,7 @@ export default class CarryArea extends BaseArea {
     if (this.controllerLevel < 3) {
       const sources = GetRoomObjects.getRoomSources(this.room);
       const harvestersInRoom = _.sum(sources, s => Helper.getCreepNamesFromArea("SourceArea", s.id).length);
-      this.maxWorkerCount = Math.min(1, harvestersInRoom);
+      this.maxWorkerCount = harvestersInRoom === 1 ? 2 : harvestersInRoom;
     }
     const allowedWorkerCount =
       this.maxWorkerCount + this.getNumberOfDyingCreeps() + (this.doWeNeedToReplaceWeakCreep() ? 1 : 0);
@@ -232,6 +232,16 @@ export default class CarryArea extends BaseArea {
       return true;
     }
 
+    // Deposit to Construction workers.
+    const constructionCreepsNames = Helper.getCreepNamesFromArea("ConstructionArea", this.room.name);
+    for (let i = 0; i < constructionCreepsNames.length; i++) {
+      const constructionCreep = Game.creeps[constructionCreepsNames[i]];
+      if (constructionCreep && constructionCreep.store.getUsedCapacity(RESOURCE_ENERGY) < 20) {
+        creep.addTask(new CreepTask(Activity.Deposit, constructionCreep.pos));
+        return true;
+      }
+    }
+
     // Deposit to creeps in UpgradeArea if we don't have a container next to the controller.
     const containerNextToController = GetRoomObjects.getWithinRangeContainer(this.controller.pos, 2);
     if (!containerNextToController) {
@@ -263,7 +273,14 @@ export default class CarryArea extends BaseArea {
     if (this.containerNextToController) structures.push(this.containerNextToController);
     const spawn = GetRoomObjects.getRoomSpawns(this.room, true)[0];
     if (spawn) {
-      const potentialContainers = GetRoomObjects.getWithinRangeContainers(spawn.pos, 4);
+      const sources = this.room.find(FIND_SOURCES);
+      const sourceContainers = sources
+        .map(source => GetRoomObjects.getWithinRangeContainer(source.pos, 2))
+        .filter(Boolean) as StructureContainer[];
+
+      const potentialContainers = GetRoomObjects.getWithinRangeContainers(spawn.pos, 4).filter(
+        container => !sourceContainers.includes(container)
+      );
       structures.push(...potentialContainers);
     }
     const storage = GetRoomObjects.getRoomStorage(this.room);

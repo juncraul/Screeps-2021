@@ -89,7 +89,9 @@ export default class UpgradeArea extends BaseArea {
 
       if (this.controller.level < 3) {
         if (creep.isEmpty()) {
-          creep.addTask(new CreepTask(Activity.MoveCloseBy, this.upgradePosition));
+          if (creep.pos.getRangeTo(this.upgradePosition) > 4) {
+            creep.addTask(new CreepTask(Activity.MoveCloseBy, this.upgradePosition));
+          }
         } else {
           if (this.containerConstructionSiteNextToController && this.controller.ticksToDowngrade > 8000) {
             creep.addTask(new CreepTask(Activity.Construct, this.containerConstructionSiteNextToController.pos));

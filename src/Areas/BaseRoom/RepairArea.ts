@@ -34,6 +34,13 @@ export default class RepairArea extends BaseArea {
         const energyTarget = this.getClosestEnergyTarget(this.creeps[i].pos);
         if (energyTarget) {
           this.creeps[i].addTask(new CreepTask(energyTarget.activity, energyTarget.pos));
+        } else {
+          const closestSource = this.creeps[i].pos.findClosestByPath(FIND_SOURCES_ACTIVE);
+          if (closestSource) {
+            this.creeps[i].addTask(
+              new CreepTask(Activity.Move, GetRoomObjects.getXStepTowardsSpawn(closestSource.pos, 3))
+            );
+          }
         }
       }
 

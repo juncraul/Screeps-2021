@@ -58,6 +58,14 @@ export default class ConstructionArea extends BaseArea {
             this.creeps[i].addTask(new CreepTask(Activity.Harvest, sources[0].pos));
           }
         }
+        if (!foundSomewhereToCollectFrom) {
+          const closestSource = this.creeps[i].pos.findClosestByPath(FIND_SOURCES_ACTIVE);
+          if (closestSource) {
+            this.creeps[i].addTask(
+              new CreepTask(Activity.Move, GetRoomObjects.getXStepTowardsSpawn(closestSource.pos, 3))
+            );
+          }
+        }
       }
       if (!this.creeps[i].isEmpty() && this.creeps[i].isFree()) {
         const constructionArea = this.getConstructionClosestByPoint(this.creeps[i].pos);

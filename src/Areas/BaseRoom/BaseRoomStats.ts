@@ -75,9 +75,9 @@ export default class BaseRoomStats {
       room.visual.text(`Spawn placed at: ${roomStats.spawnPlacedTick}`, x, y, lineStyle);
       y += 0.65;
 
-      const levelDeltas = this.getControllerLevelDeltas(roomStats);
-      room.visual.text(`Tick: ${Game.time}`, x, y, lineStyle);
+      room.visual.text(`Tick: ${Game.time - roomStats.spawnPlacedTick} ticks (${Game.time})`, x, y, lineStyle);
       y += 0.65;
+      const levelDeltas = this.getControllerLevelDeltas(roomStats);
       if (levelDeltas.length > 0) {
         levelDeltas.forEach(levelDelta => {
           room.visual.text(levelDelta, x, y, lineStyle);

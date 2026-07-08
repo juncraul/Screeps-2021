@@ -20,6 +20,7 @@ import SourceKeeperArea from "./Areas/Military/SourceKeeperArea";
 import StationaryFillerArea from "Areas/BaseRoom/StationaryFillerArea";
 import MarketArea from "Areas/BaseRoom/MarketArea";
 import BaseRoomStats from "Areas/BaseRoom/BaseRoomStats";
+import ScoutArea from "Areas/BaseRoom/ScoutArea";
 import { Helper } from "Helpers/Helper";
 
 export default class Overseer implements IOverseer {
@@ -43,6 +44,7 @@ export default class Overseer implements IOverseer {
   private overseeRoom(room: Room): SpawnTask[] {
     // Used for debugging wall repair order
     // GetRoomObjects.getClosestWallRampartToRepairAll(room);
+    const scout = this.handleScoutArea(room);
     const remoteRooms = GetRoomObjects.getAllRoomsToRemote(room);
     const harvest = this.handleHarvestArea(room);
     const carry = this.handleCarryArea(room);
@@ -133,6 +135,7 @@ export default class Overseer implements IOverseer {
       ...looterTasks,
       ...remoteTasks,
       ...remoteRebuildTasks,
+      ...scout.tasks,
       ...seasonTasks
     ];
 
@@ -146,6 +149,7 @@ export default class Overseer implements IOverseer {
       UtilityArea: { existing: utility.existing, queued: utility.tasks.length },
       MarketArea: { existing: market.existing, queued: market.tasks.length },
       StationaryFillerArea: { existing: stationaryfiller.existing, queued: stationaryfiller.tasks.length },
+      ScoutArea: { existing: scout.existing, queued: scout.tasks.length },
       DefenseArea: { existing: defense.existing, queued: defense.tasks.length }
     });
 
@@ -290,6 +294,14 @@ export default class Overseer implements IOverseer {
     tasks = tasks.concat(remoteArea.handleSpawnTasks());
     remoteArea.handleThisArea();
     return tasks;
+  }
+
+  private handleScoutArea(room: Room): { tasks: SpawnTask[]; existing: number } {
+    const scoutArea: ScoutArea = new ScoutArea(room);
+    const tasks = scoutArea.handleSpawnTasks();
+    const existing = scoutArea.creeps.length;
+    scoutArea.handleThisArea();
+    return { tasks, existing };
   }
 
   private handleUtilityArea(room: Room): { tasks: SpawnTask[]; existing: number } {

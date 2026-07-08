@@ -98,7 +98,7 @@ export default class RemoteArea extends BaseArea {
     }
 
     if (remoteMode === RemoteRoomMode.Claim) {
-      this.claimersPerRoom = this.room.controller?.owner ? 0 : 1;
+      this.claimersPerRoom = this.room?.controller?.owner ? 0 : 1;
       this.carriersPerRoom = 0;
     } else if (remoteMode === RemoteRoomMode.ReserveAttack) {
       this.harvestersPerSource = 0;
@@ -301,6 +301,9 @@ export default class RemoteArea extends BaseArea {
     if (this.baseRoom.controller && this.baseRoom.controller.level >= 4) {
       this.createRemoteRoadConnections();
     }
+
+    // Do not create containers if base room controller level is less than 2
+    if (this.baseRoom.controller && this.baseRoom.controller.level < 3) return;
 
     for (const source of this.sources) {
       const container = GetRoomObjects.getWithinRangeContainer(source.pos, 2);
@@ -579,6 +582,8 @@ export default class RemoteArea extends BaseArea {
       } else {
         creep.addTask(new CreepTask(Activity.HarvestAndDeposit, targetSource.pos));
       }
+    } else {
+      creep.addTask(new CreepTask(Activity.Harvest, targetSource.pos));
     }
   }
 
@@ -912,7 +917,8 @@ export default class RemoteArea extends BaseArea {
     // plain=1,2  road=1,1  swamp=5,6
     const bodyPartConstants: BodyPartConstant[] = [];
     const segments = Math.min(5, Math.floor((this.baseRoom.energyCapacityAvailable - 50) / 150));
-    const carryParts = this.containers.length !== this.sources.length ? 1 : 0; // If we don't have a container for each source, we need a carry part to build one.
+    const baseControllerLevel = this.baseRoom.controller ? this.baseRoom.controller.level : 0;
+    const carryParts = this.containers.length !== this.sources.length && baseControllerLevel >= 3 ? 1 : 0; // If we don't have a container for each source, we need a carry part to build one, but only if the base room controller level is 3 or higher.
     const moveParts = this.roadWorkDone ? segments / 2 : segments; // If we have roads, we can get away with fewer move parts.
 
     for (let i = 0; i < segments; i++) bodyPartConstants.push(WORK);

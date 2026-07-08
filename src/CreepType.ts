@@ -18,5 +18,6 @@ export enum CreepType {
   DefenseRanger = 16,
   StationaryFiller = 17,
   Dismantler = 18,
-  Clerk = 19
+  Clerk = 19,
+  Scout = 20
 }

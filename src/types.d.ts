@@ -22,6 +22,35 @@ interface RemoteRoomEconomy {
   energySpent: number;
 }
 
+interface ScoutControllerIntel {
+  x: number;
+  y: number;
+  roomName: string;
+  level: number | null;
+  owner: string | null;
+  reservation: string | null;
+}
+
+interface ScoutRoomIntel {
+  roomName: string;
+  lastSeen: number;
+  controller: ScoutControllerIntel | null;
+  sources: {
+    id: string;
+    x: number;
+    y: number;
+  }[];
+  minerals: {
+    id: string;
+    x: number;
+    y: number;
+    mineralType: ResourceConstant;
+    amount: number;
+  }[];
+  hostileCount: number;
+  claimable: boolean;
+}
+
 interface BaseRoomEnergyStats {
   energyCollected: number;
   energySpent: number;
@@ -62,6 +91,7 @@ interface Memory {
   scoreHistory: ScoreCollectionRecord[];
   seasonExploredRooms?: ExploredRoom[];
   seasonEnemyRooms?: string[];
+  scoutIntel?: Record<string, ScoutRoomIntel>;
   soldierFlagState?: SoldierFlagState;
   soldierFlagStates?: Record<string, SoldierFlagState>;
   remoteRoomEconomy?: Record<string, RemoteRoomEconomy>;

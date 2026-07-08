@@ -519,6 +519,13 @@ export class GetRoomObjects {
     return containers as StructureContainer[];
   }
 
+  public static getXStepTowardsSpawn(pos: RoomPosition, step: number): RoomPosition {
+    const spawn = GetRoomObjects.getRoomSpawns(Game.rooms[pos.roomName], true)[0];
+    const result = PathFinder.search(pos, spawn.pos);
+    if (result.path.length === 0) return pos; // If no path found, return the original position
+    return result.path.length <= step ? result.path[result.path.length - 1] : result.path[step - 1];
+  }
+
   // public static getSources(room: Room, onlyActive: boolean = false): Source[] {
   //  let roomMemory = MemoryManager.getRoomMemory(room.name);
   //  let sources: Source[] = [];

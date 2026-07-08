@@ -90,7 +90,7 @@ export default abstract class HarvestArea extends BaseArea {
   }
 
   protected checkForSuicide() {
-    if (this.creeps.length <= 1) return;
+    if (this.creeps.length <= 1 || this.room.energyCapacityAvailable < 1000) return;
     const mostFreshCreep = this.creeps.reduce((prev, current) =>
       prev.ticksToLive! > current.ticksToLive! ? prev : current
     );
