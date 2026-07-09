@@ -89,7 +89,16 @@ export default class ConstructionArea extends BaseArea {
   }
 
   private getConstructionsInRoom(room: Room) {
-    return room.find(FIND_MY_CONSTRUCTION_SITES);
+    const controller = GetRoomObjects.getRoomController(room);
+    if (controller) {
+      // We don't need a constructor for the controller's container, we have the upgraders.
+      const controllerContainer = GetRoomObjects.getWithinRangeConstructionSite(controller.pos, 3, STRUCTURE_CONTAINER);
+      return room
+        .find(FIND_MY_CONSTRUCTION_SITES)
+        .filter(constructionSite => !controllerContainer || constructionSite.id !== controllerContainer.id);
+    } else {
+      return room.find(FIND_MY_CONSTRUCTION_SITES);
+    }
   }
 
   private calculateMaxWorkerCount(): number {

@@ -90,7 +90,8 @@ export default class UpgradeArea extends BaseArea {
       if (this.controller.level < 3) {
         if (creep.isEmpty()) {
           if (creep.pos.getRangeTo(this.upgradePosition) > 4) {
-            creep.addTask(new CreepTask(Activity.MoveCloseBy, this.upgradePosition));
+            const pos = GetRoomObjects.getXStepTowardsTarget(creep.pos, this.upgradePosition, 2);
+            creep.addTask(new CreepTask(Activity.Move, pos));
           }
         } else {
           if (this.containerConstructionSiteNextToController && this.controller.ticksToDowngrade > 8000) {
@@ -123,7 +124,7 @@ export default class UpgradeArea extends BaseArea {
       return 1;
     }
     if (this.controllerLevel < 3) {
-      return 7;
+      return 6;
     }
 
     const availableUpgradeEnergy = this.getAvailableUpgradeEnergy();

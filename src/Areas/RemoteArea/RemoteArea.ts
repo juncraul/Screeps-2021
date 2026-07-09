@@ -2,8 +2,28 @@ import { Helper } from "Helpers/Helper";
 import { GetRoomObjects, RemoteRoomMode } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
-import BaseArea from "./BaseArea";
+import BaseArea from "./../BaseArea";
 import { CreepBase } from "CreepBase";
+import {
+  assignHarvesterToSource,
+  createHarvester,
+  findSourceWithFewestHarvesters,
+  getHarvestersForSource,
+  getSourceForCreep,
+  handleHarvester
+} from "./RemoteSourceArea";
+import {
+  createCarrier,
+  findClosestDeposit,
+  findContainerWithEnergy,
+  findNearbyRemoteEnergy,
+  findResourceWithEnergy,
+  handleCarrier
+} from "./RemoteCarryArea";
+import { createClaimer, handleClaimer, shouldSpawnClaimer } from "./RemoteClaimerArea";
+import { createRepairer, handleRepairer, shouldSpawnRepairer } from "./RemoteRepairArea";
+import { createMineralHarvester, handleMineralHarvester } from "./RemoteMineralHarvesterArea";
+import { createMineralCarrier, handleMineralCarrier } from "./RemoteMineralCarrierArea";
 
 export default class RemoteArea extends BaseArea {
   private static readonly ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
@@ -16,6 +36,7 @@ export default class RemoteArea extends BaseArea {
   containers: StructureContainer[];
   containerConstructionSites: ConstructionSite[];
   baseRoom: Room;
+  baseRoomController: StructureController | null;
   resources: Resource[];
   claimersPerRoom: number;
   harvestersPerSource: number;
@@ -61,6 +82,7 @@ export default class RemoteArea extends BaseArea {
     super("RemoteArea", roomName, new RoomPosition(25, 25, roomName), Game.rooms[roomName]);
     this.roomName = roomName;
     this.baseRoom = this.findBaseRoom(baseRoomName);
+    this.baseRoomController = this.baseRoom ? this.baseRoom.controller! : null;
 
     if (Game.rooms[roomName] && Game.rooms[roomName].controller) {
       this.controller = Game.rooms[roomName].controller!;
@@ -111,10 +133,19 @@ export default class RemoteArea extends BaseArea {
       this.repairersPerRoom = 0;
     } else {
       const energyInRoom = this.totalEnergyInRoom();
-      if (energyInRoom > 4000) {
-        this.carriersPerRoom = 3;
-      } else if (energyInRoom > 2000) {
-        this.carriersPerRoom = 2;
+      if (!this.baseRoomController || this.baseRoomController.level < 3) {
+        // We have smaller carriers at this level.
+        if (energyInRoom > 1000) {
+          this.carriersPerRoom = 3;
+        } else if (energyInRoom > 500) {
+          this.carriersPerRoom = 2;
+        }
+      } else {
+        if (energyInRoom > 4000) {
+          this.carriersPerRoom = 3;
+        } else if (energyInRoom > 2000) {
+          this.carriersPerRoom = 2;
+        }
       }
     }
     if (this.baseRoom.controller && this.baseRoom.controller.level < 3) {
@@ -164,7 +195,10 @@ export default class RemoteArea extends BaseArea {
 
     // Handle Carrier spawning
     const carrierCount = this.getCreepCountByType(CreepType.Carrier);
-    if (carrierCount < this.carriersPerRoom && this.containers.length > 0) {
+    if (
+      carrierCount < this.carriersPerRoom &&
+      (this.containers.length > 0 || (this.controller && this.controller.level <= 3))
+    ) {
       tasksForThisArea.push(this.createCarrier());
     }
 
@@ -452,283 +486,55 @@ export default class RemoteArea extends BaseArea {
   }
 
   private handleMineralHarvester(creep: CreepBase) {
-    if (!creep.isFree()) return;
-    if (creep.pos.roomName !== this.roomName) {
-      creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.roomName)));
-      return;
-    }
-    if (!this.mineral || !this.mineralContainer) return;
-    if (this.mineralContainer.store.getFreeCapacity() < 20) return;
-    creep.addTask(new CreepTask(Activity.HarvestMineral, this.mineral.pos, this.mineralContainer.pos));
+    handleMineralHarvester(this, creep);
   }
 
   private handleMineralCarrier(creep: CreepBase) {
-    if (!creep.isFree()) return;
-    const mineralType = this.mineralType;
-    if (!mineralType) return;
-
-    if (creep.pos.roomName === this.baseRoom.name) {
-      if (creep.store.getUsedCapacity() === 0) {
-        creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.roomName)));
-      } else {
-        const storage = GetRoomObjects.getRoomStorage(this.baseRoom);
-        if (storage && storage.store.getFreeCapacity() > 0) {
-          creep.addTask(new CreepTask(Activity.DepositMineral, storage.pos, null, mineralType));
-        }
-      }
-    } else if (creep.pos.roomName === this.roomName) {
-      if (creep.store.getUsedCapacity() > 0) {
-        creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.baseRoom.name)));
-      } else if (this.mineralContainer) {
-        const available = this.mineralContainer.store.getUsedCapacity(mineralType) ?? 0;
-        if (available > 0) {
-          creep.addTask(new CreepTask(Activity.CollectMineral, this.mineralContainer.pos, null, mineralType));
-        }
-      }
-    } else {
-      creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.roomName)));
-    }
+    handleMineralCarrier(this, creep);
   }
 
   private createMineralHarvester(): SpawnTask | null {
-    // Don't spawn if room is visible but lacks mineral or extractor.
-    if (this.room) {
-      if (!this.mineral) return null;
-      const extractor = this.mineral.pos.lookFor(LOOK_STRUCTURES).find(s => s.structureType === STRUCTURE_EXTRACTOR);
-      if (!extractor) return null;
-    }
-    const bodyPartConstants: BodyPartConstant[] = [WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE, MOVE];
-    return new SpawnTask(
-      CreepType.MineralHarvester,
-      this.areaId,
-      bodyPartConstants,
-      this,
-      "MinHarvester-" + this.roomName
-    );
+    return createMineralHarvester(this);
   }
 
   private createMineralCarrier(): SpawnTask {
-    const segments = Math.min(12, Math.floor(this.baseRoom.energyCapacityAvailable / 100));
-    const bodyPartConstants: BodyPartConstant[] = [];
-    for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
-    for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
-    return new SpawnTask(CreepType.MineralCarrier, this.areaId, bodyPartConstants, this, "MinCarrier-" + this.roomName);
+    return createMineralCarrier(this);
   }
 
-  private handleClaimer(creep: CreepBase) {
-    if (creep.pos.roomName !== this.roomName) {
-      creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.roomName)));
-    } else if (this.controller) {
-      if (this.remoteMode === RemoteRoomMode.Claim) {
-        creep.addTask(new CreepTask(Activity.Claim, this.controller.pos));
-      } else if (this.remoteMode === RemoteRoomMode.ReserveAttack) {
-        if (this.controller.owner && this.controller.owner.username !== Helper.getUserName()) {
-          creep.addTask(new CreepTask(Activity.AttackController, this.controller.pos)); // Attack the controller if it's owned by someone else
-        } else {
-          creep.addTask(new CreepTask(Activity.Claim, this.controller.pos)); // Claim the controller if it's unowned or reserved by us
-        }
-      } else {
-        creep.addTask(new CreepTask(Activity.Reserve, this.controller.pos));
-      }
-    }
+  public handleClaimer(creep: CreepBase) {
+    handleClaimer(this, creep);
   }
 
-  private shouldSpawnClaimer(): boolean {
-    if (!this.controller) {
-      return true;
-    }
-
-    if (this.remoteMode === RemoteRoomMode.Claim) {
-      return !this.controller.my;
-    }
-
-    if (this.remoteMode === RemoteRoomMode.ReserveAttack) {
-      return Boolean(
-        (this.controller.owner && this.controller.owner.username !== Helper.getUserName()) ||
-          (this.controller.reservation && this.controller.reservation.username !== Helper.getUserName())
-      );
-    }
-
-    return (
-      !this.controller.reservation ||
-      this.controller.reservation.username !== Helper.getUserName() ||
-      this.controller.reservation.ticksToEnd < 1000
-    );
+  public shouldSpawnClaimer(): boolean {
+    return shouldSpawnClaimer(this);
   }
 
-  private handleHarvester(creep: CreepBase) {
-    if (!creep.isFree()) return;
-
-    // Look up or assign the source for this creep using per-source memory
-    let targetSource = this.getSourceForCreep(creep.name);
-    if (!targetSource) {
-      targetSource = this.findSourceWithFewestHarvesters();
-      if (!targetSource) return;
-      this.assignHarvesterToSource(creep.name, targetSource.id);
-    }
-
-    const container = GetRoomObjects.getWithinRangeContainer(targetSource.pos, 2);
-    const constructionSite = GetRoomObjects.getWithinRangeConstructionSite(targetSource.pos, 1, STRUCTURE_CONTAINER);
-
-    if (constructionSite) {
-      if (creep.isFull()) {
-        creep.addTask(new CreepTask(Activity.Construct, constructionSite.pos));
-      } else {
-        creep.addTask(new CreepTask(Activity.Harvest, targetSource.pos));
-      }
-    } else if (container) {
-      if (!Helper.isSamePosition(container.pos, creep.pos)) {
-        creep.addTask(new CreepTask(Activity.Move, container.pos));
-      } else {
-        creep.addTask(new CreepTask(Activity.HarvestAndDeposit, targetSource.pos));
-      }
-    } else {
-      creep.addTask(new CreepTask(Activity.Harvest, targetSource.pos));
-    }
+  public handleHarvester(creep: CreepBase) {
+    handleHarvester(this, creep);
   }
 
-  private handleCarrier(creep: CreepBase) {
-    if (!creep.isFree()) return;
-
-    if (creep.pos.roomName === this.baseRoom.name) {
-      // We are at the base
-      if (creep.isEmpty()) {
-        creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.roomName)));
-      } else {
-        // Find closest deposit location in base room
-        const depositLocation = this.findClosestDeposit(creep);
-        if (depositLocation) {
-          creep.addTask(new CreepTask(Activity.Deposit, depositLocation.pos));
-        }
-      }
-    } else if (creep.pos.roomName === this.roomName) {
-      // We are in the remote room
-      if (creep.isFull()) {
-        // Move to base room
-        creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.baseRoom.name)));
-      } else {
-        // Collect from resources
-        const sourceResource = this.findResourceWithEnergy(creep);
-        if (sourceResource) {
-          creep.addTask(new CreepTask(Activity.Pickup, sourceResource.pos));
-          return;
-        }
-
-        // Collect from containers
-        const sourceContainer = this.findContainerWithEnergy(creep);
-        if (sourceContainer) {
-          creep.addTask(new CreepTask(Activity.Collect, sourceContainer.pos));
-          return;
-        }
-      }
-    }
+  public handleCarrier(creep: CreepBase) {
+    handleCarrier(this, creep);
   }
 
-  private handleRepairer(creep: CreepBase) {
-    if (!creep.isFree()) return;
-
-    if (creep.isEmpty()) {
-      const energySource = this.findNearbyRemoteEnergy(creep);
-      if (energySource) {
-        if (energySource instanceof Resource) {
-          creep.addTask(new CreepTask(Activity.Pickup, energySource.pos));
-        } else {
-          creep.addTask(new CreepTask(Activity.Collect, energySource.pos));
-        }
-        return;
-      }
-
-      const fallbackSource = creep.pos.findClosestByRange(this.sources);
-      if (fallbackSource) {
-        creep.addTask(new CreepTask(Activity.Harvest, fallbackSource.pos));
-      }
-      return;
-    }
-
-    const criticalStructure = GetRoomObjects.getClosestStructureToRepairByPath(creep.pos, 0.4);
-    if (criticalStructure) {
-      creep.addTask(new CreepTask(Activity.Repair, criticalStructure.pos));
-      return;
-    }
-
-    const constructionSite = creep.pos.findClosestByRange(FIND_MY_CONSTRUCTION_SITES);
-    if (constructionSite) {
-      creep.addTask(new CreepTask(Activity.Construct, constructionSite.pos));
-      return;
-    }
-
-    const nonCriticalStructure = GetRoomObjects.getClosestStructureToRepairByPath(creep.pos, 0.7);
-    if (nonCriticalStructure) {
-      creep.addTask(new CreepTask(Activity.Repair, nonCriticalStructure.pos));
-      return;
-    }
-
-    const anyDamagedStructure = GetRoomObjects.getClosestStructureToRepairByPath(creep.pos, 0.9);
-    if (anyDamagedStructure) {
-      creep.addTask(new CreepTask(Activity.Repair, anyDamagedStructure.pos));
-      return;
-    }
-
-    const anyWallsOrRamparts = GetRoomObjects.getClosestWallRampartToRepairByPath(creep.pos);
-    if (anyWallsOrRamparts) {
-      creep.addTask(new CreepTask(Activity.Repair, anyWallsOrRamparts.pos));
-      return;
-    }
-
-    const anyDamageBearlyScrached = GetRoomObjects.getClosestStructureToRepairByPath(creep.pos, 1.0);
-    if (anyDamageBearlyScrached) {
-      creep.addTask(new CreepTask(Activity.Repair, anyDamageBearlyScrached.pos));
-      return;
-    }
+  public handleRepairer(creep: CreepBase) {
+    handleRepairer(this, creep);
   }
 
-  private getHarvestersForSource(sourceId: string): CreepBase[] {
-    const key = `RemoteArea-Harvester-${sourceId}`;
-    const creepNames: string[] = Helper.getCashedMemory(key, []);
-    const creeps: CreepBase[] = [];
-    for (let i = creepNames.length - 1; i >= 0; i--) {
-      const creep = Game.creeps[creepNames[i]];
-      if (creep && creep.hits > 0) {
-        creeps.push(new CreepBase(creep));
-      } else {
-        creepNames.splice(i, 1);
-      }
-    }
-    Helper.setCashedMemory(key, creepNames);
-    return creeps;
+  public getHarvestersForSource(sourceId: string): CreepBase[] {
+    return getHarvestersForSource(this, sourceId);
   }
 
-  private assignHarvesterToSource(creepName: string, sourceId: string): void {
-    const key = `RemoteArea-Harvester-${sourceId}`;
-    const creepNames: string[] = Helper.getCashedMemory(key, []);
-    if (!creepNames.includes(creepName)) {
-      creepNames.push(creepName);
-      Helper.setCashedMemory(key, creepNames);
-    }
+  public assignHarvesterToSource(creepName: string, sourceId: string): void {
+    assignHarvesterToSource(this, creepName, sourceId);
   }
 
-  private getSourceForCreep(creepName: string): Source | null {
-    for (const source of this.sources) {
-      const key = `RemoteArea-Harvester-${source.id}`;
-      const creepNames: string[] = Helper.getCashedMemory(key, []);
-      if (creepNames.includes(creepName)) {
-        return source;
-      }
-    }
-    return null;
+  public getSourceForCreep(creepName: string): Source | null {
+    return getSourceForCreep(this, creepName);
   }
 
-  private findSourceWithFewestHarvesters(): Source | null {
-    let minCount = Infinity;
-    let targetSource: Source | null = null;
-    for (const source of this.sources) {
-      const count = this.getHarvestersForSource(source.id).length;
-      if (count < minCount) {
-        minCount = count;
-        targetSource = source;
-      }
-    }
-    return targetSource;
+  public findSourceWithFewestHarvesters(): Source | null {
+    return findSourceWithFewestHarvesters(this);
   }
 
   private findBaseRoom(baseRoomName?: string): Room {
@@ -776,119 +582,24 @@ export default class RemoteArea extends BaseArea {
     this.containerConstructionSites = constructionSites;
   }
 
-  private shouldSpawnRepairer(): boolean {
-    if (!this.room) {
-      return false;
-    }
-
-    if (this.room.find(FIND_MY_CONSTRUCTION_SITES).length > 0) {
-      return true;
-    }
-
-    return (
-      this.room.find(FIND_STRUCTURES, {
-        filter: structure =>
-          structure.structureType !== STRUCTURE_WALL &&
-          structure.structureType !== STRUCTURE_RAMPART &&
-          structure.hits < structure.hitsMax * 0.5
-      }).length > 0
-    );
+  public shouldSpawnRepairer(): boolean {
+    return shouldSpawnRepairer(this);
   }
 
-  private findContainerWithEnergy(creep: CreepBase): StructureContainer | null {
-    let bestContainer: StructureContainer | null = null;
-    let bestDistance = Infinity;
-
-    for (const container of this.containers) {
-      if (container.store.energy > 0) {
-        const distance = creep.pos.getRangeTo(container.pos);
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          bestContainer = container;
-        }
-      }
-    }
-
-    return bestContainer;
+  public findContainerWithEnergy(creep: CreepBase): StructureContainer | null {
+    return findContainerWithEnergy(this, creep);
   }
 
-  private findResourceWithEnergy(creep: CreepBase): Resource | null {
-    let bestResource: Resource | null = null;
-    let bestDistance = Infinity;
-
-    for (const resource of this.resources) {
-      if (resource.amount > 300) {
-        const distance = creep.pos.getRangeTo(resource.pos);
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          bestResource = resource;
-        }
-      }
-    }
-
-    return bestResource;
+  public findResourceWithEnergy(creep: CreepBase): Resource | null {
+    return findResourceWithEnergy(this, creep, 150);
   }
 
-  private findNearbyRemoteEnergy(creep: CreepBase): StructureContainer | Resource | null {
-    const resource = this.findResourceWithEnergy(creep);
-    if (resource) {
-      return resource;
-    }
-
-    const container = this.findContainerWithEnergy(creep);
-    if (container) {
-      return container;
-    }
-
-    return null;
+  public findNearbyRemoteEnergy(creep: CreepBase): StructureContainer | Resource | null {
+    return findNearbyRemoteEnergy(this, creep);
   }
 
-  private findClosestDeposit(creep: CreepBase): Structure | null {
-    if (!this.baseRoom) return null;
-
-    let bestStructure: Structure | null = null;
-    let bestDistance = Infinity;
-
-    // Check links
-    const links = this.baseRoom.find(FIND_STRUCTURES, {
-      filter: structure =>
-        structure.structureType === STRUCTURE_LINK && structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0
-    }) as StructureLink[];
-
-    for (const link of links) {
-      const distance = creep.pos.getRangeTo(link.pos);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestStructure = link;
-      }
-    }
-
-    // Check storage
-    const storage = GetRoomObjects.getRoomStorage(this.baseRoom);
-    if (storage && storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-      const distance = creep.pos.getRangeTo(storage.pos);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestStructure = storage;
-      }
-    }
-
-    // TODO: Avoid depositing at the container next to mineral
-    // Check containers
-    const containers = this.baseRoom.find(FIND_STRUCTURES, {
-      filter: structure =>
-        structure.structureType === STRUCTURE_CONTAINER && structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0
-    }) as StructureContainer[];
-
-    for (const container of containers) {
-      const distance = creep.pos.getRangeTo(container.pos);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestStructure = container;
-      }
-    }
-
-    return bestStructure;
+  public findClosestDeposit(creep: CreepBase): Structure | Creep | null {
+    return findClosestDeposit(this, creep);
   }
 
   private getCreepCountByType(type: CreepType): number {
@@ -901,57 +612,20 @@ export default class RemoteArea extends BaseArea {
     return count;
   }
 
-  private createClaimer(): SpawnTask {
-    const bodyPartConstants: BodyPartConstant[] = [];
-    const segments =
-      this.remoteMode === RemoteRoomMode.Claim
-        ? 1
-        : Math.min(3, Math.floor(this.baseRoom.energyCapacityAvailable / 650));
-    for (let i = 0; i < segments; i++) bodyPartConstants.push(CLAIM);
-    for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
-
-    return new SpawnTask(CreepType.Claimer, this.areaId, bodyPartConstants, this, "RemoteClaimer-" + this.roomName);
+  public createClaimer(): SpawnTask {
+    return createClaimer(this);
   }
 
-  private createHarvester(): SpawnTask {
-    // plain=1,2  road=1,1  swamp=5,6
-    const bodyPartConstants: BodyPartConstant[] = [];
-    const segments = Math.min(5, Math.floor((this.baseRoom.energyCapacityAvailable - 50) / 150));
-    const baseControllerLevel = this.baseRoom.controller ? this.baseRoom.controller.level : 0;
-    const carryParts = this.containers.length !== this.sources.length && baseControllerLevel >= 3 ? 1 : 0; // If we don't have a container for each source, we need a carry part to build one, but only if the base room controller level is 3 or higher.
-    const moveParts = this.roadWorkDone ? segments / 2 : segments; // If we have roads, we can get away with fewer move parts.
-
-    for (let i = 0; i < segments; i++) bodyPartConstants.push(WORK);
-    for (let i = 0; i < carryParts; i++) bodyPartConstants.push(CARRY);
-    for (let i = 0; i < moveParts; i++) bodyPartConstants.push(MOVE);
-
-    return new SpawnTask(CreepType.Harvester, this.areaId, bodyPartConstants, this, "RemoteHarvester-" + this.roomName);
+  public createHarvester(): SpawnTask {
+    return createHarvester(this);
   }
 
-  private createCarrier(): SpawnTask {
-    const bodyPartConstants: BodyPartConstant[] = [];
-    let maxSegments = this.containers.length >= 2 ? 40 : 30; // For one container - 1500 Store capacity, for two or more containers - 2000 Store capacity
-    const totalEnergyInContainers = this.containers.reduce(
-      (sum, container) => sum + container.store.getUsedCapacity(RESOURCE_ENERGY),
-      0
-    );
-    maxSegments = totalEnergyInContainers < 1000 ? maxSegments / 2 : maxSegments; // If total energy in containers is less than 1000, spawn a smaller carrier to avoid wasting energy on a large carrier that can't be filled.
-    const segments = Math.min(maxSegments, Math.floor(this.baseRoom.energyCapacityAvailable / 100));
-    const moveParts = this.roadWorkDone ? segments / 2 : segments; // If we have roads, we can get away with fewer move parts.
-
-    for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
-    for (let i = 0; i < moveParts; i++) bodyPartConstants.push(MOVE);
-    return new SpawnTask(CreepType.Carrier, this.areaId, bodyPartConstants, this, "RemoteCarrier-" + this.roomName);
+  public createCarrier(): SpawnTask {
+    return createCarrier(this);
   }
 
-  private createRepairer(): SpawnTask {
-    const bodyPartConstants: BodyPartConstant[] = [];
-    const segments = Math.min(4, Math.floor(this.baseRoom.energyCapacityAvailable / 200));
-
-    for (let i = 0; i < segments; i++) bodyPartConstants.push(WORK);
-    for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
-    for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
-    return new SpawnTask(CreepType.Repairer, this.areaId, bodyPartConstants, this, "RemoteRepairer-" + this.roomName);
+  public createRepairer(): SpawnTask {
+    return createRepairer(this);
   }
 
   private suicideCreepDueToBrokenParts(creep: CreepBase): boolean {

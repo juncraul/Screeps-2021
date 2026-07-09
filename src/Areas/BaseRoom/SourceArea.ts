@@ -95,7 +95,10 @@ export default class SourceArea extends HarvestArea {
             );
           }
         } else if (this.containerNextToHarvestArea) {
-          if (!Helper.isSamePosition(this.containerNextToHarvestArea.pos, this.creeps[i].pos)) {
+          if (
+            !Helper.isSamePosition(this.containerNextToHarvestArea.pos, this.creeps[i].pos) &&
+            this.creeps.length === 1
+          ) {
             this.creeps[i].addTask(new CreepTask(Activity.Move, this.containerNextToHarvestArea.pos));
           } else {
             this.creeps[i].addTask(new CreepTask(Activity.HarvestAndDeposit, this.source.pos));
@@ -199,8 +202,11 @@ export default class SourceArea extends HarvestArea {
         GetRoomObjects.getWithinRangeExtensions(this.containerNextToHarvestArea.pos, 1).length > 0 ? 1 : 0;
       let segments = Math.floor((this.room.energyCapacityAvailable - needCarryPart * 50) / 150); // Work-100; Move-50
       segments = buildCheapestCreep ? Math.floor((this.room.energyAvailable - needCarryPart * 50) / 150) : segments;
-      if (segments < 2) {
+      if (segments < 1) {
         console.log("SourceArea, containerNextToSource: Something wrong with room capacity");
+      } else if (segments === 1) {
+        // 300 energy
+        bodyPartConstants = [WORK, MOVE];
       } else if (segments === 2) {
         // 300 energy
         bodyPartConstants = [WORK, WORK, MOVE, MOVE];
@@ -214,7 +220,7 @@ export default class SourceArea extends HarvestArea {
         // 800 energy - This is the ideal creep with 10 energy collected per tick, enough for source refresh.
         bodyPartConstants = [WORK, WORK, WORK, WORK, WORK, MOVE, MOVE, MOVE, MOVE, MOVE];
       }
-      if (needCarryPart) {
+      if (needCarryPart && segments > 0) {
         bodyPartConstants.push(CARRY); // If we have extensions next to the container, we can add a carry part to the creep to help with energy transfer.
       }
     } else if (!this.containerNextToHarvestArea && !this.linkNextToSource) {

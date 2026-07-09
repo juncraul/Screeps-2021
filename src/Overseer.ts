@@ -4,11 +4,11 @@ import UpgradeArea from "Areas/BaseRoom/UpgradeArea";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import CarryArea from "Areas/BaseRoom/CarryArea";
 import ConstructionArea from "Areas/BaseRoom/ConstructionArea";
-import { Cannon } from "Defense/Cannon";
-import { SafeMode } from "Defense/SafeMode";
+import { Cannon } from "Areas/Military/Defense/Cannon";
+import { SafeMode } from "Areas/Military/Defense/SafeMode";
 import { GetRoomObjects, RemoteRoomMode } from "Helpers/GetRoomObjects";
 import { BaseBuilder } from "BaseBuilder/BaseBuilder";
-import RemoteArea from "Areas/RemoteArea";
+import RemoteArea from "Areas//RemoteArea/RemoteArea";
 import RemoteRebuildArea from "Areas/RemoteRebuildArea";
 import UtilityArea from "Areas/BaseRoom/UtilityArea";
 import SeasonArea from "Areas/SeasonArea";
@@ -37,6 +37,7 @@ export default class Overseer implements IOverseer {
       });
       SafeMode.run(roomWithSpawn, towers);
       BaseRoomStats.drawRoomVisual(roomWithSpawn);
+      BaseBuilder.automaticFlagPlacement(roomWithSpawn);
       BaseBuilder.logicCreateConstructionSites();
     });
   }

@@ -53,6 +53,32 @@ export class Helper {
     return adjacentPositions;
   }
 
+  public static getWalkableAdjacentPositions(pos: RoomPosition, minRange = 1, maxRange = 1): RoomPosition[] {
+    const adjacentPositions: RoomPosition[] = [];
+    for (let x = -maxRange; x <= maxRange; x++) {
+      for (let y = -maxRange; y <= maxRange; y++) {
+        const range = Math.max(Math.abs(x), Math.abs(y));
+        if (range < minRange || range > maxRange) continue;
+        const adjacentPos = new RoomPosition(pos.x + x, pos.y + y, pos.roomName);
+        if (adjacentPos.x < 0 || adjacentPos.x > 49 || adjacentPos.y < 0 || adjacentPos.y > 49) continue;
+        if (adjacentPos.lookFor(LOOK_TERRAIN)[0] === "wall") continue;
+        if (
+          adjacentPos
+            .lookFor(LOOK_STRUCTURES)
+            .filter(
+              s =>
+                s.structureType !== STRUCTURE_ROAD &&
+                s.structureType !== STRUCTURE_RAMPART &&
+                s.structureType !== STRUCTURE_CONTAINER
+            ).length > 0
+        )
+          continue;
+        adjacentPositions.push(adjacentPos);
+      }
+    }
+    return adjacentPositions;
+  }
+
   public static getCreepNamesFromArea(areaType: string, roomName: string): string[] {
     const creeps: string[] = Helper.getCashedMemory(`${areaType}-${roomName}`, []);
     return creeps;

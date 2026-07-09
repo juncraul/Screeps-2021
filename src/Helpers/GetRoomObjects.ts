@@ -438,7 +438,7 @@ export class GetRoomObjects {
     for (let i = 0.00001; i < 1 && !structure; i *= 2) {
       structure = pos.findClosestByPath(FIND_STRUCTURES, {
         filter: structure =>
-          (structure.structureType !== STRUCTURE_RAMPART &&
+          (structure.structureType === STRUCTURE_WALL &&
             structure.hits < (structure.hitsMax * i * this.getDistanceToCenterOfRoom(structure.pos)) / 2) ||
           (structure.structureType === STRUCTURE_RAMPART &&
             structure.hits < (structure.hitsMax * i * 30 * this.getDistanceToCenterOfRoom(structure.pos)) / 2) // Distance from center of room, as walls are more important the closer they are to the center of the room
@@ -522,6 +522,12 @@ export class GetRoomObjects {
   public static getXStepTowardsSpawn(pos: RoomPosition, step: number): RoomPosition {
     const spawn = GetRoomObjects.getRoomSpawns(Game.rooms[pos.roomName], true)[0];
     const result = PathFinder.search(pos, spawn.pos);
+    if (result.path.length === 0) return pos; // If no path found, return the original position
+    return result.path.length <= step ? result.path[result.path.length - 1] : result.path[step - 1];
+  }
+
+  public static getXStepTowardsTarget(pos: RoomPosition, target: RoomPosition, step: number): RoomPosition {
+    const result = PathFinder.search(pos, target);
     if (result.path.length === 0) return pos; // If no path found, return the original position
     return result.path.length <= step ? result.path[result.path.length - 1] : result.path[step - 1];
   }

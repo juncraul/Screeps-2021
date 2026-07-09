@@ -102,6 +102,20 @@ export class BaseBuilder {
     }
   }
 
+  public static automaticFlagPlacement(room: Room) {
+    if (!room.controller || room.controller.level < 2) return;
+    const buildData = this.getBaseBuildData(room.name);
+    if (buildData.plans.length > 0) return; // Don't auto-place if we already have plans
+    const spawn = GetRoomObjects.getRoomSpawns(room, true)[0];
+    if (!spawn) return; // Don't auto-place if we don't have a spawn yet
+    // Place flag
+    const flagName = "Base-Autoplaced";
+    const flagPos = new RoomPosition(spawn.pos.x, spawn.pos.y - 2, room.name);
+    if (!Game.flags[flagName]) {
+      spawn.room.createFlag(flagPos, flagName, COLOR_GREY, COLOR_YELLOW);
+    }
+  }
+
   public static logicCreateConstructionSites() {
     const autoPlaceFlags = _.filter(Game.flags, flag => {
       return flag.name === "Base" || flag.name.startsWith("Base-");
@@ -438,6 +452,7 @@ export class BaseBuilder {
     if (!planner) {
       return;
     }
+    if (controllerLevel < 4) return;
 
     const roadCoordinates = planner.buildings.road.pos;
     if (roadCoordinates.length === 0) {
@@ -725,6 +740,11 @@ export class BaseBuilder {
   }
 
   private static createExtensionsAroundSources(room: Room) {
+    if (!room.controller || room.controller.level < 3) return;
+    const currentExtensionsUnderConstruction = room.find(FIND_MY_CONSTRUCTION_SITES, {
+      filter: site => site.structureType === STRUCTURE_EXTENSION
+    });
+    if (currentExtensionsUnderConstruction.length > 0) return;
     const sources = room.find(FIND_SOURCES);
     for (const source of sources) {
       const container = GetRoomObjects.getWithinRangeContainer(source.pos, 1);
@@ -738,12 +758,12 @@ export class BaseBuilder {
       if (!roadFromContainerPos) {
         roadFromContainerPos = GetRoomObjects.getXStepTowardsSpawn(container.pos, 1);
       }
-      console.log(`Creating extensions around source at ${source.pos}. Link next to source: ${linkNextToSourcePos}, road from container: ${roadFromContainerPos}`);
 
       for (const pos of surroundingPositions) {
         if (linkNextToSourcePos && pos.isEqualTo(linkNextToSourcePos)) continue;
         if (roadFromContainerPos && pos.isEqualTo(roadFromContainerPos)) continue;
         room.createConstructionSite(pos.x, pos.y, STRUCTURE_EXTENSION);
+        return; // Create just one per tick
       }
     }
   }

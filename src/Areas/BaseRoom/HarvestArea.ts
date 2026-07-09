@@ -21,7 +21,10 @@ export default abstract class HarvestArea extends BaseArea {
     );
     this.controllerLevel = controller.level;
     this.harvestPosition = harvestPosition;
-    this.maxEmptySpaceAroundHarvestArea = Helper.getFreeAdjacentPositions(this.harvestPosition).length;
+    const sourceOrMineralPos = Game.getObjectById<Source | Mineral>(areaId)?.pos;
+    this.maxEmptySpaceAroundHarvestArea = sourceOrMineralPos
+      ? Helper.getWalkableAdjacentPositions(sourceOrMineralPos).length
+      : 1;
     this.maxWorkerCount = Math.min(this.maxEmptySpaceAroundHarvestArea, 3);
     this.containerNextToHarvestArea = GetRoomObjects.getWithinRangeContainer(harvestPosition, 2);
     this.containerConstructionSiteNextToHarvestArea = GetRoomObjects.getWithinRangeConstructionSite(
@@ -53,7 +56,7 @@ export default abstract class HarvestArea extends BaseArea {
   }
 
   protected handleSetup() {
-    if (this.controllerLevel < 2) return;
+    if (this.controllerLevel < 3) return;
     if (!this.containerNextToHarvestArea && !this.containerConstructionSiteNextToHarvestArea) {
       const potentialPositionsNextToHarvestArea = Helper.getFreeAdjacentPositions(this.harvestPosition);
       // TODO: Need to work more on this logic, in case container gets destroyed and we already have extensions, a different place might be chosen.

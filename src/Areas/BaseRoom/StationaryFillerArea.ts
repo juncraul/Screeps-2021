@@ -8,6 +8,7 @@ export default class StationaryFillerArea extends BaseArea {
   containers: StructureContainer[];
   stationaryPositions: RoomPosition[];
   maxWorkerCount: number;
+  extensionsAndSpawns: (StructureExtension | StructureSpawn)[];
 
   constructor(room: Room) {
     super(
@@ -18,11 +19,15 @@ export default class StationaryFillerArea extends BaseArea {
     );
     this.containers = this.getContainers();
     this.stationaryPositions = this.getStationaryPositions();
-    this.maxWorkerCount = this.stationaryPositions.length;
+    this.extensionsAndSpawns = this.getExtensionsAndSpawns();
+    this.maxWorkerCount = this.extensionsAndSpawns.length < 7 ? 1 : this.stationaryPositions.length;
   }
 
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
+    const roomController = GetRoomObjects.getRoomController(this.room);
+
+    if (!roomController || roomController.level < 3) return tasksForThisArea;
 
     // Only create creeps if we have a valid position
     if (this.stationaryPositions.length === 0) {
@@ -227,5 +232,16 @@ export default class StationaryFillerArea extends BaseArea {
     // Create 1xCarry 1xMove creep as specified
     const bodyPartConstants: BodyPartConstant[] = [CARRY, MOVE];
     return new SpawnTask(CreepType.StationaryFiller, this.areaId, bodyPartConstants, this);
+  }
+
+  private getExtensionsAndSpawns(): (StructureExtension | StructureSpawn)[] {
+    const extensions = this.room.find(FIND_MY_STRUCTURES, {
+      filter: structure => structure.structureType === STRUCTURE_EXTENSION
+    }) as StructureExtension[];
+    const spawns = this.room.find(FIND_MY_STRUCTURES, {
+      filter: structure => structure.structureType === STRUCTURE_SPAWN
+    }) as StructureSpawn[];
+
+    return [...extensions, ...spawns];
   }
 }

@@ -113,6 +113,9 @@ export class CreepBase {
       case Activity.Attack: // 12
         this.activityAttack();
         break;
+      case Activity.RangedAttack: // 13
+        this.activityRangedAttack();
+        break;
       case Activity.HarvestMineral: // 15
         this.activityHarvestMineral();
         break;
@@ -130,9 +133,6 @@ export class CreepBase {
         break;
       case Activity.AttackController: // 20
         this.activityAttackController();
-        break;
-      case Activity.MoveCloseBy: // 21
-        this.activityMoveCloseBy();
         break;
     }
 
@@ -225,7 +225,11 @@ export class CreepBase {
         const result = this.transfer(creep, RESOURCE_ENERGY);
         if (result === OK) {
           this.completeTask("✉️✔️");
+        } else {
+          this.completeTask("✉️✔️");
         }
+      } else {
+        this.completeTask("✉️✔️");
       }
     }
     if (this.carryCurrent === 0) {
@@ -412,6 +416,24 @@ export class CreepBase {
     }
   }
 
+  private activityRangedAttack(): void {
+    if (!this.task?.targetId) {
+      return;
+    }
+    const entityToAttack: Creep | Structure | null = Game.getObjectById(this.task.targetId as Id<Creep | Structure>);
+    if (entityToAttack) {
+      if (entityToAttack.pos.roomName !== this.room.name) {
+        this.completeTask("Enemy fled");
+        this.completeTask("Enemy fled");
+        return;
+      }
+      this.rangedAttack(entityToAttack);
+    }
+    if (!entityToAttack || entityToAttack.hits === 0) {
+      this.completeTask("Enemy dead");
+    }
+  }
+
   private activityHarvestMineral(): void {
     const mineralAtPos = CreepTask.getMineralFromTarget(this.task!.targetPlace);
     if (mineralAtPos && mineralAtPos.mineralAmount > 0) {
@@ -503,14 +525,6 @@ export class CreepBase {
     const controller: StructureController | null = CreepTask.getControllerFromTarget(this.task!.targetPlace);
     if (controller) {
       this.attackController(controller);
-    }
-  }
-
-  private activityMoveCloseBy(): void {
-    const roomPosition = CreepTask.getRoomPositionFromTarget(this.task!.targetPlace);
-    this.goTo(roomPosition, { range: 2 });
-    if (Helper.isInRange(this.pos, roomPosition, 3)) {
-      this.completeTask("👣✔️");
     }
   }
 
@@ -868,6 +882,14 @@ export class CreepBase {
     // Always move towards the target.
     this.goTo(creep.pos);
     return result;
+  }
+
+  public rangedAttack(creep: Creep | Structure) {
+    this.creep.rangedAttack(creep);
+
+    // Always move towards the target.
+    this.goTo(creep.pos);
+    return OK;
   }
 
   public dismantle(structure: Structure) {

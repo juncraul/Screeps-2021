@@ -2,6 +2,7 @@ import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "../BaseArea";
 import { CreepBase } from "CreepBase";
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
+import CreepTask, { Activity } from "Tasks/CreepTask";
 
 export const DEFENSE_FLAG_PREFIX = "Defense";
 export const DEFENSE_TEST_FLAG_PREFIX = "Defense-Test";
@@ -185,6 +186,12 @@ export default class DefenseArea extends BaseArea {
     const targetRampart = this.findBestDefenderRampart(target, creep, room);
     if (targetRampart && !this.isPosEqual(creep.pos, targetRampart.pos)) {
       this.moveThroughDefensiveRoute(creep.creep, targetRampart.pos, room);
+    } else {
+      if (creepTarget) {
+        creep.addTask(
+          new CreepTask(ranged ? Activity.RangedAttack : Activity.Attack, creepTarget.pos, null, creepTarget.id)
+        );
+      }
     }
   }
 

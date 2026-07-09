@@ -27,9 +27,10 @@ export default class CarryArea extends BaseArea {
     this.controllerLevel = controller.level;
     this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 2);
     this.spawns = GetRoomObjects.getRoomSpawns(controller.room, true);
-    this.extensions = GetRoomObjects.usesLayoutFixedExtension(controller.room)
-      ? []
-      : GetRoomObjects.getRoomExtensions(controller.room, true);
+    this.extensions =
+      GetRoomObjects.usesLayoutFixedExtension(controller.room) && this.controllerLevel > 3
+        ? []
+        : GetRoomObjects.getRoomExtensions(controller.room, true);
     this.depositToGeneralStore = this.getGeneralDeposits();
     this.depositToLimitedStore = this.getLimitedDeposits();
     this.collectFromGeneralStore = this.getGeneralStoreToCollectFrom();
@@ -75,7 +76,8 @@ export default class CarryArea extends BaseArea {
           });
           const firstDroppedResource = creep.pos.findClosestByPath(droppedResourcesNextToSources);
           if (firstDroppedResource) {
-            creep.addTask(new CreepTask(Activity.MoveCloseBy, firstDroppedResource.pos));
+            const pos = GetRoomObjects.getXStepTowardsTarget(firstDroppedResource.pos, creep.pos, 2);
+            creep.addTask(new CreepTask(Activity.Move, pos));
           }
         }
       } else {

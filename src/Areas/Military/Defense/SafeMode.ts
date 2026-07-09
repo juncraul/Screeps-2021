@@ -11,7 +11,9 @@ export class SafeMode {
     if (controller.level < 3) return; // Safe mode is not available until controller level 3
 
     const hostilePlayers = room.find(FIND_HOSTILE_CREEPS, {
-      filter: creep => creep.owner && creep.owner.username !== "Invader" && creep.owner.username !== "Source Keeper"
+      filter: creep =>
+        creep.owner &&
+        (towers.length === 0 || (creep.owner.username !== "Invader" && creep.owner.username !== "Source Keeper"))
     });
     const towerEnergy = towers.reduce((sum, tower) => sum + tower.store.getUsedCapacity(RESOURCE_ENERGY), 0);
     const towersOutOfEnergy = towers.length > 0 && towerEnergy === 0;
