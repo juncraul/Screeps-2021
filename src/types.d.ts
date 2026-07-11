@@ -11,7 +11,6 @@ interface CreepMemory {
   currentMineralType?: string | null;
   willSuicideAtTick?: number | undefined;
   sourceKeeperRecovering?: boolean;
-  lastCollectedFromExtensionOrSpawnId?: string | null;
   baseRoomCollectIntentCategory?: string;
   baseRoomSpendIntentCategory?: string;
   lastTickEnergy: number;

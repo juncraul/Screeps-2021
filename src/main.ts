@@ -38,4 +38,61 @@ export const loop = () => {
   if (Helper.getCashedMemory("IsSeason", false) && Game.cpu.bucket === 10000) {
     Game.cpu.generatePixel();
   }
+
+  executeTestFlag();
 };
+
+export function executeTestFlag() {
+  const testFlag = Game.flags.Test;
+  if (testFlag) {
+    const exitDir = Game.map.findExit(testFlag.pos.roomName, "W6N3");
+    if (exitDir === ERR_NO_PATH || exitDir === ERR_INVALID_ARGS) return;
+    const room = Game.rooms[testFlag.pos.roomName];
+    console.log(room);
+    const exits = room.find(exitDir);
+
+    const moveTarget = exits[0]; // new RoomPosition(4, 25, "W6N3");
+    const result = PathFinder.search(
+      testFlag.pos,
+      { pos: moveTarget, range: 1 }
+      // {
+      //   roomCallback: roomName => {
+      //     const room = Game.rooms[roomName];
+      //     if (!room) return false;
+
+      //     const costs = new PathFinder.CostMatrix();
+
+      //     // Avoid structures
+      //     room.find(FIND_STRUCTURES).forEach(structure => {
+      //       if (structure.structureType === STRUCTURE_ROAD) {
+      //         costs.set(structure.pos.x, structure.pos.y, 1);
+      //       } else if (
+      //         structure.structureType !== STRUCTURE_CONTAINER &&
+      //         structure.structureType !== STRUCTURE_RAMPART
+      //       ) {
+      //         costs.set(structure.pos.x, structure.pos.y, 255);
+      //       }
+      //     });
+
+      //     // Avoid creeps
+      //     room.find(FIND_CREEPS).forEach(creep => {
+      //       costs.set(creep.pos.x, creep.pos.y, 255);
+      //     });
+
+      //     return costs;
+      //   }
+      // }
+    );
+
+    // visualize path
+    Game.rooms[testFlag.pos.roomName].visual.poly(
+      result.path.filter(p => p.roomName === testFlag.pos.roomName),
+      { stroke: "#ffffff" }
+    );
+    Game.rooms[testFlag.pos.roomName].visual.text(
+      `Path length: ${result.path.length}, cost: ${result.cost}`,
+      testFlag.pos.x,
+      testFlag.pos.y - 1
+    );
+  }
+}

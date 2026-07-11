@@ -172,20 +172,7 @@ export default class RemoteArea extends BaseArea {
       return tasksForThisArea;
     }
 
-    // Handle Claimer spawning
-    const claimers = this.creeps.filter(creep => creep.creepType === CreepType.Claimer);
-    const extraClaimers =
-      this.remoteMode === RemoteRoomMode.ReserveAttack &&
-      claimers.length === 1 &&
-      claimers[0].ticksToLive &&
-      claimers[0].ticksToLive < 300
-        ? 1
-        : 0;
-    const claimerCount = this.getCreepCountByType(CreepType.Claimer);
-    if (claimerCount < this.claimersPerRoom + extraClaimers && this.shouldSpawnClaimer()) {
-      tasksForThisArea.push(this.createClaimer());
-    }
-
+    // Handle Harvester spawning
     if (
       this.sources.length > 0 &&
       this.getCreepCountByType(CreepType.Harvester) < this.harvestersPerSource * this.sources.length
@@ -208,6 +195,23 @@ export default class RemoteArea extends BaseArea {
       tasksForThisArea.push(this.createRepairer());
     }
 
+    // Handle Claimer spawning
+    const claimers = this.creeps.filter(creep => creep.creepType === CreepType.Claimer);
+    const extraClaimers =
+      this.remoteMode === RemoteRoomMode.ReserveAttack &&
+      claimers.length === 1 &&
+      claimers[0].ticksToLive &&
+      claimers[0].ticksToLive < 300
+        ? 1
+        : 0;
+    const claimerCount = this.getCreepCountByType(CreepType.Claimer);
+    if (claimerCount < this.claimersPerRoom + extraClaimers && this.shouldSpawnClaimer()) {
+      const task = this.createClaimer();
+      if (task) {
+        tasksForThisArea.push(task);
+      }
+    }
+
     return tasksForThisArea;
   }
 
@@ -216,6 +220,7 @@ export default class RemoteArea extends BaseArea {
     this.setup();
     this.handleInvaderDefenseFlag();
     this.drawLegend();
+    this.drawMapLegend();
 
     for (let i = 0; i < this.creeps.length; i++) {
       this.suicideCreepDueToBrokenParts(this.creeps[i]);
@@ -319,6 +324,40 @@ export default class RemoteArea extends BaseArea {
     visual.text("The base room is " + this.baseRoom.name, x, y, plain);
   }
 
+  private drawMapLegend(): void {
+    if (!this.room) {
+      return;
+    }
+
+    const visual = Game.map.visual;
+    const topRightStyle: MapTextStyle = { align: "right", opacity: 1, fontSize: 5, color: "#ffffff" };
+    const plain: MapTextStyle = {
+      align: "left",
+      opacity: 0.85,
+      fontSize: 3,
+      backgroundColor: "#000000",
+      color: "#eeea0f"
+    };
+    const harvesterCount = this.getCreepCountByType(CreepType.Harvester);
+    const carrierCount = this.getCreepCountByType(CreepType.Carrier);
+    const claimerCount = this.getCreepCountByType(CreepType.Claimer);
+    const repairerCount = this.getCreepCountByType(CreepType.Repairer);
+    visual.text(
+      `H/C/Cl/R: ${harvesterCount}/${carrierCount}/${claimerCount}/${repairerCount}`,
+      new RoomPosition(49, 1, this.roomName),
+      topRightStyle
+    );
+
+    const droppedResourceSummary = this.getDroppedResources();
+    const containerResourceSummary = this.getContainerResources();
+    droppedResourceSummary.forEach(([pos, amount]) => {
+      visual.text(`${amount}`, pos, plain);
+    });
+    containerResourceSummary.forEach(([pos, amount]) => {
+      visual.text(`${amount}`, pos, plain);
+    });
+  }
+
   private setup() {
     if (this.mineralOnly) {
       // In mineral mode, ensure a container exists next to the mineral deposit.
@@ -406,7 +445,7 @@ export default class RemoteArea extends BaseArea {
         structure.structureType === STRUCTURE_CONTAINER ||
         structure.structureType === STRUCTURE_STORAGE ||
         structure.structureType === STRUCTURE_LINK
-    }) as (StructureContainer | StructureStorage | StructureLink)[];
+    });
 
     const exitDirection = Game.map.findExit(this.baseRoom.name, this.roomName);
     if (exitDirection >= 0 && logisticsStructures.length > 0) {
@@ -587,7 +626,7 @@ export default class RemoteArea extends BaseArea {
   }
 
   public findContainerWithEnergy(creep: CreepBase): StructureContainer | null {
-    return findContainerWithEnergy(this, creep);
+    return findContainerWithEnergy(this, creep, 150);
   }
 
   public findResourceWithEnergy(creep: CreepBase): Resource | null {
@@ -612,7 +651,7 @@ export default class RemoteArea extends BaseArea {
     return count;
   }
 
-  public createClaimer(): SpawnTask {
+  public createClaimer(): SpawnTask | null {
     return createClaimer(this);
   }
 
@@ -628,10 +667,39 @@ export default class RemoteArea extends BaseArea {
     return createRepairer(this);
   }
 
+  private getDroppedResources(): [RoomPosition, number][] {
+    const amounts: [RoomPosition, number][] = [];
+    for (const resource of this.resources) {
+      amounts.push([resource.pos, resource.amount]);
+    }
+    return amounts;
+  }
+
+  private getContainerResources(): [RoomPosition, number][] {
+    const amounts: [RoomPosition, number][] = [];
+    for (const container of this.containers) {
+      const storedResources = Object.keys(container.store) as ResourceConstant[];
+      for (const resourceType of storedResources) {
+        const amount = container.store.getUsedCapacity(resourceType);
+        if (amount > 0) {
+          amounts.push([container.pos, amount]);
+        }
+      }
+    }
+    return amounts;
+  }
+
   private suicideCreepDueToBrokenParts(creep: CreepBase): boolean {
     if (creep.hits < creep.hitsMax / 2 && creep.willSuicideAtTick === undefined) {
       console.log(
-        `Creep ${creep.name} is critically damaged and will be suicided soon if not repaired. Current hits: ${creep.hits}/${creep.hitsMax}`
+        "Creep " +
+          creep.name +
+          " is critically damaged and will be suicided soon if not repaired. Current hits: " +
+          creep.hits +
+          "/" +
+          creep.hitsMax +
+          ". Pos " +
+          String(creep.pos)
       );
       creep.addSuicideTime(Game.time + 10); // Give it 10 ticks to get repaired
       return true;

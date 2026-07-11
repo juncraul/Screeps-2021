@@ -84,14 +84,15 @@ export default class UpgradeArea extends BaseArea {
         creep.task.taskDone = true;
       }
       if (!creep.isFree()) {
+        // We might want to interup a move activity
         continue;
       }
 
       if (this.controller.level < 3) {
         if (creep.isEmpty()) {
           if (creep.pos.getRangeTo(this.upgradePosition) > 4) {
-            const pos = GetRoomObjects.getXStepTowardsTarget(creep.pos, this.upgradePosition, 2);
-            creep.addTask(new CreepTask(Activity.Move, pos));
+            // const pos = GetRoomObjects.getXStepTowardsTarget(this.upgradePosition, creep.pos, 1);
+            creep.addTask(new CreepTask(Activity.Move, this.upgradePosition, null, null, false, 3));
           }
         } else {
           if (this.containerConstructionSiteNextToController && this.controller.ticksToDowngrade > 8000) {
@@ -128,18 +129,22 @@ export default class UpgradeArea extends BaseArea {
     }
 
     const availableUpgradeEnergy = this.getAvailableUpgradeEnergy();
+    const workBodyPartsFromCreeps = this.creeps.reduce(
+      (total, creep) => total + creep.creep.getActiveBodyparts(WORK),
+      0
+    );
+    let carryBodyPartsNeeded = 1;
 
-    if (availableUpgradeEnergy > 100000) {
-      return 5;
-    } else if (availableUpgradeEnergy >= 40000) {
-      return 4;
-    } else if (availableUpgradeEnergy >= 30000) {
-      return 3;
-    } else if (availableUpgradeEnergy >= 10000) {
-      return 2;
-    }
-
-    return 1;
+    if (availableUpgradeEnergy > 100000) carryBodyPartsNeeded = 70;
+    else if (availableUpgradeEnergy >= 40000) carryBodyPartsNeeded = 60;
+    else if (availableUpgradeEnergy >= 30000) carryBodyPartsNeeded = 50;
+    else if (availableUpgradeEnergy >= 10000) carryBodyPartsNeeded = 40;
+    else if (availableUpgradeEnergy >= 5000) carryBodyPartsNeeded = 30;
+    else if (availableUpgradeEnergy >= 2000) carryBodyPartsNeeded = 20;
+    else if (availableUpgradeEnergy >= 1000) carryBodyPartsNeeded = 10;
+    else if (availableUpgradeEnergy < 1000) carryBodyPartsNeeded = 5;
+    if (workBodyPartsFromCreeps >= carryBodyPartsNeeded) return this.creeps.length;
+    return Math.min(8, this.creeps.length + 1);
   }
 
   private getAvailableUpgradeEnergy(): number {

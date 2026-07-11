@@ -42,9 +42,9 @@ export default class ConstructionArea extends BaseArea {
           foundSomewhereToCollectFrom = true;
           continue; // This is so that not all creeps get sent to same container.
         }
-        for (let j = 0; j < this.droppedResourcesToCollectFrom.length && !foundSomewhereToCollectFrom; j++) {
-          if (this.droppedResourcesToCollectFrom[j].amount < 200) continue;
-          this.creeps[i].addTask(new CreepTask(Activity.Pickup, this.droppedResourcesToCollectFrom[j].pos));
+        const closestDroppedResource = this.creeps[i].pos.findClosestByPath(this.droppedResourcesToCollectFrom);
+        if (closestDroppedResource && closestDroppedResource.amount > 200) {
+          this.creeps[i].addTask(new CreepTask(Activity.Pickup, closestDroppedResource.pos));
           foundSomewhereToCollectFrom = true;
         }
         if (!foundSomewhereToCollectFrom && this.storage && this.storage.store.energy > 200) {
@@ -106,7 +106,30 @@ export default class ConstructionArea extends BaseArea {
     const sumOfConstructionPoint = constructions.reduce(function (accumulator, item) {
       return accumulator + item.progressTotal - item.progress;
     }, 0);
-    return Math.floor(sumOfConstructionPoint / 5000 >= 3 ? 3 : Math.ceil(sumOfConstructionPoint / 5000));
+    const availableEnergy = this.getAvailableConstructionEnergy();
+    if (sumOfConstructionPoint === 0) return 0;
+    if (Math.floor(sumOfConstructionPoint / 5000) === 1) return availableEnergy > 1000 ? 1 : 0;
+    if (Math.floor(sumOfConstructionPoint / 5000) === 2)
+      return availableEnergy > 2000 ? 2 : availableEnergy > 1000 ? 1 : 0;
+    if (Math.floor(sumOfConstructionPoint / 5000) >= 3)
+      return availableEnergy > 5000 ? 3 : availableEnergy > 2000 ? 2 : availableEnergy > 1000 ? 1 : 0;
+    return 1;
+  }
+
+  private getAvailableConstructionEnergy(): number {
+    let availableEnergy = 0;
+
+    const generalStores = this.getGeneralStoreToCollectFrom();
+    for (const structure of generalStores) {
+      availableEnergy += structure.store.getUsedCapacity(RESOURCE_ENERGY);
+    }
+
+    const storage = GetRoomObjects.getRoomStorage(this.room);
+    if (storage) {
+      availableEnergy += storage.store.getUsedCapacity(RESOURCE_ENERGY);
+    }
+
+    return availableEnergy;
   }
 
   private createCreepForThisArea(): SpawnTask {

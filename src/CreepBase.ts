@@ -240,8 +240,15 @@ export class CreepBase {
   private activityMove(): void {
     const roomPosition = CreepTask.getRoomPositionFromTarget(this.task!.targetPlace);
     this.goTo(roomPosition);
-    if (Helper.isSamePosition(this.pos, roomPosition)) {
-      this.completeTask("👣✔️");
+
+    if (this.task?.value) {
+      if (Helper.isInRange(this.pos, roomPosition, this.task.value)) {
+        this.completeTask("👣✔️");
+      }
+    } else {
+      if (Helper.isSamePosition(this.pos, roomPosition)) {
+        this.completeTask("👣✔️");
+      }
     }
   }
 
@@ -324,7 +331,9 @@ export class CreepBase {
     const controller: StructureController | null = CreepTask.getControllerFromTarget(this.task!.targetPlace);
     if (controller) {
       const result = this.claim(controller);
-      console.log(`Claiming controller in room ${controller.room.name} with creep ${this.name}, result: ${result}`);
+      console.log(
+        `Claiming controller in room ${controller.room.name} with creep ${this.name}, result: ${String(result)}`
+      );
       if (result === OK) {
         this.completeTask("Claim✔️");
       }
@@ -334,19 +343,29 @@ export class CreepBase {
   private activityMoveDifferentRoom(): void {
     const targetPos: RoomPosition = CreepTask.getRoomPositionFromTarget(this.task!.targetPlace);
     const currentRoom = this.room.name;
-    const reRouteRoom = GetRoomObjects.getReRouteRoom(targetPos.roomName, currentRoom);
+    if (targetPos.roomName === currentRoom) {
+      if (this.creep.pos.x !== 0 && this.creep.pos.x !== 49 && this.creep.pos.y !== 0 && this.creep.pos.y !== 49) {
+        this.completeTask("👣✔️");
+      } else {
+        this.goTo(targetPos);
+      }
+      return;
+    }
 
+    const reRouteRoom = GetRoomObjects.getReRouteRoom(targetPos.roomName, currentRoom);
     // If a ReRoute flag exists for this (target, from) pair, route through that room first.
-    const moveTarget =
+    let moveTarget =
       reRouteRoom && reRouteRoom !== currentRoom && reRouteRoom !== targetPos.roomName
         ? new RoomPosition(25, 25, reRouteRoom)
         : targetPos;
 
-    this.goTo(moveTarget);
+    const exitDir = Game.map.findExit(this.creep.room.name, targetPos.roomName);
+    if (exitDir === ERR_NO_PATH || exitDir === ERR_INVALID_ARGS) return;
+    const exits = this.creep.room.find(exitDir);
 
-    if (targetPos.roomName === this.room.name) {
-      this.completeTask("👣✔️");
-    }
+    moveTarget = exits[0];
+
+    this.goTo(moveTarget, { visualizePathStyle: { stroke: "#ffffff" } });
   }
 
   private activityReserve(): void {
@@ -793,7 +812,7 @@ export class CreepBase {
     Memory.remoteRoomEconomy = remoteRoomEconomy;
   }
 
-  public upgradeController(controller: StructureController): ScreepsReturnCode {
+  public upgradeController(controller: StructureController): ScreepsReturnCode | ERR_ACCESS_DENIED {
     if (Game.time % 100 === 0 && controller.sign?.username !== Helper.getUserName()) {
       const result = this.creep.signController(controller, "Upgraded by me!");
       if (result === ERR_NOT_IN_RANGE) {
@@ -819,7 +838,7 @@ export class CreepBase {
     return result;
   }
 
-  public reserve(controller: StructureController): ScreepsReturnCode {
+  public reserve(controller: StructureController): ScreepsReturnCode | ERR_ACCESS_DENIED {
     if (Game.time % 100 === 0 && controller.sign?.username !== Helper.getUserName()) {
       const result = this.creep.signController(controller, "Reserved by me, no touchy touchy!");
       if (result === ERR_NOT_IN_RANGE) {
@@ -836,7 +855,7 @@ export class CreepBase {
     return result;
   }
 
-  public claim(controller: StructureController): ScreepsReturnCode {
+  public claim(controller: StructureController): ScreepsReturnCode | ERR_ACCESS_DENIED {
     const result = this.creep.claimController(controller);
     if (result === ERR_NOT_IN_RANGE) {
       this.goTo(controller.pos);

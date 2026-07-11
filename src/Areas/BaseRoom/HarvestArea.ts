@@ -10,7 +10,6 @@ export default abstract class HarvestArea extends BaseArea {
   maxWorkerCount: number;
   containerNextToHarvestArea: StructureContainer | null;
   containerConstructionSiteNextToHarvestArea: ConstructionSite | null;
-  maxEmptySpaceAroundHarvestArea: number;
 
   constructor(memoryType: string, areaId: string, harvestPosition: RoomPosition, controller: StructureController) {
     super(
@@ -21,11 +20,7 @@ export default abstract class HarvestArea extends BaseArea {
     );
     this.controllerLevel = controller.level;
     this.harvestPosition = harvestPosition;
-    const sourceOrMineralPos = Game.getObjectById<Source | Mineral>(areaId)?.pos;
-    this.maxEmptySpaceAroundHarvestArea = sourceOrMineralPos
-      ? Helper.getWalkableAdjacentPositions(sourceOrMineralPos).length
-      : 1;
-    this.maxWorkerCount = Math.min(this.maxEmptySpaceAroundHarvestArea, 3);
+    this.maxWorkerCount = 1;
     this.containerNextToHarvestArea = GetRoomObjects.getWithinRangeContainer(harvestPosition, 2);
     this.containerConstructionSiteNextToHarvestArea = GetRoomObjects.getWithinRangeConstructionSite(
       harvestPosition,
@@ -97,11 +92,14 @@ export default abstract class HarvestArea extends BaseArea {
     const mostFreshCreep = this.creeps.reduce((prev, current) =>
       prev.ticksToLive! > current.ticksToLive! ? prev : current
     );
-    const finalStageCreep = mostFreshCreep.body.length >= 5;
+    const finalStageCreep = mostFreshCreep.getNumberOfBodyPart(WORK) >= 5;
     const isTheReplacementCreepCloseToHarvestArea = mostFreshCreep.pos.getRangeTo(this.harvestPosition) <= 2;
     for (const creep of this.creeps) {
       if (creep.id !== mostFreshCreep.id && finalStageCreep && isTheReplacementCreepCloseToHarvestArea) {
-        if (creep.willSuicideAtTick === undefined) {
+        if (
+          creep.willSuicideAtTick === undefined &&
+          (creep.ticksToLive! < 100 || creep.getNumberOfBodyPart(WORK) < 5)
+        ) {
           creep.addSuicideTime(Game.time + 3); // Give it 3 ticks before suicide
         }
       }

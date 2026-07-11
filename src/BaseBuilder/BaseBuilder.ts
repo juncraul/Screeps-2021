@@ -471,7 +471,7 @@ export class BaseBuilder {
     const containerPositions: RoomPosition[] = [];
     const containers = room.find(FIND_STRUCTURES, {
       filter: structure => structure.structureType === STRUCTURE_CONTAINER
-    }) as StructureContainer[];
+    });
     containers.forEach(container => containerPositions.push(container.pos));
 
     const containerSites = room.find(FIND_CONSTRUCTION_SITES, {
@@ -507,20 +507,21 @@ export class BaseBuilder {
   private static createWall(room: Room, previewInsteadOfBuild: boolean) {
     for (let i = 0; i < 50; i++) {
       const roomTerrain = Game.map.getRoomTerrain(room.name);
+      const buildingType = i % 3 === 0 ? STRUCTURE_RAMPART : STRUCTURE_WALL;
       if (roomTerrain.get(0, i) !== TERRAIN_MASK_WALL && roomTerrain.get(2, i) !== TERRAIN_MASK_WALL) {
-        this.createConstructionSite(room, 2, i, STRUCTURE_WALL, previewInsteadOfBuild);
+        this.createConstructionSite(room, 2, i, buildingType, previewInsteadOfBuild);
         this.createWallEdge(room, 2, i, previewInsteadOfBuild);
       }
       if (roomTerrain.get(49, i) !== TERRAIN_MASK_WALL && roomTerrain.get(47, i) !== TERRAIN_MASK_WALL) {
-        this.createConstructionSite(room, 47, i, STRUCTURE_WALL, previewInsteadOfBuild);
+        this.createConstructionSite(room, 47, i, buildingType, previewInsteadOfBuild);
         this.createWallEdge(room, 47, i, previewInsteadOfBuild);
       }
       if (roomTerrain.get(i, 0) !== TERRAIN_MASK_WALL && roomTerrain.get(i, 2) !== TERRAIN_MASK_WALL) {
-        this.createConstructionSite(room, i, 2, STRUCTURE_WALL, previewInsteadOfBuild);
+        this.createConstructionSite(room, i, 2, buildingType, previewInsteadOfBuild);
         this.createWallEdge(room, i, 2, previewInsteadOfBuild);
       }
       if (roomTerrain.get(i, 49) !== TERRAIN_MASK_WALL && roomTerrain.get(i, 47) !== TERRAIN_MASK_WALL) {
-        this.createConstructionSite(room, i, 47, STRUCTURE_WALL, previewInsteadOfBuild);
+        this.createConstructionSite(room, i, 47, buildingType, previewInsteadOfBuild);
         this.createWallEdge(room, i, 47, previewInsteadOfBuild);
       }
     }

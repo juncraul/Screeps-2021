@@ -27,7 +27,7 @@ export function handleCarrier(area: RemoteArea, creep: CreepBase): void {
         return;
       }
 
-      const sourceContainer = findContainerWithEnergy(area, creep);
+      const sourceContainer = findContainerWithEnergy(area, creep, 150);
       if (sourceContainer) {
         creep.addTask(new CreepTask(Activity.Collect, sourceContainer.pos));
         return;
@@ -58,12 +58,16 @@ export function createCarrier(area: RemoteArea): SpawnTask {
   return new SpawnTask(CreepType.Carrier, area.areaId, bodyPartConstants, area, "RemoteCarrier-" + area.roomName);
 }
 
-export function findContainerWithEnergy(area: RemoteArea, creep: CreepBase): StructureContainer | null {
+export function findContainerWithEnergy(
+  area: RemoteArea,
+  creep: CreepBase,
+  energyThreshold: number
+): StructureContainer | null {
   let bestContainer: StructureContainer | null = null;
   let bestDistance = Infinity;
 
   for (const container of area.containers) {
-    if (container.store.energy > 0) {
+    if (container.store.energy > energyThreshold) {
       const distance = creep.pos.getRangeTo(container.pos);
       if (distance < bestDistance) {
         bestDistance = distance;
@@ -75,12 +79,12 @@ export function findContainerWithEnergy(area: RemoteArea, creep: CreepBase): Str
   return bestContainer;
 }
 
-export function findResourceWithEnergy(area: RemoteArea, creep: CreepBase, energyThreashold: number): Resource | null {
+export function findResourceWithEnergy(area: RemoteArea, creep: CreepBase, energyThreshold: number): Resource | null {
   let bestResource: Resource | null = null;
   let bestDistance = Infinity;
 
   for (const resource of area.resources) {
-    if (resource.amount > energyThreashold) {
+    if (resource.amount > energyThreshold) {
       const distance = creep.pos.getRangeTo(resource.pos);
       if (distance < bestDistance) {
         bestDistance = distance;
@@ -98,7 +102,7 @@ export function findNearbyRemoteEnergy(area: RemoteArea, creep: CreepBase): Stru
     return resource;
   }
 
-  const container = findContainerWithEnergy(area, creep);
+  const container = findContainerWithEnergy(area, creep, 150);
   if (container) {
     return container;
   }
@@ -115,7 +119,7 @@ export function findClosestDeposit(area: RemoteArea, creep: CreepBase): Structur
   const links = area.baseRoom.find(FIND_STRUCTURES, {
     filter: structure =>
       structure.structureType === STRUCTURE_LINK && structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0
-  }) as StructureLink[];
+  });
 
   for (const link of links) {
     const distance = creep.pos.getRangeTo(link.pos);
@@ -137,7 +141,7 @@ export function findClosestDeposit(area: RemoteArea, creep: CreepBase): Structur
   const containers = area.baseRoom.find(FIND_STRUCTURES, {
     filter: structure =>
       structure.structureType === STRUCTURE_CONTAINER && structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0
-  }) as StructureContainer[];
+  });
 
   for (const container of containers) {
     const distance = creep.pos.getRangeTo(container.pos);

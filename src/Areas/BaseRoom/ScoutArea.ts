@@ -2,6 +2,7 @@ import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "../BaseArea";
+import { Helper } from "Helpers/Helper";
 
 interface ScoutSourceIntel {
   id: string;
@@ -131,7 +132,10 @@ export default class ScoutArea extends BaseArea {
 
     const hostileCount = room.find(FIND_HOSTILE_CREEPS).length;
     const hasController = !!controller;
-    const controllerFree = hasController && !controller.owner && !controller.reservation;
+    const controllerNeutru = !controller.owner && !controller.reservation;
+    const controllerReservedByUs = controller.reservation === Helper.getUserName();
+    const controllerReservedByInvader = controller.reservation === "Invader";
+    const controllerFree = hasController && (controllerNeutru || controllerReservedByUs || controllerReservedByInvader);
     const claimable = hostileCount === 0 && hasController && controllerFree && sources.length > 0;
 
     return {
@@ -149,12 +153,12 @@ export default class ScoutArea extends BaseArea {
     const flagName = this.getManagedFlagName(room.name);
     const existingFlag = Game.flags[flagName];
 
-    if (!intel.claimable) {
-      if (existingFlag) {
-        existingFlag.remove();
-      }
-      return;
-    }
+    // if (!intel.claimable) {
+    //   if (existingFlag) {
+    //     existingFlag.remove();
+    //   }
+    //   return;
+    // }
 
     if (existingFlag || !intel.controller) {
       return;
@@ -165,7 +169,11 @@ export default class ScoutArea extends BaseArea {
   }
 
   private hasHostiles(room: Room): boolean {
-    return room.find(FIND_HOSTILE_CREEPS).length > 0;
+    return (
+      room
+        .find(FIND_HOSTILE_CREEPS)
+        .filter(creep => creep.getActiveBodyparts(ATTACK) > 0 || creep.getActiveBodyparts(RANGED_ATTACK) > 0).length > 0
+    );
   }
 
   private getScoutRoomNames(): string[] {

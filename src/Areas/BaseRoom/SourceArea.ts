@@ -23,6 +23,19 @@ export default class SourceArea extends HarvestArea {
     );
     this.linkNextToSource = GetRoomObjects.getWithinRangeLink(source.pos, 2);
     this.linkForStorage = this.populateLinkStorage();
+    this.maxWorkerCount = this.calculateMaxWorkerCount();
+  }
+
+  private calculateMaxWorkerCount(): number {
+    const sourcePos = Game.getObjectById<Source>(this.areaId)?.pos;
+    const maxEmptySpaceAroundHarvestArea = sourcePos ? Helper.getWalkableAdjacentPositions(sourcePos).length : 1;
+    const creeps = this.creeps.filter(creep => (creep.ticksToLive ?? 0) > 200);
+    const workBodyPartsFromCreeps = creeps.reduce((total, creep) => total + creep.creep.getActiveBodyparts(WORK), 0);
+    const areWeAtMaxHarvestPower = workBodyPartsFromCreeps >= 5;
+    if (areWeAtMaxHarvestPower) {
+      return creeps.length;
+    }
+    return Math.min(maxEmptySpaceAroundHarvestArea, 3);
   }
 
   public handleThisArea() {
@@ -68,46 +81,50 @@ export default class SourceArea extends HarvestArea {
 
   protected handleCreeps() {
     for (let i = 0; i < this.creeps.length; i++) {
-      if (!this.creeps[i].isFree()) continue;
+      const creep = this.creeps[i];
+      this.checkIfCreepCanHaveBetterPosition(creep);
 
-      if (this.creeps[i].isFull()) {
+      if (!creep.isFree()) continue;
+
+      if (creep.isFull()) {
         if (this.containerConstructionSiteNextToHarvestArea) {
-          this.creeps[i].addTask(
-            new CreepTask(Activity.Construct, this.containerConstructionSiteNextToHarvestArea.pos)
-          );
+          creep.addTask(new CreepTask(Activity.Construct, this.containerConstructionSiteNextToHarvestArea.pos));
         }
         if (this.containerNextToHarvestArea) {
           if (this.containerNextToHarvestArea.store.getFreeCapacity() > 0) {
-            this.creeps[i].addTask(new CreepTask(Activity.Deposit, this.containerNextToHarvestArea.pos));
+            creep.addTask(new CreepTask(Activity.Deposit, this.containerNextToHarvestArea.pos));
           } else {
-            this.creeps[i].addTask(new CreepTask(Activity.Drop, this.containerNextToHarvestArea.pos));
+            creep.addTask(new CreepTask(Activity.Drop, this.containerNextToHarvestArea.pos));
           }
         }
       } else {
         if (this.containerConstructionSiteNextToHarvestArea) {
-          this.creeps[i].addTask(new CreepTask(Activity.Harvest, this.source.pos));
+          creep.addTask(new CreepTask(Activity.Harvest, this.source.pos));
         } else if (this.linkNextToSource && this.containerNextToHarvestArea) {
-          if (!Helper.isSamePosition(this.containerNextToHarvestArea.pos, this.creeps[i].pos)) {
-            this.creeps[i].addTask(new CreepTask(Activity.Move, this.containerNextToHarvestArea.pos));
+          if (!Helper.isSamePosition(this.containerNextToHarvestArea.pos, creep.pos)) {
+            creep.addTask(new CreepTask(Activity.Move, this.containerNextToHarvestArea.pos));
           } else {
-            this.creeps[i].addTask(
-              new CreepTask(Activity.HarvestAndDeposit, this.source.pos, this.linkNextToSource.pos)
-            );
+            creep.addTask(new CreepTask(Activity.HarvestAndDeposit, this.source.pos, this.linkNextToSource.pos));
           }
         } else if (this.containerNextToHarvestArea) {
-          if (
-            !Helper.isSamePosition(this.containerNextToHarvestArea.pos, this.creeps[i].pos) &&
-            this.creeps.length === 1
-          ) {
-            this.creeps[i].addTask(new CreepTask(Activity.Move, this.containerNextToHarvestArea.pos));
-          } else {
-            this.creeps[i].addTask(new CreepTask(Activity.HarvestAndDeposit, this.source.pos));
+          if (!this.checkIfCreepCanHaveBetterPosition(creep)) {
+            creep.addTask(new CreepTask(Activity.HarvestAndDeposit, this.source.pos));
           }
         } else {
-          this.creeps[i].addTask(new CreepTask(Activity.Harvest, this.source.pos));
+          creep.addTask(new CreepTask(Activity.Harvest, this.source.pos));
         }
       }
     }
+  }
+
+  private checkIfCreepCanHaveBetterPosition(creep: any): boolean {
+    if (!this.containerNextToHarvestArea) return false;
+    if (Helper.isSamePosition(this.containerNextToHarvestArea.pos, creep.pos)) return false;
+
+    const creepsOnContainer = this.creeps.filter(creep => creep.pos.isEqualTo(this.containerNextToHarvestArea!.pos));
+    if (creepsOnContainer.length > 0) return false;
+    creep.addTask(new CreepTask(Activity.Move, this.containerNextToHarvestArea.pos));
+    return true;
   }
 
   private handleLinks() {

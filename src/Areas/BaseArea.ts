@@ -40,6 +40,19 @@ export default class BaseArea {
     return creeps;
   }
 
+  getTotalCollectableEnergy(): number {
+    let totalEnergy = 0;
+    const generalStore: (StructureContainer | Ruin)[] = this.getGeneralStoreToCollectFrom();
+    for (let i: number = generalStore.length - 1; i >= 0; i--) {
+      totalEnergy += generalStore[i].store.getUsedCapacity(RESOURCE_ENERGY);
+    }
+    const droppedResources: Resource[] = this.getDroppedResourcesToCollectFrom(RESOURCE_ENERGY);
+    for (let i: number = droppedResources.length - 1; i >= 0; i--) {
+      totalEnergy += droppedResources[i].amount;
+    }
+    return totalEnergy;
+  }
+
   getGeneralStoreToCollectFrom(): (StructureContainer | Ruin)[] {
     const containers: (StructureContainer | Ruin)[] = [];
     const sources: Source[] = Game.rooms[this.areaPos.roomName].find(FIND_SOURCES);

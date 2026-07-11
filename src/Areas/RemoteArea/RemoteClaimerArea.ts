@@ -46,10 +46,11 @@ export function shouldSpawnClaimer(area: RemoteArea): boolean {
   );
 }
 
-export function createClaimer(area: RemoteArea): SpawnTask {
+export function createClaimer(area: RemoteArea): SpawnTask | null {
   const bodyPartConstants: BodyPartConstant[] = [];
   const segments =
     area.remoteMode === RemoteRoomMode.Claim ? 1 : Math.min(3, Math.floor(area.baseRoom.energyCapacityAvailable / 650));
+  if (segments < 1) return null;
   for (let i = 0; i < segments; i++) bodyPartConstants.push(CLAIM);
   for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
 

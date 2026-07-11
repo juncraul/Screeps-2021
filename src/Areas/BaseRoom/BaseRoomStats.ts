@@ -106,6 +106,8 @@ export default class BaseRoomStats {
         y += 0.6;
       });
     }
+
+    this.drawResourcesInRoom(room);
   }
 
   private static getOrCreateRoomStats(roomName: string): BaseRoomEnergyStats {
@@ -215,5 +217,62 @@ export default class BaseRoomStats {
       const delta = reachedAtTick - roomStats.spawnPlacedTick!;
       return `RCL ${level}: +${delta} ticks (${reachedAtTick})`;
     });
+  }
+
+  private static drawResourcesInRoom(room: Room): void {
+    const style: TextStyle = {
+      align: "center",
+      opacity: 0.8,
+      backgroundColor: "#000000",
+      color: "#ffcc00",
+      font: "0.5 Trebuchet MS"
+    };
+    const droppedResources = room.find(FIND_DROPPED_RESOURCES);
+    for (const resource of droppedResources) {
+      // Draw a visual indicator for each dropped resource
+      if (resource.resourceType === RESOURCE_ENERGY) {
+        room.visual.text(`${resource.amount}`, resource.pos.x, resource.pos.y, style);
+      } else {
+        room.visual.text(`${resource.resourceType}: ${resource.amount}`, resource.pos.x, resource.pos.y, style);
+      }
+    }
+    const tombstones = room.find(FIND_TOMBSTONES);
+    for (const tombstone of tombstones) {
+      // Draw a visual indicator for each tombstone's resources
+      for (const resourceType in tombstone.store) {
+        const amount = tombstone.store[resourceType as ResourceConstant];
+        if (resourceType === RESOURCE_ENERGY) {
+          room.visual.text(`${amount}`, tombstone.pos.x, tombstone.pos.y, style);
+        } else {
+          room.visual.text(`${resourceType}: ${amount}`, tombstone.pos.x, tombstone.pos.y, style);
+        }
+      }
+    }
+    const ruins = room.find(FIND_RUINS);
+    for (const ruin of ruins) {
+      // Draw a visual indicator for each ruin's resources
+      for (const resourceType in ruin.store) {
+        const amount = ruin.store[resourceType as ResourceConstant];
+        if (resourceType === RESOURCE_ENERGY) {
+          room.visual.text(`${amount}`, ruin.pos.x, ruin.pos.y, style);
+        } else {
+          room.visual.text(`${resourceType}: ${amount}`, ruin.pos.x, ruin.pos.y, style);
+        }
+      }
+    }
+    const containers: StructureContainer[] = room.find(FIND_STRUCTURES, {
+      filter: s => s.structureType === STRUCTURE_CONTAINER
+    });
+    for (const container of containers) {
+      // Draw a visual indicator for each container's resources
+      for (const resourceType in container.store) {
+        const amount = container.store[resourceType as ResourceConstant];
+        if (resourceType === RESOURCE_ENERGY) {
+          room.visual.text(`${amount}`, container.pos.x, container.pos.y, style);
+        } else {
+          room.visual.text(`${resourceType}: ${amount}`, container.pos.x, container.pos.y, style);
+        }
+      }
+    }
   }
 }
