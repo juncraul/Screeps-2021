@@ -35,7 +35,7 @@ export const loop = () => {
   });
 
   // We can generate a pixel when the bucket is full
-  if (Helper.getCashedMemory("IsSeason", false) && Game.cpu.bucket === 10000) {
+  if (Helper.getCashedMemory("PersistentWorld", false) && Game.cpu.bucket === 10000) {
     Game.cpu.generatePixel();
   }
 
@@ -45,52 +45,78 @@ export const loop = () => {
 export function executeTestFlag() {
   const testFlag = Game.flags.Test;
   if (testFlag) {
-    const exitDir = Game.map.findExit(testFlag.pos.roomName, "W6N3");
+    const exitDir = Game.map.findExit(testFlag.pos.roomName, "E23N15");
     if (exitDir === ERR_NO_PATH || exitDir === ERR_INVALID_ARGS) return;
     const room = Game.rooms[testFlag.pos.roomName];
-    console.log(room);
     const exits = room.find(exitDir);
 
-    const moveTarget = exits[0]; // new RoomPosition(4, 25, "W6N3");
-    const result = PathFinder.search(
-      testFlag.pos,
-      { pos: moveTarget, range: 1 }
-      // {
-      //   roomCallback: roomName => {
-      //     const room = Game.rooms[roomName];
-      //     if (!room) return false;
+    // const moveTarget = exits[0];
+    let bestCost = Infinity;
+    let bestPath: PathFinderPath | null = null;
+    let costMatrix: CostMatrix;
+    for (const exit of exits) {
+      const result = PathFinder.search(
+        testFlag.pos,
+        { pos: exit, range: 1 },
+        {
+          plainCost: 2,
+          swampCost: 10,
+          roomCallback: roomName => {
+            const room = Game.rooms[roomName];
+            if (!room) return false;
 
-      //     const costs = new PathFinder.CostMatrix();
+            const costs = new PathFinder.CostMatrix();
 
-      //     // Avoid structures
-      //     room.find(FIND_STRUCTURES).forEach(structure => {
-      //       if (structure.structureType === STRUCTURE_ROAD) {
-      //         costs.set(structure.pos.x, structure.pos.y, 1);
-      //       } else if (
-      //         structure.structureType !== STRUCTURE_CONTAINER &&
-      //         structure.structureType !== STRUCTURE_RAMPART
-      //       ) {
-      //         costs.set(structure.pos.x, structure.pos.y, 255);
-      //       }
-      //     });
+            // Avoid structures
+            room.find(FIND_STRUCTURES).forEach(structure => {
+              if (structure.structureType === STRUCTURE_ROAD) {
+                costs.set(structure.pos.x, structure.pos.y, 1);
+              } else if (
+                structure.structureType !== STRUCTURE_CONTAINER &&
+                structure.structureType !== STRUCTURE_RAMPART
+              ) {
+                costs.set(structure.pos.x, structure.pos.y, 255);
+              }
+            });
 
-      //     // Avoid creeps
-      //     room.find(FIND_CREEPS).forEach(creep => {
-      //       costs.set(creep.pos.x, creep.pos.y, 255);
-      //     });
+            // Avoid creeps
+            room.find(FIND_CREEPS).forEach(creep => {
+              costs.set(creep.pos.x, creep.pos.y, 255);
+            });
 
-      //     return costs;
-      //   }
-      // }
-    );
+            costMatrix = costs;
+
+            return costs;
+          }
+        }
+      );
+      if (result.cost < bestCost) {
+        bestCost = result.cost;
+        bestPath = result;
+      }
+    }
+
+    for (let i = 0; i < 50; i++) {
+      for (let j = 0; j < 50; j++) {
+        if (costMatrix!) {
+          const cost = costMatrix!.get(i, j);
+          room.visual.text(cost.toString(), i, j, { font: 0.5, color: "#ff0000" });
+        }
+      }
+    }
+
+    if (!bestPath) {
+      console.log("No path found");
+      return;
+    }
 
     // visualize path
     Game.rooms[testFlag.pos.roomName].visual.poly(
-      result.path.filter(p => p.roomName === testFlag.pos.roomName),
+      bestPath.path.filter(p => p.roomName === testFlag.pos.roomName),
       { stroke: "#ffffff" }
     );
     Game.rooms[testFlag.pos.roomName].visual.text(
-      `Path length: ${result.path.length}, cost: ${result.cost}`,
+      `Path length: ${bestPath.path.length}, cost: ${bestPath.cost}`,
       testFlag.pos.x,
       testFlag.pos.y - 1
     );

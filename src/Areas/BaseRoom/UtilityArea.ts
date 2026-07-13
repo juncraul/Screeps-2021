@@ -19,6 +19,10 @@ export default class UtilityArea extends BaseArea {
     this.labs = GetRoomObjects.getRoomLabs(storage.room);
   }
 
+  public handleThisArea() {
+    this.handleCreeps();
+  }
+
   public handleSpawnTasks(): SpawnTask[] {
     if (GetRoomObjects.usesLayoutFixedExtension(this.room)) return []; // We don't need utility if we have stationary fillers, they will handle the energy transfer.
 
@@ -35,24 +39,24 @@ export default class UtilityArea extends BaseArea {
     return tasksForThisArea;
   }
 
-  public handleThisArea() {
-    for (let i = 0; i < this.creeps.length; i++) {
-      if (!this.creeps[i].isFree()) continue;
+  private handleCreeps() {
+    for (const creep of this.creeps) {
+      if (!creep.isFree()) continue;
 
-      if (this.creeps[i].isEmpty()) {
+      if (creep.isEmpty()) {
         if (this.link && this.link.store.energy > 100) {
-          this.creeps[i].addTask(new CreepTask(Activity.Collect, this.link.pos));
+          creep.addTask(new CreepTask(Activity.Collect, this.link.pos));
         } else {
           if (this.storage) {
-            this.creeps[i].addTask(new CreepTask(Activity.Collect, this.storage.pos));
+            creep.addTask(new CreepTask(Activity.Collect, this.storage.pos));
           }
         }
       } else {
-        const structureToDeposit = this.getWhereToDeposit(this.creeps[i].pos);
+        const structureToDeposit = this.getWhereToDeposit(creep.pos);
         if (structureToDeposit) {
-          this.creeps[i].addTask(new CreepTask(Activity.Deposit, structureToDeposit.pos));
+          creep.addTask(new CreepTask(Activity.Deposit, structureToDeposit.pos));
         } else if (this.storage) {
-          this.creeps[i].addTask(new CreepTask(Activity.Deposit, this.storage.pos));
+          creep.addTask(new CreepTask(Activity.Deposit, this.storage.pos));
         }
       }
     }
@@ -61,15 +65,15 @@ export default class UtilityArea extends BaseArea {
   private getWhereToDeposit(
     currentPosition: RoomPosition
   ): StructureSpawn | StructureExtension | StructureTower | null {
-    let extensions = this.room.find(FIND_MY_STRUCTURES, {
+    let extensions: StructureExtension[] = this.room.find(FIND_MY_STRUCTURES, {
       filter: structure => structure.structureType === STRUCTURE_EXTENSION
-    }) as StructureExtension[];
-    let spawns = this.room.find(FIND_MY_STRUCTURES, {
+    });
+    let spawns: StructureSpawn[] = this.room.find(FIND_MY_STRUCTURES, {
       filter: structure => structure.structureType === STRUCTURE_SPAWN
-    }) as StructureSpawn[];
-    const towers = this.room.find(FIND_MY_STRUCTURES, {
+    });
+    const towers: StructureTower[] = this.room.find(FIND_MY_STRUCTURES, {
       filter: structure => structure.structureType === STRUCTURE_TOWER && structure.energy < 950
-    }) as StructureTower[];
+    });
 
     if (towers.find(tower => tower.energy < 50)) {
       // If any tower is below 50 energy, prioritize it over extensions and spawns

@@ -43,6 +43,17 @@ export default class MarketArea extends BaseArea {
     this.cachedContext = null;
   }
 
+  public handleThisArea() {
+    const context = this.getMarketContext();
+
+    const needsWork = context.flagsNeedingTransfer.length > 0 || context.needsTerminalBuffer;
+    if (!needsWork) {
+      return;
+    }
+
+    this.handleCreeps();
+  }
+
   public handleSpawnTasks(): SpawnTask[] {
     const context = this.getMarketContext();
     const tasksForThisArea: SpawnTask[] = [];
@@ -56,21 +67,12 @@ export default class MarketArea extends BaseArea {
     return tasksForThisArea;
   }
 
-  public handleThisArea() {
-    const context = this.getMarketContext();
-    if (!this.terminal) {
-      return;
-    }
+  private handleCreeps() {
+    if (!this.terminal) return;
 
-    const needsWork = context.flagsNeedingTransfer.length > 0 || context.needsTerminalBuffer;
-    if (!needsWork) {
-      return;
-    }
+    for (const creep of this.creeps) {
+      if (!creep.isFree()) continue;
 
-    for (let i = 0; i < this.creeps.length; i++) {
-      if (!this.creeps[i].isFree()) continue;
-
-      const creep = this.creeps[i];
       if (creep.isEmpty()) {
         if (this.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
           creep.withdraw(this.storage, RESOURCE_ENERGY);

@@ -1,5 +1,5 @@
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
-import { DEFENSE_TEST_FLAG_PREFIX } from "Areas/Military/DefenseArea";
+import { DEFENSE_TEST_FLAG_PREFIX } from "Areas/Military/Defense/DefenseArea";
 
 export class SafeMode {
   public static run(room: Room, towers: StructureTower[]): void {

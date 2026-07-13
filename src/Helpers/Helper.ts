@@ -229,4 +229,72 @@ export class Helper {
 
     return { searchPath: search.path, incomplete: false, remainingRoadsToBuild };
   }
+
+  public static findClosestMatching(
+    startPos: RoomPosition,
+    maxRange: number | null,
+    callback: (pos: RoomPosition) => boolean
+  ): RoomPosition | null {
+    if (maxRange === null) {
+      maxRange = 50;
+    }
+    for (let range = 1; range <= maxRange; range++) {
+      for (let dx = -range; dx <= range; dx++) {
+        for (let dy = -range; dy <= range; dy++) {
+          // Only positions on the edge of the square
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== range) continue;
+
+          const x = startPos.x + dx;
+          const y = startPos.y + dy;
+
+          if (x < 0 || x > 49 || y < 0 || y > 49) continue;
+
+          const pos = new RoomPosition(x, y, startPos.roomName);
+
+          if (callback(pos)) {
+            return pos;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  public static positionIsWalkable(pos: RoomPosition): boolean {
+    const room = Game.rooms[pos.roomName];
+    if (!room) {
+      return false;
+    }
+    const terrain = room.getTerrain().get(pos.x, pos.y);
+    if (terrain === TERRAIN_MASK_WALL) {
+      return false;
+    }
+    const structures = pos.lookFor(LOOK_STRUCTURES);
+    if (
+      structures.some(
+        structure =>
+          structure.structureType !== STRUCTURE_ROAD &&
+          structure.structureType !== STRUCTURE_CONTAINER &&
+          structure.structureType !== STRUCTURE_RAMPART
+      )
+    ) {
+      return false;
+    }
+    const constructionSites = pos.lookFor(LOOK_CONSTRUCTION_SITES);
+    if (
+      constructionSites.some(
+        site =>
+          site.structureType !== STRUCTURE_ROAD &&
+          site.structureType !== STRUCTURE_CONTAINER &&
+          site.structureType !== STRUCTURE_RAMPART
+      )
+    ) {
+      return false;
+    }
+    const creeps = pos.lookFor(LOOK_CREEPS);
+    if (creeps.length > 0) {
+      return false;
+    }
+    return true;
+  }
 }

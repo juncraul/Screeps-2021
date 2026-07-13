@@ -26,18 +26,6 @@ export default class SourceArea extends HarvestArea {
     this.maxWorkerCount = this.calculateMaxWorkerCount();
   }
 
-  private calculateMaxWorkerCount(): number {
-    const sourcePos = Game.getObjectById<Source>(this.areaId)?.pos;
-    const maxEmptySpaceAroundHarvestArea = sourcePos ? Helper.getWalkableAdjacentPositions(sourcePos).length : 1;
-    const creeps = this.creeps.filter(creep => (creep.ticksToLive ?? 0) > 200);
-    const workBodyPartsFromCreeps = creeps.reduce((total, creep) => total + creep.creep.getActiveBodyparts(WORK), 0);
-    const areWeAtMaxHarvestPower = workBodyPartsFromCreeps >= 5;
-    if (areWeAtMaxHarvestPower) {
-      return creeps.length;
-    }
-    return Math.min(maxEmptySpaceAroundHarvestArea, 3);
-  }
-
   public handleThisArea() {
     super.handleThisArea();
     this.handleLinks();
@@ -80,8 +68,7 @@ export default class SourceArea extends HarvestArea {
   }
 
   protected handleCreeps() {
-    for (let i = 0; i < this.creeps.length; i++) {
-      const creep = this.creeps[i];
+    for (const creep of this.creeps) {
       this.checkIfCreepCanHaveBetterPosition(creep);
 
       if (!creep.isFree()) continue;
@@ -204,6 +191,22 @@ export default class SourceArea extends HarvestArea {
     return null;
   }
 
+  private calculateMaxWorkerCount(): number {
+    const sourcePos = Game.getObjectById<Source>(this.areaId)?.pos;
+    const maxEmptySpaceAroundHarvestArea = sourcePos ? Helper.getWalkableAdjacentPositions(sourcePos).length : 1;
+    const creeps = this.creeps.filter(creep => (creep.ticksToLive ?? 0) > 200);
+    const workBodyPartsFromCreeps = creeps.reduce((total, creep) => total + creep.creep.getActiveBodyparts(WORK), 0);
+    const areWeAtMaxHarvestPower = workBodyPartsFromCreeps >= 5;
+    if (areWeAtMaxHarvestPower) {
+      return creeps.length;
+    }
+    return Math.min(maxEmptySpaceAroundHarvestArea, 3);
+  }
+
+  protected doWeNeedToReplaceWeakCreep(): boolean {
+    return super.doWeNeedToReplaceWeakCreep();
+  }
+
   protected createCreepForThisArea(): SpawnTask | null {
     let bodyPartConstants: BodyPartConstant[] = [];
     const buildCheapestCreep = this.creeps.length === 0 || !this.hasCarryCreepsInRoom(); // We might get in a deadend where resources will never be more available.
@@ -243,10 +246,10 @@ export default class SourceArea extends HarvestArea {
     } else if (!this.containerNextToHarvestArea && !this.linkNextToSource) {
       let segments = Math.floor(this.room.energyCapacityAvailable / 150); // Work-100; Move-50
       segments = buildCheapestCreep ? Math.floor(this.room.energyAvailable / 150) : segments;
-      const carriesInRoom = Helper.getCashedMemory(`CarryArea-${this.room.name}`, []);
-      if (carriesInRoom.length === 0) {
-        segments = 1; // We should create the cheapest creep as the next one will be a carry.
-      }
+      // const carriesInRoom = Helper.getCashedMemory(`CarryArea-${this.room.name}`, []);
+      // if (carriesInRoom.length === 0) {
+      //   segments = 1; // We should create the cheapest creep as the next one will be a carry.
+      // }
       if (segments < 1) {
         console.log("SourceArea, containerNextToSource: Something wrong with room capacity");
       } else if (segments === 1) {
@@ -283,9 +286,5 @@ export default class SourceArea extends HarvestArea {
       }
     }
     return new SpawnTask(CreepType.Harvester, this.source.id, bodyPartConstants, this);
-  }
-
-  protected doWeNeedToReplaceWeakCreep(): boolean {
-    return super.doWeNeedToReplaceWeakCreep();
   }
 }

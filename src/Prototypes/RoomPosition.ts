@@ -1,5 +1,6 @@
 let lastSitePlacedFullTick: number | undefined;
 
+// eslint-disable-next-line @typescript-eslint/unbound-method
 const originalCreateConstructionSite = RoomPosition.prototype.createConstructionSite;
 
 RoomPosition.prototype.createConstructionSite = function (

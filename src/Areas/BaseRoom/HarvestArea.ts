@@ -29,6 +29,12 @@ export default abstract class HarvestArea extends BaseArea {
     );
   }
 
+  public handleThisArea() {
+    this.handleSetup();
+    this.handleCreeps();
+    this.checkForSuicide();
+  }
+
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
     const allowedWorkerCount =
@@ -42,12 +48,6 @@ export default abstract class HarvestArea extends BaseArea {
     }
 
     return tasksForThisArea;
-  }
-
-  public handleThisArea() {
-    this.handleSetup();
-    this.handleCreeps();
-    this.checkForSuicide();
   }
 
   protected handleSetup() {

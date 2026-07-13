@@ -68,7 +68,7 @@ export default class BaseArea {
     const edgeContainers: StructureContainer[] = Game.rooms[this.areaPos.roomName].find(FIND_STRUCTURES, {
       filter: s =>
         s.structureType === STRUCTURE_CONTAINER && (s.pos.x < 3 || s.pos.x > 47 || s.pos.y < 3 || s.pos.y > 47)
-    }) as StructureContainer[];
+    });
     containers.push(...edgeContainers);
 
     const ruins: Ruin[] = Game.rooms[this.areaPos.roomName].find(FIND_RUINS);

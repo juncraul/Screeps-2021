@@ -331,6 +331,12 @@ export class GetRoomObjects {
     return structures.length > 0 ? (structures as StructureExtension[]) : [];
   }
 
+  public static getContainerNextToController(room: Room): StructureContainer | null {
+    const controller = room.controller;
+    if (!controller) return null;
+    return this.getWithinRangeContainer(controller.pos, 3);
+  }
+
   // --------------------------
   // Get Closest By Path Functions
   // Functions to return objects which are closest by path from position
@@ -460,7 +466,7 @@ export class GetRoomObjects {
             structure.hits < (structure.hitsMax * i * 30 * this.getDistanceToCenterOfRoom(structure.pos)) / 2) // Distance from center of room, as walls are more important the closer they are to the center of the room
       });
     }
-    console.log(JSON.stringify(structures.map(s => ({ id: s.id, hits: s.hits, hitsMax: s.hitsMax, pos: s.pos }))));
+
     // Use room visual to draw index on each structure
     for (let i = 0; i < structures.length; i++) {
       const structure = structures[i];
@@ -520,8 +526,9 @@ export class GetRoomObjects {
   }
 
   public static getXStepTowardsSpawn(pos: RoomPosition, step: number): RoomPosition {
-    const spawn = GetRoomObjects.getRoomSpawns(Game.rooms[pos.roomName], true)[0];
-    const result = PathFinder.search(pos, spawn.pos);
+    const spawns = GetRoomObjects.getRoomSpawns(Game.rooms[pos.roomName], true);
+    if (spawns.length === 0) return pos; // If no spawns found, return the original position
+    const result = PathFinder.search(pos, spawns[0].pos);
     if (result.path.length === 0) return pos; // If no path found, return the original position
     return result.path.length <= step ? result.path[result.path.length - 1] : result.path[step - 1];
   }

@@ -1,5 +1,5 @@
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
-import BaseArea from "../BaseArea";
+import BaseArea from "../../BaseArea";
 import { CreepBase } from "CreepBase";
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
@@ -230,7 +230,7 @@ export default class DefenseArea extends BaseArea {
   private findBestDefenderRampart(enemyPos: RoomPosition, creep: CreepBase, room: Room): StructureRampart | null {
     const ramparts = room.find(FIND_MY_STRUCTURES, {
       filter: s => s.structureType === STRUCTURE_RAMPART
-    }) as StructureRampart[];
+    });
 
     if (ramparts.length === 0) return null;
 
@@ -258,13 +258,13 @@ export default class DefenseArea extends BaseArea {
       return a.rampart.pos.getRangeTo(creep.pos) - b.rampart.pos.getRangeTo(creep.pos);
     });
 
-    return candidates[0].rampart;
+    return candidates[0].rampart as StructureRampart;
   }
 
   private findBestHealerRampart(defenderPos: RoomPosition, healer: CreepBase, room: Room): StructureRampart | null {
     const ramparts = room.find(FIND_MY_STRUCTURES, {
       filter: s => s.structureType === STRUCTURE_RAMPART
-    }) as StructureRampart[];
+    });
 
     if (ramparts.length === 0) return null;
 
@@ -295,7 +295,7 @@ export default class DefenseArea extends BaseArea {
       return a.rampart.pos.getRangeTo(defenderPos) - b.rampart.pos.getRangeTo(defenderPos);
     });
 
-    return ranked[0].rampart;
+    return ranked[0].rampart as StructureRampart;
   }
 
   // ─── Utility ─────────────────────────────────────────────────────────────

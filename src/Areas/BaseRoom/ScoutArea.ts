@@ -51,6 +51,12 @@ export default class ScoutArea extends BaseArea {
     this.roomIntel = this.loadIntelFromMemory();
   }
 
+  public handleThisArea(): void {
+    this.refreshIntelForVisibleRooms();
+    this.handleCreeps();
+    this.saveIntelToMemory();
+  }
+
   public handleSpawnTasks(): SpawnTask[] {
     const activeScouts = this.creeps.filter(creep => !(creep.ticksToLive !== undefined && creep.ticksToLive < 100));
     if (activeScouts.length >= 1) {
@@ -60,9 +66,7 @@ export default class ScoutArea extends BaseArea {
     return [this.createScout()];
   }
 
-  public handleThisArea(): void {
-    this.refreshIntelForVisibleRooms();
-
+  public handleCreeps(): void {
     for (const creep of this.creeps) {
       if (!creep.isFree()) {
         continue;
@@ -83,8 +87,6 @@ export default class ScoutArea extends BaseArea {
 
       creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, nextRoomName)));
     }
-
-    this.saveIntelToMemory();
   }
 
   private refreshIntelForVisibleRooms(): void {

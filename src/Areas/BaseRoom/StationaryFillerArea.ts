@@ -18,10 +18,14 @@ export default class StationaryFillerArea extends BaseArea {
       room.controller ? room.controller.pos : new RoomPosition(25, 25, room.name),
       room
     );
-    this.containers = this.getContainers();
+    this.containers = StationaryFillerArea.getContainers(room);
     this.extensionsAndSpawns = this.getExtensionsAndSpawns();
     this.stationaryPositions = this.getStationaryPositions();
     this.maxWorkerCount = this.extensionsAndSpawns.length < 7 ? 1 : this.stationaryPositions.length;
+  }
+
+  public handleThisArea() {
+    this.handleCreeps();
   }
 
   public handleSpawnTasks(): SpawnTask[] {
@@ -44,19 +48,19 @@ export default class StationaryFillerArea extends BaseArea {
     return tasksForThisArea;
   }
 
-  public handleThisArea() {
-    for (let i = 0; i < this.creeps.length; i++) {
+  private handleCreeps() {
+    for (const creep of this.creeps) {
       // Move to stationary position if not already there
       if (this.stationaryPositions.length > 0) {
-        const areWeAtAnyStationaryPosition = this.stationaryPositions.some(pos => this.creeps[i].pos.isEqualTo(pos));
+        const areWeAtAnyStationaryPosition = this.stationaryPositions.some(pos => creep.pos.isEqualTo(pos));
         if (!areWeAtAnyStationaryPosition) {
           const emptyStationaryPositions = this.stationaryPositions.filter(pos => {
-            return !this.creeps.some(creep => creep.pos.isEqualTo(pos));
+            return !this.creeps.some(c => c.pos.isEqualTo(pos));
           });
           if (emptyStationaryPositions.length > 0) {
             const targetPosition = emptyStationaryPositions[0];
-            if (!this.creeps[i].pos.isEqualTo(targetPosition)) {
-              this.creeps[i].addTask(new CreepTask(Activity.Move, targetPosition, null, null, true));
+            if (!creep.pos.isEqualTo(targetPosition)) {
+              creep.addTask(new CreepTask(Activity.Move, targetPosition, null, null, true));
               continue;
             }
           }
@@ -64,62 +68,38 @@ export default class StationaryFillerArea extends BaseArea {
       }
 
       // Handle energy collection and deposit
-      if (!this.creeps[i].isFull()) {
-        const droppedResourceUnderCreep = this.creeps[i].pos
+      if (!creep.isFull()) {
+        const droppedResourceUnderCreep = creep.pos
           .lookFor(LOOK_RESOURCES)
           .find(resource => resource.resourceType === RESOURCE_ENERGY);
         if (droppedResourceUnderCreep) {
-          this.creeps[i].addTask(new CreepTask(Activity.Pickup, droppedResourceUnderCreep.pos));
+          creep.addTask(new CreepTask(Activity.Pickup, droppedResourceUnderCreep.pos));
           continue;
         }
-        const container = this.creeps[i].pos.findInRange(this.containers, 1)[0];
+        const container = creep.pos.findInRange(this.containers, 1)[0];
         if (container && container.store.energy > 0) {
-          this.creeps[i].addTask(new CreepTask(Activity.Collect, container.pos, null, null, true));
+          creep.addTask(new CreepTask(Activity.Collect, container.pos, null, null, true));
         } else {
-          const collectableExtensions = this.getExtensionsThatWeCanCollectFrom(this.creeps[i]);
+          const collectableExtensions = this.getExtensionsThatWeCanCollectFrom(creep);
           if (collectableExtensions.length > 0) {
-            const closestExtension = this.creeps[i].pos.findInRange(collectableExtensions, 1)[0];
+            const closestExtension = creep.pos.findInRange(collectableExtensions, 1)[0];
             if (closestExtension) {
-              this.creeps[i].addTask(new CreepTask(Activity.Collect, closestExtension.pos, null, null, true));
+              creep.addTask(new CreepTask(Activity.Collect, closestExtension.pos, null, null, true));
             }
           }
         }
       } else {
-        const haveContainerNearby = this.creeps[i].pos.findInRange(this.containers, 1).length > 0;
-        const structureToDeposit = this.getNearbyExtensionOrSpawn(this.creeps[i].pos, !haveContainerNearby);
+        const haveContainerNearby = creep.pos.findInRange(this.containers, 1).length > 0;
+        const structureToDeposit = this.getNearbyExtensionOrSpawn(creep.pos, !haveContainerNearby);
         if (structureToDeposit) {
-          this.creeps[i].addTask(new CreepTask(Activity.Deposit, structureToDeposit.pos, null, null, true));
+          creep.addTask(new CreepTask(Activity.Deposit, structureToDeposit.pos, null, null, true));
         }
       }
     }
   }
 
-  public static createThisAreaForRoom(room: Room): boolean {
-    // Only create creeps if this room uses LayoutFixedExtension and we have a valid position
-    return GetRoomObjects.usesLayoutFixedExtension(room);
-  }
-
-  private getContainers(): StructureContainer[] {
-    const plans = this.getFixedExtensionBuildPlans();
-    if (plans.length === 0) return [];
-
-    const containerPositions: RoomPosition[] = [];
-    for (const plan of plans) {
-      const planStartX = plan.x - 3;
-      const planStartY = plan.y - 3;
-
-      containerPositions.push(new RoomPosition(planStartX + 3, planStartY + 1, this.room.name));
-    }
-
-    const structures = this.room.find(FIND_STRUCTURES, {
-      filter: s => s.structureType === STRUCTURE_CONTAINER && containerPositions.some(pos => s.pos.isEqualTo(pos))
-    });
-
-    return structures as StructureContainer[];
-  }
-
   private getStationaryPositions(): RoomPosition[] {
-    const plans = this.getFixedExtensionBuildPlans();
+    const plans = StationaryFillerArea.getFixedExtensionBuildPlans(this.room);
     if (plans.length === 0) return [];
 
     const stationaryPositions: RoomPosition[] = [];
@@ -155,7 +135,7 @@ export default class StationaryFillerArea extends BaseArea {
   }
 
   private getExtensionsThatWeCanCollectFrom(creep: CreepBase): StructureExtension[] {
-    const plans = this.getFixedExtensionBuildPlans();
+    const plans = StationaryFillerArea.getFixedExtensionBuildPlans(this.room);
     if (plans.length === 0) return [];
 
     const extensions = this.room.find(FIND_MY_STRUCTURES, {
@@ -197,25 +177,7 @@ export default class StationaryFillerArea extends BaseArea {
       return currentPosition.findClosestByRange(candidateStructures);
     }
 
-    if (nearbyStructures.length === 0) {
-      return null;
-    }
-
-    // Fallback: if no alternative exists, refill the original nearby target to avoid idle creeps.
-    return currentPosition.findClosestByRange(nearbyStructures);
-  }
-
-  private getFixedExtensionBuildPlans(): any[] {
-    const buildData = Helper.getCashedMemory(`Base-Build-Plans-${this.room.name}`, {
-      plans: [],
-      ramparts: []
-    });
-
-    if (!buildData || !buildData.plans || buildData.plans.length === 0) {
-      return [];
-    }
-
-    return buildData.plans.filter((plan: any) => plan.secondaryColor === COLOR_YELLOW);
+    return null;
   }
 
   private createCreepForThisArea(): SpawnTask | null {
@@ -233,5 +195,44 @@ export default class StationaryFillerArea extends BaseArea {
     });
 
     return [...extensions, ...spawns] as (StructureExtension | StructureSpawn)[];
+  }
+
+  public static createThisAreaForRoom(room: Room): boolean {
+    // Only create creeps if this room uses LayoutFixedExtension and we have a valid position
+    return GetRoomObjects.usesLayoutFixedExtension(room);
+  }
+
+  public static getContainers(room: Room): StructureContainer[] {
+    const plans = StationaryFillerArea.getFixedExtensionBuildPlans(room);
+    if (plans.length === 0) return [];
+
+    const containerPositions: RoomPosition[] = [];
+    for (const plan of plans) {
+      const planStartX = plan.x - 3;
+      const planStartY = plan.y - 3;
+
+      containerPositions.push(new RoomPosition(planStartX + 3, planStartY + 1, room.name));
+      containerPositions.push(new RoomPosition(planStartX + 1, planStartY + 3, room.name));
+      containerPositions.push(new RoomPosition(planStartX + 5, planStartY + 3, room.name));
+    }
+
+    const structures = room.find(FIND_STRUCTURES, {
+      filter: s => s.structureType === STRUCTURE_CONTAINER && containerPositions.some(pos => s.pos.isEqualTo(pos))
+    });
+
+    return structures as StructureContainer[];
+  }
+
+  public static getFixedExtensionBuildPlans(room: Room): any[] {
+    const buildData = Helper.getCashedMemory(`Base-Build-Plans-${room.name}`, {
+      plans: [],
+      ramparts: []
+    });
+
+    if (!buildData || !buildData.plans || buildData.plans.length === 0) {
+      return [];
+    }
+
+    return buildData.plans.filter((plan: any) => plan.secondaryColor === COLOR_YELLOW);
   }
 }

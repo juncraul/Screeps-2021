@@ -19,6 +19,10 @@ export default class RepairArea extends BaseArea {
     this.maxWorkerCount = this.calculateMaxWorkerCount();
   }
 
+  public handleThisArea() {
+    this.handleCreeps();
+  }
+
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
     if (this.creeps.length < this.maxWorkerCount + this.getNumberOfDyingCreeps()) {
@@ -28,26 +32,30 @@ export default class RepairArea extends BaseArea {
     return tasksForThisArea;
   }
 
-  public handleThisArea() {
-    for (let i = 0; i < this.creeps.length; i++) {
-      if (this.creeps[i].isEmpty() && this.creeps[i].isFree()) {
-        const energyTarget = this.getClosestEnergyTarget(this.creeps[i].pos);
+  private handleCreeps() {
+    for (const creep of this.creeps) {
+      if (!creep.isFree()) continue;
+      if (creep.pos.roomName !== this.room.name) {
+        creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.room.name)));
+        continue;
+      }
+
+      if (creep.isEmpty()) {
+        const energyTarget = this.getClosestEnergyTarget(creep.pos);
         if (energyTarget) {
-          this.creeps[i].addTask(new CreepTask(energyTarget.activity, energyTarget.pos));
+          creep.addTask(new CreepTask(energyTarget.activity, energyTarget.pos));
         } else {
-          const closestSource = this.creeps[i].pos.findClosestByPath(FIND_SOURCES_ACTIVE);
+          const closestSource = creep.pos.findClosestByPath(FIND_SOURCES_ACTIVE);
           if (closestSource) {
-            this.creeps[i].addTask(
-              new CreepTask(Activity.Move, GetRoomObjects.getXStepTowardsSpawn(closestSource.pos, 3))
+            creep.addTask(
+              new CreepTask(Activity.Move, GetRoomObjects.getXStepTowardsTarget(creep.pos, closestSource.pos, 3))
             );
           }
         }
-      }
-
-      if (!this.creeps[i].isEmpty() && this.creeps[i].isFree()) {
-        const structureToRepair = this.getClosestStructureToRepair(this.creeps[i].pos);
+      } else {
+        const structureToRepair = this.getClosestStructureToRepair(creep.pos);
         if (structureToRepair) {
-          this.creeps[i].addTask(new CreepTask(Activity.Repair, structureToRepair.pos));
+          creep.addTask(new CreepTask(Activity.Repair, structureToRepair.pos));
         }
       }
     }

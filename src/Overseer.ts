@@ -14,7 +14,7 @@ import UtilityArea from "Areas/BaseRoom/UtilityArea";
 import SeasonArea from "Areas/SeasonArea";
 import RepairArea from "Areas/BaseRoom/RepairArea";
 import SoldierArea from "./Areas/Military/SoldierArea";
-import DefenseArea from "./Areas/Military/DefenseArea";
+import DefenseArea from "./Areas/Military/Defense/DefenseArea";
 import LooterArea from "./Areas/Military/LooterArea";
 import SourceKeeperArea from "./Areas/Military/SourceKeeperArea";
 import StationaryFillerArea from "Areas/BaseRoom/StationaryFillerArea";
@@ -93,8 +93,8 @@ export default class Overseer implements IOverseer {
       CreepType.StationaryFiller,
       CreepType.StationaryFiller,
       CreepType.StationaryFiller,
-      CreepType.Harvester,
-      CreepType.Carrier
+      CreepType.Carrier,
+      CreepType.Harvester
     ];
     const existing: Record<number, number> = {
       [CreepType.Harvester]: harvest.existing,
@@ -182,7 +182,11 @@ export default class Overseer implements IOverseer {
     const mineralTasks: SpawnTask[] = [];
     let mineralExisting = 0;
 
-    const sources: Source[] = GetRoomObjects.getRoomSources(room);
+    const spawn: StructureSpawn | null = GetRoomObjects.getRoomSpawns(room, true)[0] ?? null;
+    let sources: Source[] = GetRoomObjects.getRoomSources(room);
+    if (spawn) {
+      sources = sources.sort((a, b) => spawn.pos.getRangeTo(a) - spawn.pos.getRangeTo(b));
+    }
     sources.forEach(source => {
       const sourceArea: SourceArea = new SourceArea(source, room.controller!);
       sourceTasks.push(...sourceArea.handleSpawnTasks());

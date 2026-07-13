@@ -19,7 +19,7 @@ export default class UpgradeArea extends BaseArea {
     super("UpgradeArea", controller.id, controller.pos, controller.room);
     this.controller = controller;
     this.controllerLevel = controller.level;
-    this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 3);
+    this.containerNextToController = GetRoomObjects.getContainerNextToController(controller.room);
     this.linkNextToController = GetRoomObjects.getWithinRangeLink(controller.pos, 2);
     this.containerConstructionSiteNextToController = GetRoomObjects.getWithinRangeConstructionSite(
       controller.pos,
@@ -35,6 +35,11 @@ export default class UpgradeArea extends BaseArea {
     this.upgradePosition = Helper.getFreeAdjacentPositions(controller.pos, 1, 1)[0];
   }
 
+  public handleThisArea() {
+    this.handleSetup();
+    this.handleCreeps();
+  }
+
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
     if (this.creeps.length < this.maxWorkerCount) {
@@ -46,13 +51,8 @@ export default class UpgradeArea extends BaseArea {
     return tasksForThisArea;
   }
 
-  public handleThisArea() {
-    this.handleSetup();
-    this.handleCreeps();
-  }
-
   private handleSetup() {
-    if (this.controllerLevel < 3 && this.creeps.length < 3) return;
+    if (this.controllerLevel < 3 && this.creeps.length < 2) return;
 
     if (!this.containerNextToController && !this.containerConstructionSiteNextToController) {
       const positionForContainer = this.getBestPositionForContainer();
@@ -76,9 +76,7 @@ export default class UpgradeArea extends BaseArea {
   }
 
   private handleCreeps() {
-    for (let i: number = this.creeps.length - 1; i >= 0; i--) {
-      const creep = this.creeps[i];
-
+    for (const creep of this.creeps) {
       // Container construction site appeared, cancel the upgrade.
       if (this.containerConstructionSiteNextToController && creep.task?.activity === Activity.Upgrade) {
         creep.task.taskDone = true;
@@ -124,9 +122,9 @@ export default class UpgradeArea extends BaseArea {
     if (this.controllerLevel === 8) {
       return 1;
     }
-    if (this.controllerLevel < 3) {
-      return 6;
-    }
+    // if (this.controllerLevel < 3) {
+    //   return 6;
+    // }
 
     const availableUpgradeEnergy = this.getAvailableUpgradeEnergy();
     const workBodyPartsFromCreeps = this.creeps.reduce(
@@ -142,7 +140,8 @@ export default class UpgradeArea extends BaseArea {
     else if (availableUpgradeEnergy >= 5000) carryBodyPartsNeeded = 30;
     else if (availableUpgradeEnergy >= 2000) carryBodyPartsNeeded = 20;
     else if (availableUpgradeEnergy >= 1000) carryBodyPartsNeeded = 10;
-    else if (availableUpgradeEnergy < 1000) carryBodyPartsNeeded = 5;
+    else if (availableUpgradeEnergy >= 500) carryBodyPartsNeeded = 7;
+    else if (availableUpgradeEnergy < 500) carryBodyPartsNeeded = 4;
     if (workBodyPartsFromCreeps >= carryBodyPartsNeeded) return this.creeps.length;
     return Math.min(8, this.creeps.length + 1);
   }

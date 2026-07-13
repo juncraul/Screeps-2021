@@ -4,6 +4,7 @@ import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "../BaseArea";
 import { CreepBase } from "CreepBase";
 import { Helper } from "Helpers/Helper";
+import StationaryFillerArea from "./StationaryFillerArea";
 
 export default class CarryArea extends BaseArea {
   controller: StructureController;
@@ -12,8 +13,7 @@ export default class CarryArea extends BaseArea {
   containerNextToController: StructureContainer | null;
   spawns: StructureSpawn[];
   extensions: StructureExtension[];
-  depositToGeneralStore: StructureContainer[];
-  depositToLimitedStore: (StructureSpawn | StructureExtension | StructureTower | StructureLink)[];
+  extensionsAndSpawns: (StructureExtension | StructureSpawn)[];
   collectFromGeneralStore: (StructureContainer | Ruin)[];
   collectFromLimitedStore: StructureLink[];
   droppedResourcesToCollectFrom: Resource[];
@@ -25,17 +25,20 @@ export default class CarryArea extends BaseArea {
     this.controller = controller;
     this.maxWorkerCount = 1;
     this.controllerLevel = controller.level;
-    this.containerNextToController = GetRoomObjects.getWithinRangeContainer(controller.pos, 2);
+    this.containerNextToController = GetRoomObjects.getContainerNextToController(controller.room);
     this.spawns = GetRoomObjects.getRoomSpawns(controller.room, true);
-    this.extensions = this.getExtensionsToFill();
-    this.depositToGeneralStore = this.getGeneralDeposits();
-    this.depositToLimitedStore = this.getLimitedDeposits();
+    this.extensions = GetRoomObjects.getRoomExtensions(this.room, true);
+    this.extensionsAndSpawns = [...this.spawns, ...this.extensions];
     this.collectFromGeneralStore = this.getGeneralStoreToCollectFrom();
     this.collectFromLimitedStore = this.getLimitedStoreToCollectFrom();
     this.droppedResourcesToCollectFrom = this.getDroppedResourcesToCollectFrom(RESOURCE_ENERGY);
     this.mineralContainer = this.getMineralContainer();
     this.storage = GetRoomObjects.getRoomStorage(controller.room);
     this.maxWorkerCount = this.calculateMaxWorkerCount();
+  }
+
+  public handleThisArea() {
+    this.handleCreeps();
   }
 
   public handleSpawnTasks(): SpawnTask[] {
@@ -52,11 +55,11 @@ export default class CarryArea extends BaseArea {
     return tasksForThisArea;
   }
 
-  public handleThisArea() {
-    for (let i = 0; i < this.creeps.length; i++) {
-      if (!this.creeps[i].isFree()) continue;
+  private handleCreeps() {
+    for (const creep of this.creeps) {
+      this.interupCurrentTaskIfNeeded(creep);
 
-      const creep = this.creeps[i];
+      if (!creep.isFree()) continue;
 
       if (creep.isEmpty()) {
         // If the creep was last carrying minerals, try to refill with minerals first.
@@ -76,6 +79,25 @@ export default class CarryArea extends BaseArea {
   }
 
   // ─── Private helpers ────────────────────────────────────────────────────────
+
+  private interupCurrentTaskIfNeeded(creep: CreepBase): void {
+    if (!creep.task) return;
+    if (creep.task.activity === Activity.Collect) {
+      const targetCollect: Structure | Tombstone | Ruin | null = CreepTask.getStructureFromTargetNoRoadNoRampart(
+        creep.task.targetPlace
+      );
+      if (
+        targetCollect instanceof StructureContainer ||
+        targetCollect instanceof Ruin ||
+        targetCollect instanceof Tombstone
+      ) {
+        // Someone else has already emptied the container, ruin, or tombstone. Cancel the task.
+        if (targetCollect.store.getUsedCapacity(RESOURCE_ENERGY) <= 20) {
+          creep.task = null;
+        }
+      }
+    }
+  }
 
   private getCarriedMineralType(creep: CreepBase): ResourceConstant | null {
     for (const resourceType in creep.store) {
@@ -194,9 +216,26 @@ export default class CarryArea extends BaseArea {
   }
 
   private findSomewhereToDeposit(creep: CreepBase): void {
-    // Check if we have an utility creep in UtilityArea
+    if (this.weHaveCreepsInUtilityArea()) {
+      if (this.storage && this.storage.store.getUsedCapacity(RESOURCE_ENERGY) < 2000) {
+        this.depositToStorage(creep);
+        return;
+      }
+
+      if (this.depositToTowers(creep)) return;
+      if (this.depositToUpgradeArea(creep)) return;
+      if (this.depositToConstructionWorkers(creep)) return;
+    } else {
+      if (this.depositToSpawningArea(creep)) return;
+      if (this.depositToTowers(creep)) return;
+      if (this.depositToUpgradeArea(creep)) return;
+      if (this.depositToConstructionWorkers(creep)) return;
+    }
+  }
+
+  private weHaveCreepsInUtilityArea(): boolean {
     const creepsInUtilityArea = Helper.getCreepNamesFromArea("UtilityArea", this.room.name);
-    if (
+    return (
       creepsInUtilityArea &&
       creepsInUtilityArea.length > 0 &&
       !(
@@ -204,18 +243,7 @@ export default class CarryArea extends BaseArea {
         Game.creeps[creepsInUtilityArea[0]] && // This might be undefined, even though creepsInUtilityArea.length is 1. Adding this extra check to prevent that. Observed after utility died.
         Game.creeps[creepsInUtilityArea[0]].spawning === true
       )
-    ) {
-      if (this.storage && this.storage.store.getUsedCapacity(RESOURCE_ENERGY) < 2000) {
-        this.depositToStorage(creep);
-        return;
-      }
-
-      if (this.depositToFirstGeneralStore(creep)) return;
-      if (this.depositToFirstLimitedStore(creep)) return;
-    } else {
-      if (this.depositToFirstLimitedStore(creep)) return;
-      if (this.depositToFirstGeneralStore(creep)) return;
-    }
+    );
   }
 
   private depositToStorage(creep: CreepBase): void {
@@ -224,34 +252,45 @@ export default class CarryArea extends BaseArea {
     }
   }
 
-  private depositToFirstLimitedStore(creep: CreepBase): boolean {
+  private depositToSpawningArea(creep: CreepBase): boolean {
     const stationaryFillers = GetRoomObjects.usesLayoutFixedExtension(this.room);
-    if (stationaryFillers) {
-      const containersNextToSpawns = GetRoomObjects.getRoomSpawns(this.room, true)
-        .map(spawn => GetRoomObjects.getWithinRangeContainers(spawn.pos, 3))
-        .flat()
-        .filter(cont => cont !== null && cont.store.getFreeCapacity(RESOURCE_ENERGY) > 500);
-      const closestContainer = creep.pos.findClosestByPath(containersNextToSpawns);
+    const containersNextToSpawns = StationaryFillerArea.getContainers(this.room);
+    // Fill containers next to spawns first if we have stationary fillers, otherwise fill extensions and spawns.
+    if (stationaryFillers && containersNextToSpawns.length > 0) {
+      const closestContainer = creep.pos.findClosestByPath(
+        containersNextToSpawns.filter(cont => cont.store.getFreeCapacity(RESOURCE_ENERGY) > 0)
+      );
       if (closestContainer) {
         creep.addTask(new CreepTask(Activity.Deposit, closestContainer.pos));
         return true;
       }
+    } else {
+      const closestExtensionOrSpawn = creep.pos.findClosestByPath(
+        this.extensionsAndSpawns.filter(structure => structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0)
+      );
+      if (closestExtensionOrSpawn) {
+        creep.addTask(new CreepTask(Activity.Deposit, closestExtensionOrSpawn.pos));
+        return true;
+      }
     }
-    const depositToLimitedStoreSorted = this.depositToLimitedStore.sort((a, b) => {
-      const aIsTower = a.structureType === STRUCTURE_TOWER;
-      const bIsTower = b.structureType === STRUCTURE_TOWER;
+    return false;
+  }
 
-      if (aIsTower && !bIsTower) return 1;
-      if (!aIsTower && bIsTower) return -1;
-
-      return a.pos.getRangeTo(creep.pos.x, creep.pos.y) - b.pos.getRangeTo(creep.pos.x, creep.pos.y);
-    });
-    for (let j = 0; j < depositToLimitedStoreSorted.length; j++) {
-      if (depositToLimitedStoreSorted[j].store.getFreeCapacity(RESOURCE_ENERGY) === 0) continue;
-      creep.addTask(new CreepTask(Activity.Deposit, depositToLimitedStoreSorted[j].pos));
-      return true;
+  private depositToTowers(creep: CreepBase): boolean {
+    const towers = GetRoomObjects.getRoomTowers(this.room).filter(
+      tower => tower.store.getFreeCapacity(RESOURCE_ENERGY) > 100
+    );
+    if (towers.length > 0) {
+      const closestTower = creep.pos.findClosestByPath(towers);
+      if (closestTower) {
+        creep.addTask(new CreepTask(Activity.Deposit, closestTower.pos));
+        return true;
+      }
     }
+    return false;
+  }
 
+  private depositToConstructionWorkers(creep: CreepBase): boolean {
     // Deposit to Construction workers.
     const constructionCreepsNames = Helper.getCreepNamesFromArea("ConstructionArea", this.room.name);
     for (let i = 0; i < constructionCreepsNames.length; i++) {
@@ -261,13 +300,18 @@ export default class CarryArea extends BaseArea {
         return true;
       }
     }
+    return false;
+  }
 
+  private depositToUpgradeArea(creep: CreepBase): boolean {
     // Deposit to creeps in UpgradeArea if we don't have a container next to the controller.
-    const containerNextToController = GetRoomObjects.getWithinRangeContainer(this.controller.pos, 2);
-    if (!containerNextToController) {
+    if (this.containerNextToController) {
+      creep.addTask(new CreepTask(Activity.Deposit, this.containerNextToController.pos));
+      return true;
+    } else {
       const upgradeCreepNames = Helper.getCreepNamesFromArea("UpgradeArea", this.controller.id);
-      for (let i = 0; i < upgradeCreepNames.length; i++) {
-        const upgradeCreep = Game.creeps[upgradeCreepNames[i]];
+      for (const upgradeCreepName of upgradeCreepNames) {
+        const upgradeCreep = Game.creeps[upgradeCreepName];
         if (upgradeCreep && upgradeCreep.store.getUsedCapacity(RESOURCE_ENERGY) < 20) {
           creep.addTask(new CreepTask(Activity.Deposit, upgradeCreep.pos));
           return true;
@@ -275,70 +319,6 @@ export default class CarryArea extends BaseArea {
       }
     }
     return false;
-  }
-
-  private depositToFirstGeneralStore(creep: CreepBase): boolean {
-    const deposit = creep.pos.findClosestByPath(
-      this.depositToGeneralStore.filter(store => store.store.getFreeCapacity(RESOURCE_ENERGY) > 500)
-    );
-    if (deposit) {
-      creep.addTask(new CreepTask(Activity.Deposit, deposit.pos));
-      return true;
-    }
-    return false;
-  }
-
-  private getGeneralDeposits(): StructureContainer[] {
-    const structures: StructureContainer[] = [];
-    if (this.containerNextToController) structures.push(this.containerNextToController);
-    const spawn = GetRoomObjects.getRoomSpawns(this.room, true)[0];
-    if (spawn) {
-      const sources = this.room.find(FIND_SOURCES);
-      const sourceContainers = sources
-        .map(source => GetRoomObjects.getWithinRangeContainer(source.pos, 2))
-        .filter(Boolean) as StructureContainer[];
-
-      const potentialContainers = GetRoomObjects.getWithinRangeContainers(spawn.pos, 4).filter(
-        container => !sourceContainers.includes(container)
-      );
-      structures.push(...potentialContainers);
-    }
-    const storage = GetRoomObjects.getRoomStorage(this.room);
-    if (storage) {
-      const potentialContainers = GetRoomObjects.getWithinRangeContainers(storage.pos, 4);
-      structures.push(...potentialContainers);
-    }
-    return structures;
-  }
-
-  private getLimitedDeposits(): (StructureSpawn | StructureExtension | StructureTower | StructureLink)[] {
-    const structures: (StructureSpawn | StructureExtension | StructureTower | StructureLink)[] = [];
-    this.extensions.forEach(extension => {
-      if (extension.store.getFreeCapacity(RESOURCE_ENERGY) > 0) structures.push(extension);
-    });
-    if (!GetRoomObjects.usesLayoutFixedExtension(this.room) && this.controllerLevel < 3) {
-      this.spawns.forEach(spawn => {
-        if (spawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) structures.push(spawn);
-      });
-    }
-    GetRoomObjects.getRoomTowers(this.room).forEach(tower => {
-      if (tower.store.getFreeCapacity(RESOURCE_ENERGY) > 200) structures.push(tower);
-    });
-    // GetRoomObjects.getRoomSources(this.room).forEach(source =>{
-    //   let potentialLink = GetRoomObjects.getWithinRangeLink(source.pos, 3);
-    //   if(potentialLink && potentialLink.store.getFreeCapacity(RESOURCE_ENERGY) !== 0)
-    //     structures.push(potentialLink)
-    // })
-    return structures;
-  }
-
-  private getExtensionsToFill(): StructureExtension[] {
-    // TODO: Ideally would be to get the data from stationary filler area and check if we have creeps in there and maybe other conditions.
-    if (GetRoomObjects.usesLayoutFixedExtension(this.room) && this.controllerLevel >= 3) {
-      return [];
-    } else {
-      return GetRoomObjects.getRoomExtensions(this.room, true);
-    }
   }
 
   private calculateMaxWorkerCount(): number {
@@ -364,6 +344,9 @@ export default class CarryArea extends BaseArea {
       // Use energyAvailable to setup the segments with 3 as a cap. A.k.a. wait till Spawn has 300 energy.
       segments = Math.floor(this.room.energyAvailable / 100) < 3 ? Math.floor(this.room.energyAvailable / 100) : 3;
     }
+    // if (this.controller.level === 1) {
+    //   if (segments > 1) segments = 1; // Don't spawn more than 1 segment if controller is level 1, because we can't fill extensions anyway.
+    // }
     if (segments < 1) {
       console.log(`Error: Trying to spawn a carrier with segments ${segments} less than 1`);
       return null;

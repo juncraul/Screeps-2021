@@ -198,10 +198,11 @@ export class BaseBuilder {
       }
     }
 
-    for (const roomName in Game.rooms) {
-      this.executeBuildPlans(roomName, this.getBaseBuildData(roomName).plans);
-      this.createExtensionsAroundSources(Game.rooms[roomName]);
-    }
+    const rooms = GetRoomObjects.getAllClaimedRooms();
+    rooms.forEach(room => {
+      this.executeBuildPlans(room.name, this.getBaseBuildData(room.name).plans);
+      this.createExtensionsAroundSources(room);
+    });
 
     const deleteStructuresFlag = Game.flags.DeleteStructures;
     if (deleteStructuresFlag) {

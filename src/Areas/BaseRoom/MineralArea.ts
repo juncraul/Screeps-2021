@@ -15,17 +15,17 @@ export default class MineralArea extends HarvestArea {
     }
   }
 
+  public handleThisArea() {
+    if (this.controllerLevel < 6) return;
+    super.handleThisArea();
+  }
+
   public handleSpawnTasks(): SpawnTask[] {
     if (this.controllerLevel < 6) return [];
     const extractor = this.mineral.pos.lookFor(LOOK_STRUCTURES).find(s => s.structureType === STRUCTURE_EXTRACTOR);
     if (!extractor) return [];
     if (!this.containerNextToHarvestArea) return [];
     return super.handleSpawnTasks();
-  }
-
-  public handleThisArea() {
-    if (this.controllerLevel < 6) return;
-    super.handleThisArea();
   }
 
   protected handleSetup() {
