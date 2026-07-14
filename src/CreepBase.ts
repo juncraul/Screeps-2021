@@ -375,7 +375,7 @@ export class CreepBase {
     for (const exit of exits) {
       const result = PathFinder.search(
         this.creep.pos,
-        { pos: exit, range: 1 },
+        { pos: exit, range: 0 },
         {
           plainCost: 2,
           swampCost: 10,

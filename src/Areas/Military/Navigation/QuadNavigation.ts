@@ -2,7 +2,7 @@ import { CreepBase } from "../../../CreepBase";
 import { Helper } from "Helpers/Helper";
 
 export default class QuadNavigation {
-  public static tryMoveAsFormation(creeps: CreepBase[], destinationFlag: RoomPosition): boolean {
+  public static tryMoveAsFormation(creeps: CreepBase[], destinationFlag: RoomPosition, flagName: string): boolean {
     if (creeps.length < 4) {
       return false;
     }
@@ -18,7 +18,7 @@ export default class QuadNavigation {
     // leader.pos.roomName === destinationFlag.roomName ? destinationFlag : new RoomPosition(25, 25, destinationFlag.roomName);
 
     if (!this.isQuadAssembled(quad)) {
-      const regroupSlots = this.findBestRegroupSlots(leader, quad);
+      const regroupSlots = this.findBestRegroupSlots(leader, quad, flagName);
       if (!regroupSlots) {
         return false;
       }
@@ -26,12 +26,17 @@ export default class QuadNavigation {
       this.regroupQuad(quad, leader.pos, regroupSlots);
       return true;
     } else {
-      Helper.setCashedMemory(`QuadNavigation-${leader.name}`, []);
+      Helper.setCashedMemory(`QuadNavigation-${flagName}`, []);
+    }
+
+    // Check if creeps have fatique
+    if (creeps.some(creep => creep.creep.fatigue > 0)) {
+      return true;
     }
 
     const direction = this.getLeaderDirectionForQuadPath(leader, destination, quad);
     if (!direction) {
-      return false;
+      return true;
     }
 
     const step = this.getStepOffset(direction);
@@ -110,7 +115,9 @@ export default class QuadNavigation {
     }
 
     for (let i = 0; i < quad.length; i++) {
-      quad[i].creep.moveTo(slots[i], { reusePath: 0, range: 0 });
+      if (!Helper.isSamePosition(quad[i].pos, slots[i])) {
+        quad[i].creep.moveTo(slots[i], { reusePath: 0, range: 0, visualizePathStyle: { stroke: "#ff0000" } });
+      }
       room.visual.text(`${i}`, slots[i].x, slots[i].y, {
         align: "center",
         opacity: 0.8,
@@ -123,24 +130,28 @@ export default class QuadNavigation {
     return slots;
   }
 
-  private static findBestRegroupSlots(leader: CreepBase, squadCreeps: CreepBase[]): RoomPosition[] | null {
+  private static findBestRegroupSlots(
+    leader: CreepBase,
+    squadCreeps: CreepBase[],
+    flagName: string
+  ): RoomPosition[] | null {
     const room = Game.rooms[leader.pos.roomName];
     if (!room) {
       return null;
     }
 
-    const memorySlots = Helper.getCashedMemory<string[]>(`QuadNavigation-${leader.name}`, []);
+    const memorySlots = Helper.getCashedMemory<string[]>(`QuadNavigation-${flagName}`, []);
     const slots = memorySlots.map(slot => {
       const [x, y, roomName] = slot.split(":");
       return new RoomPosition(parseInt(x, 10), parseInt(y, 10), roomName);
     });
 
     const positionsValid = slots.every(slot => this.isPositionEmpty(slot, squadCreeps));
-    if (slots.length !== 0 && positionsValid) {
+    if (slots.length !== 0 && positionsValid && leader.pos.roomName === slots[0].roomName) {
       return slots;
     }
 
-    const empty4SquarePosForLeader = Helper.findClosestMatching(leader.pos, 10, pos => {
+    const empty4SquarePosForLeader = Helper.findClosestMatching(leader.pos, 10, true, pos => {
       const slots = this.getSquareSlots(pos);
       if (
         !this.isPositionEmpty(slots[0], squadCreeps) ||
@@ -169,7 +180,7 @@ export default class QuadNavigation {
 
     if (squadPositions.length === 4) {
       Helper.setCashedMemory(
-        `QuadNavigation-${leader.name}`,
+        `QuadNavigation-${flagName}`,
         squadPositions.map(slot => `${slot.x}:${slot.y}:${slot.roomName}`)
       );
       return squadPositions;

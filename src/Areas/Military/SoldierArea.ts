@@ -4,6 +4,7 @@ import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./../BaseArea";
 import { CreepBase } from "../../CreepBase";
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
+import LineNaviagation from "./Navigation/LineNaviagation";
 import QuadNavigation from "./Navigation/QuadNavigation";
 
 const SQUAD_SIZE = 5;
@@ -197,9 +198,19 @@ export default class SoldierArea extends BaseArea {
     this.runHealerPassiveEffect();
     this.runDismantlerPassiveEffect();
 
-    const formationMovementApplied = QuadNavigation.tryMoveAsFormation(this.creeps, this.flag.position);
+    const combatAssigned = this.assignCombatTask(Game.flags[this.flag.name]);
+    const targetPosition = combatAssigned ? combatAssigned.pos : this.flag.position;
+    const creepsAreInRoomWithDestination =
+      this.creeps.filter(c => c.pos.roomName === this.flag.targetRoom).length === this.creeps.length;
+    const formationMovementApplied = creepsAreInRoomWithDestination
+      ? QuadNavigation.tryMoveAsFormation(this.creeps, targetPosition, this.flag.name)
+      : LineNaviagation.tryMoveAsFormation(this.creeps, targetPosition);
 
     for (const creep of this.creeps) {
+      if (formationMovementApplied) {
+        if (creep.task) creep.task.taskDone = true;
+        continue;
+      }
       if (!creep.isFree()) continue;
 
       if (creep.pos.roomName !== this.flag.targetRoom) {
@@ -208,14 +219,9 @@ export default class SoldierArea extends BaseArea {
       }
 
       if (creep.creepType === CreepType.Healer) {
-        if (!formationMovementApplied) {
-          creep.addTask(new CreepTask(Activity.Move, this.flag.position));
-        }
+        creep.addTask(new CreepTask(Activity.Move, this.flag.position));
       } else {
-        const combatAssigned = this.assignCombatTask(creep, this.flag.secondaryColor);
-        if (!combatAssigned && !formationMovementApplied) {
-          creep.addTask(new CreepTask(Activity.Move, this.flag.position));
-        }
+        creep.addTask(new CreepTask(Activity.Move, this.flag.position));
       }
     }
   }
@@ -428,23 +434,26 @@ export default class SoldierArea extends BaseArea {
     return _.filter(Game.creeps, creep => creep.my && creep.hits < creep.hitsMax);
   }
 
-  private assignCombatTask(creep: CreepBase, secondaryColor: number): boolean {
-    const room = creep.room;
-    switch (secondaryColor) {
+  private assignCombatTask(flag: Flag): Structure | Creep | null {
+    const room = flag.room;
+    if (!room) return null;
+    switch (flag.secondaryColor) {
       case SecondaryColor.RED:
-        return this.attackEverything(creep, room);
+        return this.attackEverything(flag.pos);
       case SecondaryColor.GRAY:
-        return this.attackStructures(creep, room);
+        return this.attackStructures(flag.pos);
       case SecondaryColor.BLUE:
-        return this.attackCreeps(creep, room);
+        return this.attackCreeps(flag.pos);
       case SecondaryColor.WHITE:
-        return false; // No attack, just move to flag
+        return null; // No attack, just move to flag
       default:
-        return this.attackEverything(creep, room);
+        return this.attackEverything(flag.pos);
     }
   }
 
-  private attackEverything(creep: CreepBase, room: Room): boolean {
+  private attackEverything(pos: RoomPosition): Structure | Creep | null {
+    const room = pos.roomName ? Game.rooms[pos.roomName] : null;
+    if (!room) return null;
     // We need to filter players we don't want to attack, like our allies or exceptions.
     const enemyCreeps = room
       .find(FIND_HOSTILE_CREEPS)
@@ -453,51 +462,46 @@ export default class SoldierArea extends BaseArea {
       .find(FIND_HOSTILE_STRUCTURES)
       .filter(structure => structure.owner && !EXCEPTION_PLAYER_NAMES.includes(structure.owner.username));
     if (enemyCreeps.length > 0) {
-      const target = creep.pos.findClosestByPath(enemyCreeps);
+      const target = pos.findClosestByPath(enemyCreeps);
       if (target) {
-        creep.addTask(new CreepTask(Activity.Attack, target.pos, null, target.id));
-        return true;
+        return target;
       }
     } else if (enemyStructures.length > 0) {
-      const target = this.flag.position.findClosestByPath(enemyStructures);
+      const target = pos.findClosestByPath(enemyStructures);
       if (target) {
-        creep.addTask(new CreepTask(Activity.Attack, target.pos, null, target.id));
-        return true;
+        return target;
       }
     }
-    return false;
+    return null;
   }
 
-  private attackStructures(creep: CreepBase, room: Room): boolean {
+  private attackStructures(pos: RoomPosition): Structure | null {
+    const room = pos.roomName ? Game.rooms[pos.roomName] : null;
+    if (!room) return null;
     const enemyStructures = room
       .find(FIND_HOSTILE_STRUCTURES)
       .filter(structure => structure.owner && !EXCEPTION_PLAYER_NAMES.includes(structure.owner.username));
     if (enemyStructures.length > 0) {
-      const target = this.flag.position.findClosestByPath(enemyStructures);
+      const target = pos.findClosestByPath(enemyStructures);
       if (target) {
-        const creepHasWork = creep.creep.body.some(part => part.type === WORK);
-        if (creepHasWork) {
-          creep.addTask(new CreepTask(Activity.Dismantle, target.pos, null, target.id));
-        } else {
-          creep.addTask(new CreepTask(Activity.Attack, target.pos, null, target.id));
-        }
-        return true;
+        return target;
       }
     }
-    return false;
+    return null;
   }
 
-  private attackCreeps(creep: CreepBase, room: Room): boolean {
+  private attackCreeps(pos: RoomPosition): Creep | null {
+    const room = pos.roomName ? Game.rooms[pos.roomName] : null;
+    if (!room) return null;
     const enemyCreeps = room
       .find(FIND_HOSTILE_CREEPS)
       .filter(creep => !EXCEPTION_PLAYER_NAMES.includes(creep.owner.username));
     if (enemyCreeps.length > 0) {
-      const target = creep.pos.findClosestByPath(enemyCreeps);
+      const target = pos.findClosestByPath(enemyCreeps);
       if (target) {
-        creep.addTask(new CreepTask(Activity.Attack, target.pos, null, target.id));
-        return true;
+        return target;
       }
     }
-    return false;
+    return null;
   }
 }

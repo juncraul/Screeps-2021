@@ -294,6 +294,7 @@ export default class Overseer implements IOverseer {
     baseRoomName?: string,
     mineralOnly = false
   ): SpawnTask[] {
+    if (roomName === "W6N3") console.log("handleRemoteArea", roomName);
     let tasks: SpawnTask[] = [];
     const remoteArea: RemoteArea = new RemoteArea(roomName, remoteMode, baseRoomName, mineralOnly);
     tasks = tasks.concat(remoteArea.handleSpawnTasks());
@@ -458,7 +459,7 @@ export default class Overseer implements IOverseer {
       if (spawn.spawning == null) {
         const roleName = task.getCreepTypeText();
         const creepName = task.namePrefix ? `${task.namePrefix}-${Game.time}` : `${roleName}-${Game.time}`;
-        if (spawn.spawnCreep(task.bodyPartConstant, creepName) === OK) {
+        if (spawn.spawnCreep(task.bodyPartConstant, creepName, { directions: task.spawnDirection }) === OK) {
           theNewCreep = Game.creeps[creepName];
           theNewCreep.memory.role = roleName;
           const spentEnergy = task.bodyPartConstant.reduce((sum, bodyPart) => sum + BODYPART_COST[bodyPart], 0);

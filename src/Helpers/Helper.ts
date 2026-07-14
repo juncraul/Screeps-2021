@@ -233,6 +233,7 @@ export class Helper {
   public static findClosestMatching(
     startPos: RoomPosition,
     maxRange: number | null,
+    avoidEdges: boolean,
     callback: (pos: RoomPosition) => boolean
   ): RoomPosition | null {
     if (maxRange === null) {
@@ -248,6 +249,21 @@ export class Helper {
           const y = startPos.y + dy;
 
           if (x < 0 || x > 49 || y < 0 || y > 49) continue;
+
+          if (
+            avoidEdges &&
+            (x === 0 ||
+              x === 1 ||
+              x === 47 ||
+              x === 48 ||
+              x === 49 ||
+              y === 0 ||
+              y === 1 ||
+              y === 47 ||
+              y === 48 ||
+              y === 49)
+          )
+            continue;
 
           const pos = new RoomPosition(x, y, startPos.roomName);
 
@@ -296,5 +312,62 @@ export class Helper {
       return false;
     }
     return true;
+  }
+
+  public static simplePathFinderWithObstacles(start: RoomPosition, end: RoomPosition): PathFinderPath {
+    const result = PathFinder.search(
+      start,
+      { pos: end, range: 0 },
+      {
+        plainCost: 2,
+        swampCost: 10,
+        maxOps: 5000,
+        roomCallback: roomName => {
+          const room = Game.rooms[roomName];
+          if (!room) {
+            return false;
+          }
+
+          const costs = new PathFinder.CostMatrix();
+          const terrain = room.getTerrain();
+          const blocked = new Set<string>();
+
+          const structures = room.find(FIND_STRUCTURES);
+          for (const structure of structures) {
+            if (
+              structure.structureType === STRUCTURE_ROAD ||
+              structure.structureType === STRUCTURE_CONTAINER ||
+              structure.structureType === STRUCTURE_RAMPART
+            ) {
+              continue;
+            }
+            blocked.add(`${structure.pos.x}:${structure.pos.y}`);
+          }
+
+          const creeps = room.find(FIND_CREEPS);
+          for (const creep of creeps) {
+            blocked.add(`${creep.pos.x}:${creep.pos.y}`);
+          }
+
+          for (let x = 0; x < 50; x++) {
+            for (let y = 0; y < 50; y++) {
+              if (x < 1 || x > 48 || y < 1 || y > 48) {
+                costs.set(x, y, 255);
+                continue;
+              }
+
+              const positionBlocked = terrain.get(x, y) === TERRAIN_MASK_WALL || blocked.has(`${x}:${y}`);
+
+              if (positionBlocked) {
+                costs.set(x, y, 255);
+              }
+            }
+          }
+
+          return costs;
+        }
+      }
+    );
+    return result;
   }
 }

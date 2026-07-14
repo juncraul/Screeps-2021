@@ -21,7 +21,7 @@ export default class StationaryFillerArea extends BaseArea {
     this.containers = StationaryFillerArea.getContainers(room);
     this.extensionsAndSpawns = this.getExtensionsAndSpawns();
     this.stationaryPositions = this.getStationaryPositions();
-    this.maxWorkerCount = this.extensionsAndSpawns.length < 7 ? 1 : this.stationaryPositions.length;
+    this.maxWorkerCount = this.stationaryPositions.length;
   }
 
   public handleThisArea() {
@@ -183,7 +183,11 @@ export default class StationaryFillerArea extends BaseArea {
   private createCreepForThisArea(): SpawnTask | null {
     // Create 1xCarry 1xMove creep as specified
     const bodyPartConstants: BodyPartConstant[] = [CARRY, MOVE];
-    return new SpawnTask(CreepType.StationaryFiller, this.areaId, bodyPartConstants, this);
+    return new SpawnTask(CreepType.StationaryFiller, this.areaId, bodyPartConstants, this, null, null, [
+      TOP_LEFT,
+      TOP_RIGHT,
+      BOTTOM
+    ]);
   }
 
   private getExtensionsAndSpawns(): (StructureExtension | StructureSpawn)[] {

@@ -528,13 +528,13 @@ export class GetRoomObjects {
   public static getXStepTowardsSpawn(pos: RoomPosition, step: number): RoomPosition {
     const spawns = GetRoomObjects.getRoomSpawns(Game.rooms[pos.roomName], true);
     if (spawns.length === 0) return pos; // If no spawns found, return the original position
-    const result = PathFinder.search(pos, spawns[0].pos);
+    const result = Helper.simplePathFinderWithObstacles(pos, spawns[0].pos);
     if (result.path.length === 0) return pos; // If no path found, return the original position
     return result.path.length <= step ? result.path[result.path.length - 1] : result.path[step - 1];
   }
 
   public static getXStepTowardsTarget(pos: RoomPosition, target: RoomPosition, step: number): RoomPosition {
-    const result = PathFinder.search(pos, target);
+    const result = Helper.simplePathFinderWithObstacles(pos, target);
     if (result.path.length === 0) return pos; // If no path found, return the original position
     return result.path.length <= step ? result.path[result.path.length - 1] : result.path[step - 1];
   }

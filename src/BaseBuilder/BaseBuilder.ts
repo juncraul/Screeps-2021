@@ -751,10 +751,10 @@ export class BaseBuilder {
     for (const source of sources) {
       const container = GetRoomObjects.getWithinRangeContainer(source.pos, 1);
       if (!container) continue;
-      const surroundingPositions = Helper.getFreeAdjacentPositions(container.pos);
+      const surroundingPositions = Helper.getWalkableAdjacentPositions(container.pos);
       let linkNextToSourcePos = GetRoomObjects.getWithinRangeLink(source.pos, 2)?.pos;
       if (!linkNextToSourcePos) {
-        linkNextToSourcePos = Helper.getFreeAdjacentPositions(container.pos)[0];
+        linkNextToSourcePos = Helper.getWalkableAdjacentPositions(container.pos)[0];
       }
       let roadFromContainerPos = GetRoomObjects.getWithinRangeStructures(container.pos, 1, STRUCTURE_ROAD)[0]?.pos;
       if (!roadFromContainerPos) {

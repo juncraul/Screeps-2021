@@ -55,41 +55,7 @@ export function executeTestFlag() {
     let bestPath: PathFinderPath | null = null;
     let costMatrix: CostMatrix;
     for (const exit of exits) {
-      const result = PathFinder.search(
-        testFlag.pos,
-        { pos: exit, range: 1 },
-        {
-          plainCost: 2,
-          swampCost: 10,
-          roomCallback: roomName => {
-            const room = Game.rooms[roomName];
-            if (!room) return false;
-
-            const costs = new PathFinder.CostMatrix();
-
-            // Avoid structures
-            room.find(FIND_STRUCTURES).forEach(structure => {
-              if (structure.structureType === STRUCTURE_ROAD) {
-                costs.set(structure.pos.x, structure.pos.y, 1);
-              } else if (
-                structure.structureType !== STRUCTURE_CONTAINER &&
-                structure.structureType !== STRUCTURE_RAMPART
-              ) {
-                costs.set(structure.pos.x, structure.pos.y, 255);
-              }
-            });
-
-            // Avoid creeps
-            room.find(FIND_CREEPS).forEach(creep => {
-              costs.set(creep.pos.x, creep.pos.y, 255);
-            });
-
-            costMatrix = costs;
-
-            return costs;
-          }
-        }
-      );
+      const result = Helper.simplePathFinderWithObstacles(testFlag.pos, exit);
       if (result.cost < bestCost) {
         bestCost = result.cost;
         bestPath = result;
