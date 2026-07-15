@@ -22,7 +22,7 @@ export default class SourceKeeperArea extends SoldierArea {
       primaryColor: COLOR_RED,
       secondaryColor: COLOR_RED,
       squadSize: 2,
-      bodySegments: null
+      powerRank: null
     });
     this.memoryType = "SourceKeeperArea";
     this.flag = flag;
@@ -45,7 +45,7 @@ export default class SourceKeeperArea extends SoldierArea {
         primaryColor: flag.color,
         secondaryColor: flag.secondaryColor,
         squadSize: 2,
-        bodySegments: null
+        powerRank: null
       };
     });
   }
@@ -210,9 +210,9 @@ export default class SourceKeeperArea extends SoldierArea {
   }
 
   private findBestKeeperLair(room: Room, position: RoomPosition): StructureKeeperLair | null {
-    const lairs = room.find(FIND_HOSTILE_STRUCTURES, {
+    const lairs: StructureKeeperLair[] = room.find(FIND_HOSTILE_STRUCTURES, {
       filter: structure => structure.structureType === STRUCTURE_KEEPER_LAIR
-    }) as StructureKeeperLair[];
+    });
 
     if (lairs.length === 0) {
       return null;

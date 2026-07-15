@@ -10,11 +10,12 @@ import QuadNavigation from "./Navigation/QuadNavigation";
 const SQUAD_SIZE = 5;
 const ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
 const EXCEPTION_PLAYER_NAMES = ["nekey975"];
+const TICKS_TO_LIVE_THRESHOLD = 250;
 
 enum PrimaryColor {
-  RED = COLOR_RED, // Melee
-  GREEN = COLOR_GREEN, // Ranged
-  BLUE = COLOR_BLUE, // Healer
+  RED = COLOR_RED, // Only Melee
+  GREEN = COLOR_GREEN, // Only Ranged
+  BLUE = COLOR_BLUE, // 1 Melee rest Healer
   PURPLE = COLOR_PURPLE, // Split (half Melee, half Ranged)
   YELLOW = COLOR_YELLOW // Dismantle (1 Dismantler, rest Healers)
 }
@@ -34,7 +35,7 @@ export interface AttackFlagConfig {
   primaryColor: number;
   secondaryColor: number;
   squadSize: number;
-  bodySegments: number | null;
+  powerRank: number | null;
 }
 
 /**
@@ -71,7 +72,7 @@ export default class SoldierArea extends BaseArea {
         primaryColor: flag.color,
         secondaryColor: flag.secondaryColor,
         squadSize: parsed.squadSize,
-        bodySegments: parsed.bodySegments
+        powerRank: parsed.powerRank
       });
       currentStates[flag.name] = {
         x: flag.pos.x,
@@ -128,9 +129,9 @@ export default class SoldierArea extends BaseArea {
 
     visual.text("=== Attack Flags ===", x, y, title);
     y += 0.9;
-    visual.text("Name format: Attack-squadSize-bodySegments-baseRoom-anyText", x, y, header);
+    visual.text("Name format: Attack-squadSize-powerRank-baseRoom-anyText", x, y, header);
     y += 0.7;
-    visual.text("Example: Attack-4-2-E29S25-Healers => squad 4, 2 segments, base E29S25", x, y, plain);
+    visual.text("Example: Attack-4-2-E29S25-Healers => squad 4, power rank 2, base E29S25", x, y, plain);
     y += 0.7;
     visual.text("Attack-4-2-Healers keeps default: spawn from any base", x, y, plain);
     y += 0.9;
@@ -141,7 +142,7 @@ export default class SoldierArea extends BaseArea {
     y += 0.6;
     visual.text("  GREEN -> Ranged squad", x, y, plain);
     y += 0.6;
-    visual.text("  BLUE -> Healer squad", x, y, plain);
+    visual.text("  BLUE -> 1-Melee rest Healer squad", x, y, plain);
     y += 0.6;
     visual.text("  PURPLE -> Split squad (half Melee, half Ranged)", x, y, plain);
     y += 0.8;
@@ -161,15 +162,16 @@ export default class SoldierArea extends BaseArea {
     y += 0.7;
     for (const area of soldierAreas) {
       const flag = area.flag;
-      const role = CreepType[SoldierArea.getCreepTypeFromColor(flag.primaryColor, 0, flag.squadSize)];
+      // const role = CreepType[SoldierArea.getCreepTypeFromColor(flag.primaryColor, 0, flag.squadSize)];
       let targetType = "Everything";
       if (flag.secondaryColor === SecondaryColor.GRAY) targetType = "Structures";
       else if (flag.secondaryColor === SecondaryColor.BLUE) targetType = "Creeps";
       else if (flag.secondaryColor === SecondaryColor.WHITE) targetType = "None";
-      const segmentText = flag.bodySegments === null ? "default" : `${flag.bodySegments}`;
+      const segmentText = flag.powerRank === null ? "default" : `${flag.powerRank}`;
       const spawnBaseText = flag.baseRoomName ? flag.baseRoomName : "any";
       visual.text(
-        `${flag.name}: squad ${area.creeps.length}/${flag.squadSize}, segments ${segmentText}, base ${spawnBaseText}, role ${role}, target ${targetType}, room ${flag.targetRoom}`,
+        // `${flag.name}: squad ${area.creeps.length}/${flag.squadSize}, power ${segmentText}, base ${spawnBaseText}, role ${role}, target ${targetType}, room ${flag.targetRoom}`,
+        `${flag.name}: squad ${area.creeps.length}/${flag.squadSize}, power ${segmentText}, base ${spawnBaseText}, target ${targetType}, room ${flag.targetRoom}`,
         x,
         y,
         active
@@ -182,7 +184,7 @@ export default class SoldierArea extends BaseArea {
 
   public handleSpawnTasks(room: Room): SpawnTask[] {
     if (this.flag.baseRoomName && this.flag.baseRoomName !== room.name) return [];
-    const dying = this.creeps.filter(c => c.ticksToLive && c.ticksToLive < 150).length;
+    const dying = this.creeps.filter(c => c.ticksToLive && c.ticksToLive < TICKS_TO_LIVE_THRESHOLD).length;
     const deficit = Math.max(0, this.flag.squadSize - this.creeps.length + dying);
     const tasks: SpawnTask[] = [];
     if (deficit > 0) {
@@ -198,17 +200,32 @@ export default class SoldierArea extends BaseArea {
     this.runHealerPassiveEffect();
     this.runDismantlerPassiveEffect();
 
-    const combatAssigned = this.assignCombatTask(Game.flags[this.flag.name]);
-    const targetPosition = combatAssigned ? combatAssigned.pos : this.flag.position;
+    // const combatAssigned = this.assignCombatTask(Game.flags[this.flag.name]);
+    // const targetPosition = combatAssigned ? combatAssigned.pos : this.flag.position;
+    const firstFourCreeps = this.creeps.slice(0, 4);
     const creepsAreInRoomWithDestination =
-      this.creeps.filter(c => c.pos.roomName === this.flag.targetRoom).length === this.creeps.length;
+      firstFourCreeps.filter(c => c.pos.roomName === this.flag.targetRoom).length === firstFourCreeps.length;
     const formationMovementApplied = creepsAreInRoomWithDestination
-      ? QuadNavigation.tryMoveAsFormation(this.creeps, targetPosition, this.flag.name)
-      : LineNaviagation.tryMoveAsFormation(this.creeps, targetPosition);
+      ? QuadNavigation.tryToKiteTheEnemyAsFormation(firstFourCreeps, this.flag.position, this.flag.name, this.flag.secondaryColor === SecondaryColor.WHITE)
+      : LineNaviagation.tryMoveAsFormation(firstFourCreeps, this.flag.position);
 
     for (const creep of this.creeps) {
       if (formationMovementApplied) {
         if (creep.task) creep.task.taskDone = true;
+
+        if (creep.getNumberOfBodyPart(ATTACK) > 0) {
+          const getNearbyHostileCreeps = creep.pos.findInRange(FIND_HOSTILE_CREEPS, 1);
+          if (getNearbyHostileCreeps.length > 0) {
+            creep.say("⚔️");
+            creep.creep.attack(getNearbyHostileCreeps[0]);
+          }
+
+          const getNearbyHostileStructures = creep.pos.findInRange(FIND_HOSTILE_STRUCTURES, 1);
+          if (getNearbyHostileStructures.length > 0) {
+            creep.say("⚔️");
+            creep.creep.attack(getNearbyHostileStructures[0]);
+          }
+        }
         continue;
       }
       if (!creep.isFree()) continue;
@@ -223,6 +240,13 @@ export default class SoldierArea extends BaseArea {
       } else {
         creep.addTask(new CreepTask(Activity.Move, this.flag.position));
       }
+
+      if (creep.creepType !== CreepType.Healer) {
+        const combatAssigned = this.assignCombatTask(Game.flags[this.flag.name]);
+        if (combatAssigned) {
+          creep.addTask(new CreepTask(Activity.Attack, combatAssigned.pos, null, combatAssigned.id));
+        }
+      }
     }
   }
 
@@ -232,19 +256,19 @@ export default class SoldierArea extends BaseArea {
     name: string
   ): {
     squadSize: number;
-    bodySegments: number | null;
+    powerRank: number | null;
     baseRoomName?: string;
   } {
     if (name === "Attack") {
-      return { squadSize: SQUAD_SIZE, bodySegments: null };
+      return { squadSize: SQUAD_SIZE, powerRank: null };
     }
     const parts = name.split("-");
     const parsedSquad = parts[1];
-    const parsedSegments = parts[2];
+    const parsedPowerRank = parts[2];
     const squadSize = /^\d+$/.test(parsedSquad) ? parseInt(parsedSquad, 10) : SQUAD_SIZE;
-    const bodySegments = /^\d+$/.test(parsedSegments) ? parseInt(parsedSegments, 10) : null;
+    const powerRank = /^\d+$/.test(parsedPowerRank) ? parseInt(parsedPowerRank, 10) : null;
     const baseRoomName = parts.slice(3).find(part => ROOM_NAME_PATTERN.test(part));
-    return { squadSize, bodySegments, baseRoomName };
+    return { squadSize, powerRank, baseRoomName };
   }
 
   private static clearTasksForFlag(flagName: string): void {
@@ -283,18 +307,22 @@ export default class SoldierArea extends BaseArea {
     return configs;
   }
 
-  private static getCreepTypeFromColor(
-    primaryColor: number,
-    existingCountInFlag: number,
-    squadSize: number
-  ): CreepType {
+  private getCreepTypeFromColor(primaryColor: number, existingCountInFlag: number, squadSize: number): CreepType {
     if (primaryColor === PrimaryColor.GREEN) return CreepType.Ranged;
-    if (primaryColor === PrimaryColor.BLUE) return CreepType.Healer;
+    if (primaryColor === PrimaryColor.BLUE) {
+      const creepsWithMeleeBodyPart = this.creeps.filter(
+        creep => creep.getNumberOfBodyPart(ATTACK) > 0 && (creep.creep.ticksToLive ?? 0) > TICKS_TO_LIVE_THRESHOLD
+      );
+      return creepsWithMeleeBodyPart.length === 0 ? CreepType.Melee : CreepType.Healer;
+    }
     if (primaryColor === PrimaryColor.PURPLE) {
       return existingCountInFlag < Math.ceil(squadSize / 2) ? CreepType.Melee : CreepType.Ranged;
     }
     if (primaryColor === PrimaryColor.YELLOW) {
-      return existingCountInFlag === 0 ? CreepType.Dismantler : CreepType.Healer;
+      const creepsWithWorkBodyPart = this.creeps.filter(
+        creep => creep.getNumberOfBodyPart(WORK) > 0 && (creep.creep.ticksToLive ?? 0) > TICKS_TO_LIVE_THRESHOLD
+      );
+      return creepsWithWorkBodyPart.length === 0 ? CreepType.Dismantler : CreepType.Healer;
     }
     return CreepType.Melee;
   }
@@ -324,25 +352,23 @@ export default class SoldierArea extends BaseArea {
   }
 
   private createCreepForFlag(): SpawnTask | null {
-    const creepType = SoldierArea.getCreepTypeFromColor(
-      this.flag.primaryColor,
-      this.creeps.length,
-      this.flag.squadSize
-    );
+    const creepType = this.getCreepTypeFromColor(this.flag.primaryColor, this.creeps.length, this.flag.squadSize);
+    const basePowerRank = this.flag.powerRank ?? 1;
+    const creepPowerRank = this.getCreepPowerRank(basePowerRank, creepType);
     let bodyPartConstants: BodyPartConstant[];
 
     switch (creepType) {
       case CreepType.Melee:
-        bodyPartConstants = this.createMeleeBody(this.flag.bodySegments ?? 1);
+        bodyPartConstants = this.createMeleeBody(creepPowerRank);
         break;
       case CreepType.Ranged:
-        bodyPartConstants = this.createRangedBody(this.flag.bodySegments ?? 1);
+        bodyPartConstants = this.createRangedBody(creepPowerRank);
         break;
       case CreepType.Healer:
-        bodyPartConstants = this.createHealerBody(this.flag.bodySegments ?? 1);
+        bodyPartConstants = this.createHealerBody(creepPowerRank);
         break;
       case CreepType.Dismantler:
-        bodyPartConstants = this.createDismantlerBody(this.flag.bodySegments ?? 1);
+        bodyPartConstants = this.createDismantlerBody(creepPowerRank);
         break;
       default:
         return null;
@@ -351,25 +377,56 @@ export default class SoldierArea extends BaseArea {
     return new SpawnTask(creepType, this.areaId, bodyPartConstants, this, null, this.flag.baseRoomName);
   }
 
+  private getCreepPowerRank(basePowerRank: number, creepType: CreepType): number {
+    if (this.flag.primaryColor === PrimaryColor.BLUE && creepType === CreepType.Melee) {
+      return basePowerRank * 2;
+    }
+
+    if (this.flag.primaryColor === PrimaryColor.YELLOW && creepType === CreepType.Dismantler) {
+      return basePowerRank * 2;
+    }
+
+    return basePowerRank;
+  }
+
   private createMeleeBody(segments: number): BodyPartConstant[] {
     const body: BodyPartConstant[] = [];
-    for (let i = 0; i < segments; i++) body.push(ATTACK); // ATTACK-80; MOVE-50 plain=1  road=1  swamp=5
-    for (let i = 0; i < segments; i++) body.push(MOVE); // ATTACK-80; MOVE-50 plain=1  road=1  swamp=5
+    let toughParts = 0;
+    if (segments === 20) toughParts = 8;
+    if (segments === 18) toughParts = 7;
+    if (segments === 16) toughParts = 6;
+    if (segments === 14) toughParts = 5;
+    if (segments === 12) toughParts = 4;
+    if (segments === 10) toughParts = 3;
+    if (segments === 8) toughParts = 2;
+    if (segments === 6) toughParts = 1;
+    for (let i = 0; i < toughParts; i++) {
+      body.push(TOUGH);
+      body.push(MOVE);
+    }
+    for (let i = 0; i < segments; i++) {
+      body.push(ATTACK); // ATTACK-80; MOVE-50 plain=1  road=1  swamp=5
+      body.push(MOVE);
+    }
     return body;
   }
 
   private createRangedBody(segments: number): BodyPartConstant[] {
     const body: BodyPartConstant[] = [];
-    for (let i = 0; i < segments; i++) body.push(RANGED_ATTACK); // RANGED_ATTACK-150; Move-50 plain=1  road=1  swamp=5
-    for (let i = 0; i < segments; i++) body.push(MOVE); // RANGED_ATTACK-150; Move-50 plain=1  road=1  swamp=5
+    for (let i = 0; i < segments; i++) {
+      body.push(RANGED_ATTACK); // RANGED_ATTACK-150; Move-50 plain=1  road=1  swamp=5
+      body.push(MOVE);
+    }
     return body;
   }
 
   private createHealerBody(segments: number): BodyPartConstant[] {
     if (segments === 0) segments = 6; // 0 is used for maximum segments.
     const body: BodyPartConstant[] = [];
-    for (let i = 0; i < segments; i++) body.push(MOVE); // HEAL-200; MOVE-50  plain=1  road=1  swamp=5
-    for (let i = 0; i < segments; i++) body.push(HEAL); // HEAL-200; MOVE-50  plain=1  road=1  swamp=5
+    for (let i = 0; i < segments; i++) {
+      body.push(HEAL); // HEAL-200; MOVE-50  plain=1  road=1  swamp=5
+      body.push(MOVE);
+    }
     return body;
   }
 

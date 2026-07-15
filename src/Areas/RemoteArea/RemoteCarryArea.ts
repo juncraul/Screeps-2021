@@ -44,7 +44,7 @@ export function handleCarrier(area: RemoteArea, creep: CreepBase): void {
 
 export function createCarrier(area: RemoteArea): SpawnTask {
   const bodyPartConstants: BodyPartConstant[] = [];
-  let maxSegments = area.containers.length >= 2 ? 40 : 30;
+  let maxSegments = area.containers.length >= 2 ? 20 : 15;
   const totalEnergyInContainers = area.containers.reduce(
     (sum, container) => sum + container.store.getUsedCapacity(RESOURCE_ENERGY),
     0

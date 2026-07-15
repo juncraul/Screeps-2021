@@ -19,7 +19,7 @@ export default class StationaryFillerArea extends BaseArea {
       room
     );
     this.containers = StationaryFillerArea.getContainers(room);
-    this.extensionsAndSpawns = this.getExtensionsAndSpawns();
+    this.extensionsAndSpawns = StationaryFillerArea.getExtensionsAndSpawnsFromStationaryFillerArea(room);
     this.stationaryPositions = this.getStationaryPositions();
     this.maxWorkerCount = this.stationaryPositions.length;
   }
@@ -190,15 +190,45 @@ export default class StationaryFillerArea extends BaseArea {
     ]);
   }
 
-  private getExtensionsAndSpawns(): (StructureExtension | StructureSpawn)[] {
-    const extensions = this.room.find(FIND_MY_STRUCTURES, {
+  public static getExtensionsAndSpawnsFromStationaryFillerArea(room: Room): (StructureExtension | StructureSpawn)[] {
+    const extensions = room.find(FIND_MY_STRUCTURES, {
       filter: structure => structure.structureType === STRUCTURE_EXTENSION
     });
-    const spawns = this.room.find(FIND_MY_STRUCTURES, {
+    const spawns = room.find(FIND_MY_STRUCTURES, {
       filter: structure => structure.structureType === STRUCTURE_SPAWN
     });
 
-    return [...extensions, ...spawns] as (StructureExtension | StructureSpawn)[];
+    const structures = [...extensions, ...spawns] as (StructureExtension | StructureSpawn)[];
+    const plans = StationaryFillerArea.getFixedExtensionBuildPlans(room);
+    if (plans.length === 0) return structures;
+
+    const extensionsAndSpawnsPositions: RoomPosition[] = [];
+    for (const plan of plans) {
+      const planStartX = plan.x - 3;
+      const planStartY = plan.y - 3;
+
+      // TODO: ideally these values should be picked up somehow from the layout.
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 1, planStartY + 1, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 1, planStartY + 2, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 1, planStartY + 3, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 1, planStartY + 4, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 2, planStartY + 1, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 2, planStartY + 3, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 2, planStartY + 5, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 3, planStartY + 1, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 3, planStartY + 2, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 3, planStartY + 3, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 3, planStartY + 4, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 3, planStartY + 5, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 4, planStartY + 1, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 4, planStartY + 3, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 4, planStartY + 5, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 5, planStartY + 1, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 5, planStartY + 2, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 5, planStartY + 3, room.name));
+      extensionsAndSpawnsPositions.push(new RoomPosition(planStartX + 5, planStartY + 4, room.name));
+    }
+    return structures.filter(structure => extensionsAndSpawnsPositions.some(pos => structure.pos.isEqualTo(pos)));
   }
 
   public static createThisAreaForRoom(room: Room): boolean {
@@ -215,9 +245,8 @@ export default class StationaryFillerArea extends BaseArea {
       const planStartX = plan.x - 3;
       const planStartY = plan.y - 3;
 
+      // TODO: ideally these values should be picked up somehow from the layout.
       containerPositions.push(new RoomPosition(planStartX + 3, planStartY + 1, room.name));
-      containerPositions.push(new RoomPosition(planStartX + 1, planStartY + 3, room.name));
-      containerPositions.push(new RoomPosition(planStartX + 5, planStartY + 3, room.name));
     }
 
     const structures = room.find(FIND_STRUCTURES, {

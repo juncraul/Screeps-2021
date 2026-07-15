@@ -154,6 +154,7 @@ export default class RemoteArea extends BaseArea {
   }
 
   public handleSpawnTasks(): SpawnTask[] {
+    // if (this.roomName === "W6N3") console.log("handleSpawnTasks", this.roomName);
     const tasksForThisArea: SpawnTask[] = [];
     // Check if we have an invader flag
     const invaderFlag = Game.flags[RemoteArea.INVADER_DEFENDER + this.baseRoom.name];
@@ -656,6 +657,7 @@ export default class RemoteArea extends BaseArea {
   }
 
   public createHarvester(): SpawnTask {
+    // if (this.roomName === "W6N3") console.log("Creating harvester for remote area", this.roomName);
     return createHarvester(this);
   }
 

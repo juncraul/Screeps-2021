@@ -86,28 +86,14 @@ export default class UpgradeArea extends BaseArea {
         continue;
       }
 
-      if (this.controller.level < 3) {
-        if (creep.isEmpty()) {
-          if (creep.pos.getRangeTo(this.upgradePosition) > 4) {
-            // const pos = GetRoomObjects.getXStepTowardsTarget(this.upgradePosition, creep.pos, 1);
-            creep.addTask(new CreepTask(Activity.Move, this.upgradePosition, null, null, false, 3));
-          }
-        } else {
-          if (this.containerConstructionSiteNextToController && this.controller.ticksToDowngrade > 8000) {
-            creep.addTask(new CreepTask(Activity.Construct, this.containerConstructionSiteNextToController.pos));
-          } else {
-            creep.addTask(new CreepTask(Activity.Upgrade, this.controller.pos));
-          }
+      if (creep.isEmpty()) {
+        if (this.findSomwhereToCollectEnergyFrom(creep)) continue;
+        if (creep.pos.getRangeTo(this.upgradePosition) > 4) {
+          // const pos = GetRoomObjects.getXStepTowardsTarget(this.upgradePosition, creep.pos, 1);
+          creep.addTask(new CreepTask(Activity.Move, this.upgradePosition, null, null, false, 3));
         }
-      }
-
-      // Find some resources
-      if (!creep.isFull()) {
-        this.findSomwhereToCollectEnergyFrom(creep);
-      }
-
-      // Build the construction site(Container) or do the main job, which is upgrade the controller.
-      if (creep.isFull()) {
+      } else {
+        // Build the construction site(Container) or do the main job, which is upgrade the controller.
         if (this.containerConstructionSiteNextToController && this.controller.ticksToDowngrade > 8000) {
           creep.addTask(new CreepTask(Activity.Construct, this.containerConstructionSiteNextToController.pos));
         } else {
@@ -201,30 +187,35 @@ export default class UpgradeArea extends BaseArea {
     return new SpawnTask(CreepType.Upgrader, this.areaId, bodyPartConstants, this);
   }
 
-  private findSomwhereToCollectEnergyFrom(creep: CreepBase): void {
+  private findSomwhereToCollectEnergyFrom(creep: CreepBase): boolean {
     if (this.linkNextToController && this.linkNextToController.store[RESOURCE_ENERGY] > 0) {
       creep.addTask(new CreepTask(Activity.Collect, this.linkNextToController.pos));
+      return true;
     } else if (this.containerNextToController && this.containerNextToController.store[RESOURCE_ENERGY] > 0) {
       creep.addTask(new CreepTask(Activity.Collect, this.containerNextToController.pos));
-    } else {
-      const storagesAndContainers: (
-        | StructureStorage
-        | StructureContainer
-      )[] = this.getGeneralStoreToCollectFrom().filter(
-        store => store instanceof StructureContainer && store.store[RESOURCE_ENERGY] > 500
-      ) as StructureContainer[];
-      const roomStorage = GetRoomObjects.getRoomStorage(this.room);
-      if (roomStorage && roomStorage.store[RESOURCE_ENERGY] > 1000) {
-        storagesAndContainers.push(roomStorage);
-      }
-      const collectFromGeneralStoreSorted = storagesAndContainers.sort(
-        (a, b) => a.pos.getRangeTo(creep.pos.x, creep.pos.y) - b.pos.getRangeTo(creep.pos.x, creep.pos.y)
-      );
-      for (let j = 0; j < collectFromGeneralStoreSorted.length; j++) {
-        creep.addTask(new CreepTask(Activity.Collect, collectFromGeneralStoreSorted[j].pos));
-        break;
-      }
+      return true;
     }
+    return false;
+    // Disabled this, this is logic moves the creep away from upgrade area.
+    // else {
+    //   const storagesAndContainers: (
+    //     | StructureStorage
+    //     | StructureContainer
+    //   )[] = this.getGeneralStoreToCollectFrom().filter(
+    //     store => store instanceof StructureContainer && store.store[RESOURCE_ENERGY] > 500
+    //   ) as StructureContainer[];
+    //   const roomStorage = GetRoomObjects.getRoomStorage(this.room);
+    //   if (roomStorage && roomStorage.store[RESOURCE_ENERGY] > 1000) {
+    //     storagesAndContainers.push(roomStorage);
+    //   }
+    //   const collectFromGeneralStoreSorted = storagesAndContainers.sort(
+    //     (a, b) => a.pos.getRangeTo(creep.pos.x, creep.pos.y) - b.pos.getRangeTo(creep.pos.x, creep.pos.y)
+    //   );
+    //   for (let j = 0; j < collectFromGeneralStoreSorted.length; j++) {
+    //     creep.addTask(new CreepTask(Activity.Collect, collectFromGeneralStoreSorted[j].pos));
+    //     break;
+    //   }
+    // }
   }
 
   private getBestPositionForContainer(): RoomPosition | null {

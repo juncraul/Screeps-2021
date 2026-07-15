@@ -294,7 +294,7 @@ export default class Overseer implements IOverseer {
     baseRoomName?: string,
     mineralOnly = false
   ): SpawnTask[] {
-    if (roomName === "W6N3") console.log("handleRemoteArea", roomName);
+    // if (roomName === "W6N3") console.log("handleRemoteArea", roomName);
     let tasks: SpawnTask[] = [];
     const remoteArea: RemoteArea = new RemoteArea(roomName, remoteMode, baseRoomName, mineralOnly);
     tasks = tasks.concat(remoteArea.handleSpawnTasks());
@@ -358,6 +358,11 @@ export default class Overseer implements IOverseer {
       room.visual.text(`${areaName}: ${count.existing} live (+${count.queued} queued)`, x, y, lineStyle);
       y += 0.65;
     }
+    const totalCreepBodyParts = Object.values(Game.creeps).reduce((sum, creep) => sum + creep.body.length, 0);
+    room.visual.text(`Total Creep Body Parts: ${totalCreepBodyParts}`, x, y, lineStyle);
+    y += 0.65;
+    const totalCreepCount = Object.values(Game.creeps).length;
+    room.visual.text(`Total Creep Count: ${totalCreepCount}`, x, y, lineStyle);
   }
 
   private handleSoldierArea(room: Room): SpawnTask[] {

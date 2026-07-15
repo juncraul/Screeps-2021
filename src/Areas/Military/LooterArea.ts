@@ -28,7 +28,7 @@ export default class LooterArea extends SoldierArea {
       primaryColor: COLOR_RED,
       secondaryColor: COLOR_RED,
       squadSize: 2,
-      bodySegments: null
+      powerRank: null
     });
     this.flag = flag;
     this.creeps = this.getCreepsAssignedToThisArea();
@@ -50,7 +50,7 @@ export default class LooterArea extends SoldierArea {
         primaryColor: flag.color,
         secondaryColor: flag.secondaryColor,
         squadSize: 2,
-        bodySegments: null
+        powerRank: null
       };
     });
   }

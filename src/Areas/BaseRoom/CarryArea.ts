@@ -225,11 +225,13 @@ export default class CarryArea extends BaseArea {
       if (this.depositToTowers(creep)) return;
       if (this.depositToUpgradeArea(creep)) return;
       if (this.depositToConstructionWorkers(creep)) return;
+      if (this.depositToStorage(creep)) return;
     } else {
       if (this.depositToSpawningArea(creep)) return;
       if (this.depositToTowers(creep)) return;
       if (this.depositToUpgradeArea(creep)) return;
       if (this.depositToConstructionWorkers(creep)) return;
+      if (this.depositToStorage(creep)) return;
     }
   }
 
@@ -246,10 +248,12 @@ export default class CarryArea extends BaseArea {
     );
   }
 
-  private depositToStorage(creep: CreepBase): void {
+  private depositToStorage(creep: CreepBase): boolean {
     if (this.storage && this.storage.store.getFreeCapacity() > 0) {
       creep.addTask(new CreepTask(Activity.Deposit, this.storage.pos));
+      return true;
     }
+    return false;
   }
 
   private depositToSpawningArea(creep: CreepBase): boolean {
@@ -260,8 +264,18 @@ export default class CarryArea extends BaseArea {
       const closestContainer = creep.pos.findClosestByPath(
         containersNextToSpawns.filter(cont => cont.store.getFreeCapacity(RESOURCE_ENERGY) > 0)
       );
-      if (closestContainer) {
+      if (closestContainer && closestContainer.store.getFreeCapacity(RESOURCE_ENERGY) > 500) {
         creep.addTask(new CreepTask(Activity.Deposit, closestContainer.pos));
+        return true;
+      }
+      const extensionsAndSpawns = StationaryFillerArea.getExtensionsAndSpawnsFromStationaryFillerArea(this.room);
+      const closestExtensionOrSpawn = creep.pos.findClosestByPath(
+        this.extensionsAndSpawns
+          .filter(structure => !extensionsAndSpawns.some(pos => structure.pos.isEqualTo(pos)))
+          .filter(structure => structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0)
+      );
+      if (closestExtensionOrSpawn) {
+        creep.addTask(new CreepTask(Activity.Deposit, closestExtensionOrSpawn.pos));
         return true;
       }
     } else {
@@ -305,7 +319,7 @@ export default class CarryArea extends BaseArea {
 
   private depositToUpgradeArea(creep: CreepBase): boolean {
     // Deposit to creeps in UpgradeArea if we don't have a container next to the controller.
-    if (this.containerNextToController) {
+    if (this.containerNextToController && this.containerNextToController.store.getFreeCapacity(RESOURCE_ENERGY) > 500) {
       creep.addTask(new CreepTask(Activity.Deposit, this.containerNextToController.pos));
       return true;
     } else {
@@ -339,6 +353,7 @@ export default class CarryArea extends BaseArea {
     const bodyPartConstants: BodyPartConstant[] = [];
     const leaveAmountEnergyUnused = this.room.energyCapacityAvailable / 100 > 10 ? 300 : 0; // Don't wait for a full refill if we have a lot of energy capacity, but if we have less than 1000 energy capacity, wait for a full refill.
     let segments = Math.floor((this.room.energyCapacityAvailable - leaveAmountEnergyUnused) / 100); // Carry-50; Move-50
+    segments = Math.min(segments, 15);
     if (this.creeps.length === 0) {
       // Note: In this situation, there is no way to fill extensions
       // Use energyAvailable to setup the segments with 3 as a cap. A.k.a. wait till Spawn has 300 energy.

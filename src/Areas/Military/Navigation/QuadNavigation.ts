@@ -1,8 +1,92 @@
 import { CreepBase } from "../../../CreepBase";
+import { CreepType } from "../../../CreepType";
 import { Helper } from "Helpers/Helper";
 
 export default class QuadNavigation {
-  public static tryMoveAsFormation(creeps: CreepBase[], destinationFlag: RoomPosition, flagName: string): boolean {
+  public static tryToKiteTheEnemyAsFormation(
+    quadCreeps: CreepBase[],
+    destination: RoomPosition,
+    memoryName: string,
+    pacifist: boolean
+  ): boolean {
+    if (quadCreeps.length < 4) {
+      return false;
+    }
+
+    const ordered = this.getOrderedFormationCreeps(quadCreeps);
+    const quad = ordered.slice(0, 4);
+    if (!this.creepsAreInRangeOfEachOther(quad, 4)) {
+      return false;
+    }
+
+    const leader = quad[0];
+    const anchor = this.getQuadAnchor(quad);
+    const pathOrigin = anchor ?? leader.pos;
+    const threat = this.getPrimaryThreat(pathOrigin.roomName, pathOrigin);
+    const totalHits = _.sum(quad, creep => creep.hits);
+
+    const kiteStateKey = `QuadNavigation-KiteState-${memoryName}`;
+    const previousState = Helper.getCashedMemory<{ tick: number; totalHits: number; isRetreating: boolean } | null>(
+      kiteStateKey,
+      null
+    );
+    const damageTaken =
+      previousState && previousState.tick === Game.time - 1 ? Math.max(0, previousState.totalHits - totalHits) : 0;
+
+    const damagedCreeps = quad.filter(creep => creep.hits < creep.hitsMax);
+    const mostDamaged = _.max(damagedCreeps, creep => creep.hitsMax - creep.hits);
+    const mostDamagedPercentage = mostDamaged ? mostDamaged.hits / mostDamaged.hitsMax : 1;
+    const totalMissingHits = _.sum(damagedCreeps, creep => creep.hitsMax - creep.hits);
+    const totalHealPotential = this.getTotalPotentialHealPerTick(quad);
+    const focusedHealPotential = mostDamaged ? this.getPotentialHealOnTarget(quad, mostDamaged) : 0;
+    const focusedDamageMissing = mostDamaged ? mostDamaged.hitsMax - mostDamaged.hits : 0;
+
+    if (!pacifist) {
+      console.log(
+        `[${memoryName}] Kite State: Damage Taken: ${damageTaken}, Total Missing Hits: ${totalMissingHits}, Total Heal Potential: ${totalHealPotential}, Focused Heal Potential: ${focusedHealPotential}, Focused Damage Missing: ${focusedDamageMissing}`
+      );
+    }
+
+    const healerCannotKeepUp = focusedDamageMissing > focusedHealPotential || totalMissingHits > totalHealPotential;
+    const isRetreating = previousState && previousState.tick === Game.time - 1 && previousState.isRetreating;
+    if (isRetreating) console.log(`[${memoryName}] Retreating from threat at ${threat?.pos} due to previous state.`);
+    const shouldRetreat = isRetreating
+      ? totalMissingHits !== 0
+      : mostDamagedPercentage < 0.6 && damageTaken > 0 && healerCannotKeepUp && !!threat;
+
+    Helper.setCashedMemory(kiteStateKey, { tick: Game.time, totalHits, isRetreating: shouldRetreat });
+
+    if (quad.some(creep => creep.creep.fatigue > 0)) {
+      return true;
+    }
+
+    if (threat) {
+      if (shouldRetreat) {
+        console.log(`[${memoryName}] Retreating from threat at ${threat.pos} due to damage taken and healer cannot keep up.`);
+        leader.say("😱"); // Retreat to destination
+        return this.tryMoveAsFormation(quadCreeps, destination, memoryName, false);
+      } else {
+        if (!pacifist) {
+          if (leader.pos.inRangeTo(threat?.pos ?? leader.pos, 1)) {
+            return true; // We arrived at the enemy. We are done with navigation.
+          } else {
+            leader.say("⚔️👣"); // Move towards threat
+            return this.tryMoveAsFormation(quadCreeps, threat.pos, memoryName, true);
+          }
+        }
+      }
+    }
+
+    leader.say("👣🚩"); // Move towards destination
+    return this.tryMoveAsFormation(quadCreeps, destination, memoryName, true);
+  }
+
+  private static tryMoveAsFormation(
+    creeps: CreepBase[],
+    destination: RoomPosition,
+    memoryName: string,
+    rotateTowardsTarget: boolean
+  ): boolean {
     if (creeps.length < 4) {
       return false;
     }
@@ -14,11 +98,9 @@ export default class QuadNavigation {
     }
 
     const leader = quad[0];
-    const destination = destinationFlag;
-    // leader.pos.roomName === destinationFlag.roomName ? destinationFlag : new RoomPosition(25, 25, destinationFlag.roomName);
 
     if (!this.isQuadAssembled(quad)) {
-      const regroupSlots = this.findBestRegroupSlots(leader, quad, flagName);
+      const regroupSlots = this.findBestRegroupSlots(leader, quad, memoryName);
       if (!regroupSlots) {
         return false;
       }
@@ -26,7 +108,12 @@ export default class QuadNavigation {
       this.regroupQuad(quad, leader.pos, regroupSlots);
       return true;
     } else {
-      Helper.setCashedMemory(`QuadNavigation-${flagName}`, []);
+      Helper.setCashedMemory(`QuadNavigation-${memoryName}`, []);
+    }
+
+    const anchor = this.getQuadAnchor(quad);
+    if (!anchor) {
+      return false;
     }
 
     // Check if creeps have fatique
@@ -34,7 +121,11 @@ export default class QuadNavigation {
       return true;
     }
 
-    const direction = this.getLeaderDirectionForQuadPath(leader, destination, quad);
+    if (rotateTowardsTarget && this.rotateQuadTowardTarget(quad, anchor, destination)) {
+      return true;
+    }
+
+    const direction = this.getLeaderDirectionForQuadPath(anchor, destination, quad);
     if (!direction) {
       return true;
     }
@@ -44,9 +135,9 @@ export default class QuadNavigation {
       return false;
     }
 
-    const nextLeader = new RoomPosition(leader.pos.x + step.dx, leader.pos.y + step.dy, leader.pos.roomName);
-    const nextSquare = this.getSquareSlots(nextLeader);
-    const room = Game.rooms[nextLeader.roomName];
+    const nextAnchor = new RoomPosition(anchor.x + step.dx, anchor.y + step.dy, anchor.roomName);
+    const nextSquare = this.getSquareSlots(nextAnchor);
+    const room = Game.rooms[nextAnchor.roomName];
     if (!room) {
       return false;
     }
@@ -58,21 +149,21 @@ export default class QuadNavigation {
       for (let i = 0; i < quad.length; i++) {
         room.visual.text(`${i}`, nextSquare[i].x, nextSquare[i].y, {
           align: "center",
-          opacity: 0.8,
+          opacity: 0.4,
           font: 0.5,
           color: "#00ff88",
           backgroundColor: "#000000"
         });
       }
     } else {
-      const lineSlots = this.getLineSlots(nextLeader, quad.length, step);
+      const lineSlots = this.getLineSlots(nextAnchor, quad.length, step);
       for (const creep of quad) {
         creep.creep.move(direction);
       }
       for (let i = 0; i < quad.length; i++) {
         room.visual.text(`${i}`, lineSlots[i].x, lineSlots[i].y, {
           align: "center",
-          opacity: 0.8,
+          opacity: 0.4,
           font: 0.5,
           color: "#ffcc00",
           backgroundColor: "#000000"
@@ -81,29 +172,37 @@ export default class QuadNavigation {
     }
 
     for (const trailing of ordered.slice(4)) {
-      trailing.creep.moveTo(leader.pos, { reusePath: 0, range: 1 });
+      trailing.creep.moveTo(anchor, { reusePath: 0, range: 1 });
     }
 
     return true;
   }
 
   private static getOrderedFormationCreeps(creeps: CreepBase[]): CreepBase[] {
-    // const unassigned = creeps.filter(
-    //   creep => creep.memory.formationOrder === null || creep.memory.formationOrder === undefined
-    // );
-    // if (unassigned.length > 0) {
-    const orderedByTimeToLive = creeps.slice().sort((a, b) => a.ticksToLive! - b.ticksToLive!);
-    for (let i = 0; i < orderedByTimeToLive.length; i++) {
-      orderedByTimeToLive[i].memory.formationOrder = i;
-    }
-    // }
+    const designatedLeader =
+      creeps.find(creep => creep.creepType === CreepType.Melee) ??
+      creeps.find(creep => creep.creepType === CreepType.Dismantler) ??
+      creeps.slice().sort((a, b) => a.ticksToLive! - b.ticksToLive!)[0];
 
-    return creeps.slice().sort((a, b) => (a.memory.formationOrder ?? 0) - (b.memory.formationOrder ?? 0));
+    const followers = creeps
+      .filter(creep => creep.name !== designatedLeader.name)
+      .sort((a, b) => a.ticksToLive! - b.ticksToLive!);
+
+    const ordered = [designatedLeader, ...followers];
+    for (let i = 0; i < ordered.length; i++) {
+      ordered[i].memory.formationOrder = i;
+    }
+
+    return ordered;
   }
 
   private static isQuadAssembled(quad: CreepBase[]): boolean {
-    const leader = quad[0];
-    const expectedSlots = this.getSquareSlots(leader.pos);
+    const anchor = this.getQuadAnchor(quad);
+    if (!anchor) {
+      return false;
+    }
+
+    const expectedSlots = this.getSquareSlots(anchor);
     const occupied = new Set(quad.map(creep => `${creep.pos.x}:${creep.pos.y}:${creep.pos.roomName}`));
     return expectedSlots.every(slot => occupied.has(`${slot.x}:${slot.y}:${slot.roomName}`));
   }
@@ -120,7 +219,7 @@ export default class QuadNavigation {
       }
       room.visual.text(`${i}`, slots[i].x, slots[i].y, {
         align: "center",
-        opacity: 0.8,
+        opacity: 0.4,
         font: 0.5,
         color: "#66ccff",
         backgroundColor: "#000000"
@@ -133,14 +232,14 @@ export default class QuadNavigation {
   private static findBestRegroupSlots(
     leader: CreepBase,
     squadCreeps: CreepBase[],
-    flagName: string
+    memoryName: string
   ): RoomPosition[] | null {
     const room = Game.rooms[leader.pos.roomName];
     if (!room) {
       return null;
     }
 
-    const memorySlots = Helper.getCashedMemory<string[]>(`QuadNavigation-${flagName}`, []);
+    const memorySlots = Helper.getCashedMemory<string[]>(`QuadNavigation-${memoryName}`, []);
     const slots = memorySlots.map(slot => {
       const [x, y, roomName] = slot.split(":");
       return new RoomPosition(parseInt(x, 10), parseInt(y, 10), roomName);
@@ -171,7 +270,7 @@ export default class QuadNavigation {
     for (const pos of squadPositions) {
       room.visual.text("R", pos.x, pos.y, {
         align: "center",
-        opacity: 0.8,
+        opacity: 0.4,
         font: 0.5,
         color: "#ff0000",
         backgroundColor: "#000000"
@@ -180,7 +279,7 @@ export default class QuadNavigation {
 
     if (squadPositions.length === 4) {
       Helper.setCashedMemory(
-        `QuadNavigation-${flagName}`,
+        `QuadNavigation-${memoryName}`,
         squadPositions.map(slot => `${slot.x}:${slot.y}:${slot.roomName}`)
       );
       return squadPositions;
@@ -190,18 +289,20 @@ export default class QuadNavigation {
   }
 
   private static getLeaderDirectionForQuadPath(
-    leader: CreepBase,
+    anchor: RoomPosition,
     destination: RoomPosition,
-    quad: CreepBase[]
+    quad: CreepBase[],
+    fleeing = false
   ): DirectionConstant | null {
     const squadNames = new Set(quad.map(creep => creep.name));
     const result = PathFinder.search(
-      leader.pos,
+      anchor,
       { pos: destination, range: 0 },
       {
         plainCost: 2,
         swampCost: 10,
         maxOps: 5000,
+        flee: fleeing,
         roomCallback: roomName => {
           const room = Game.rooms[roomName];
           if (!room) {
@@ -265,11 +366,203 @@ export default class QuadNavigation {
       }
     );
 
-    if (result.incomplete || result.path.length === 0) {
+    if (result.path.length === 0) {
       return null;
     }
 
-    return leader.pos.getDirectionTo(result.path[0]);
+    return anchor.getDirectionTo(result.path[0]);
+  }
+
+  private static rotateQuadTowardTarget(quad: CreepBase[], anchor: RoomPosition, destination: RoomPosition): boolean {
+    const leader = quad[0];
+    const slots = this.getSquareSlots(anchor);
+    const currentLeaderSlotIndex = slots.findIndex(slot => Helper.isSamePosition(slot, leader.pos));
+    if (currentLeaderSlotIndex === -1) {
+      return false;
+    }
+
+    const desiredLeaderSlotIndex = this.getClosestSlotIndexToTarget(slots, destination);
+    if (desiredLeaderSlotIndex === currentLeaderSlotIndex) {
+      return false;
+    }
+
+    const clockwiseOrder = [0, 1, 3, 2];
+    const anticlockwiseOrder = [0, 2, 3, 1];
+    const slotToCreep = new Map<number, CreepBase>();
+    for (let i = 0; i < slots.length; i++) {
+      const occupant = quad.find(creep => Helper.isSamePosition(creep.pos, slots[i]));
+      if (!occupant) {
+        return false;
+      }
+      slotToCreep.set(i, occupant);
+    }
+
+    const isClockwise = this.isClockwiseRotation(currentLeaderSlotIndex, desiredLeaderSlotIndex);
+    const order = isClockwise ? clockwiseOrder : anticlockwiseOrder;
+    for (let orderIndex = 0; orderIndex < order.length; orderIndex++) {
+      const fromSlotIndex = order[orderIndex];
+      const toSlotIndex = order[(orderIndex + 1) % order.length];
+      const creep = slotToCreep.get(fromSlotIndex);
+      if (!creep) {
+        return false;
+      }
+
+      const direction = creep.pos.getDirectionTo(slots[toSlotIndex]);
+      creep.creep.move(direction);
+    }
+
+    const room = Game.rooms[anchor.roomName];
+    if (room) {
+      for (let i = 0; i < slots.length; i++) {
+        room.visual.text(`R${i}`, slots[i].x, slots[i].y, {
+          align: "center",
+          opacity: 0.4,
+          font: 0.5,
+          color: i === desiredLeaderSlotIndex ? "#ffaa00" : "#66ccff",
+          backgroundColor: "#000000"
+        });
+      }
+      room.visual.circle(destination.x, destination.y, { fill: "transparent", radius: 0.5, stroke: "#00ff00" });
+      room.visual.circle(leader.pos.x, leader.pos.y, { fill: "transparent", radius: 0.5, stroke: "#ff0000" });
+    }
+
+    return true;
+  }
+
+  private static isClockwiseRotation(currentIndex: number, desiredIndex: number): boolean {
+    if (currentIndex === 0) {
+      return desiredIndex === 1 || desiredIndex === 3;
+    }
+    if (currentIndex === 1) {
+      return desiredIndex === 3 || desiredIndex === 2;
+    }
+    if (currentIndex === 3) {
+      return desiredIndex === 2 || desiredIndex === 0;
+    }
+    if (currentIndex === 2) {
+      return desiredIndex === 0 || desiredIndex === 1;
+    }
+    return false;
+  }
+
+  private static getClosestSlotIndexToTarget(slots: RoomPosition[], target: RoomPosition): number {
+    let bestIndex = 0;
+    let bestRange = Infinity;
+
+    for (let i = 0; i < slots.length; i++) {
+      const range = slots[i].getRangeTo(target);
+      if (range < bestRange) {
+        bestRange = range;
+        bestIndex = i;
+      }
+    }
+
+    return bestIndex;
+  }
+
+  private static getQuadAnchor(quad: CreepBase[]): RoomPosition | null {
+    if (quad.length < 4) {
+      return null;
+    }
+
+    const roomName = quad[0].pos.roomName;
+    if (quad.some(creep => creep.pos.roomName !== roomName)) {
+      return null;
+    }
+
+    const occupied = new Set(quad.map(creep => `${creep.pos.x}:${creep.pos.y}`));
+    const minX = _.min(quad.map(creep => creep.pos.x));
+    const maxX = _.max(quad.map(creep => creep.pos.x));
+    const minY = _.min(quad.map(creep => creep.pos.y));
+    const maxY = _.max(quad.map(creep => creep.pos.y));
+
+    if (minX === undefined || maxX === undefined || minY === undefined || maxY === undefined) {
+      return null;
+    }
+
+    if (maxX - minX !== 1 || maxY - minY !== 1) {
+      return null;
+    }
+
+    const requiredSlots = [`${minX}:${minY}`, `${minX + 1}:${minY}`, `${minX}:${minY + 1}`, `${minX + 1}:${minY + 1}`];
+    if (!requiredSlots.every(slot => occupied.has(slot))) {
+      return null;
+    }
+
+    return new RoomPosition(minX, minY, roomName);
+  }
+
+  private static getPrimaryThreat(
+    roomName: string,
+    nearPos: RoomPosition
+  ): { pos: RoomPosition; type: "creep" | "tower" | "structure" } | null {
+    const room = Game.rooms[roomName];
+    if (!room) {
+      return null;
+    }
+
+    const hostileCreeps = room
+      .find(FIND_HOSTILE_CREEPS)
+      .filter(
+        hostile =>
+          hostile.getActiveBodyparts(ATTACK) > 0 ||
+          hostile.getActiveBodyparts(RANGED_ATTACK) > 0 ||
+          hostile.getActiveBodyparts(WORK) > 0
+      );
+
+    if (hostileCreeps.length > 0) {
+      const closestHostile = nearPos.findClosestByRange(hostileCreeps);
+      if (closestHostile) {
+        return { pos: closestHostile.pos, type: "creep" };
+      }
+    }
+
+    const hostileTowers = room
+      .find(FIND_HOSTILE_STRUCTURES)
+      .filter(
+        structure => structure.structureType === STRUCTURE_TOWER && structure.store.getUsedCapacity(RESOURCE_ENERGY) > 0
+      ) as StructureTower[];
+
+    if (hostileTowers.length > 0) {
+      const closestTower = nearPos.findClosestByRange(hostileTowers);
+      if (closestTower) {
+        return { pos: closestTower.pos, type: "tower" };
+      }
+    }
+
+    const anyHostileStructures = room
+      .find(FIND_HOSTILE_STRUCTURES)
+      .filter(structure => structure.structureType !== STRUCTURE_CONTROLLER);
+    if (anyHostileStructures.length > 0) {
+      const closestStructure = nearPos.findClosestByRange(anyHostileStructures);
+      if (closestStructure) {
+        return { pos: closestStructure.pos, type: "structure" };
+      }
+    }
+
+    return null;
+  }
+
+  private static getTotalPotentialHealPerTick(quad: CreepBase[]): number {
+    return _.sum(quad, creep => creep.creep.getActiveBodyparts(HEAL) * HEAL_POWER);
+  }
+
+  private static getPotentialHealOnTarget(quad: CreepBase[], target: CreepBase): number {
+    return _.sum(quad, creep => {
+      const healParts = creep.creep.getActiveBodyparts(HEAL);
+      if (healParts <= 0) {
+        return 0;
+      }
+
+      const range = creep.pos.getRangeTo(target.pos);
+      if (range <= 1) {
+        return healParts * HEAL_POWER;
+      }
+      if (range <= 3) {
+        return healParts * RANGED_HEAL_POWER;
+      }
+      return 0;
+    });
   }
 
   private static getStepOffset(direction: DirectionConstant): { dx: number; dy: number } | null {

@@ -1,5 +1,6 @@
 import { CreepBase } from "../../../CreepBase";
 import { Helper } from "Helpers/Helper";
+import { CreepType } from "../../../CreepType";
 
 export default class LineNaviagation {
   public static tryMoveAsFormation(creeps: CreepBase[], destination: RoomPosition): boolean {
@@ -36,6 +37,10 @@ export default class LineNaviagation {
       if (lastPos.x === 48) path.push(new RoomPosition(49, lastPos.y, lastPos.roomName));
       if (lastPos.y === 1) path.push(new RoomPosition(lastPos.x, 0, lastPos.roomName));
       if (lastPos.y === 48) path.push(new RoomPosition(lastPos.x, 49, lastPos.roomName));
+
+      if (Game.map.getRoomTerrain(lastPos.roomName).get(lastPos.x, lastPos.y) !== TERRAIN_MASK_WALL) {
+        path.pop(); // remove it as it is a wall.
+      }
     }
 
     for (let i = 0; i < path.length; i++) {
@@ -52,12 +57,21 @@ export default class LineNaviagation {
   }
 
   private static getOrderedFormationCreeps(creeps: CreepBase[]): CreepBase[] {
-    const orderedByTimeToLive = creeps.slice().sort((a, b) => a.ticksToLive! - b.ticksToLive!);
-    for (let i = 0; i < orderedByTimeToLive.length; i++) {
-      orderedByTimeToLive[i].memory.formationOrder = i;
+    const designatedLeader =
+      creeps.find(creep => creep.creepType === CreepType.Melee) ??
+      creeps.find(creep => creep.creepType === CreepType.Dismantler) ??
+      creeps.slice().sort((a, b) => a.ticksToLive! - b.ticksToLive!)[0];
+
+    const followers = creeps
+      .filter(creep => creep.name !== designatedLeader.name)
+      .sort((a, b) => a.ticksToLive! - b.ticksToLive!);
+
+    const ordered = [designatedLeader, ...followers];
+    for (let i = 0; i < ordered.length; i++) {
+      ordered[i].memory.formationOrder = i;
     }
 
-    return creeps.slice().sort((a, b) => (a.memory.formationOrder ?? 0) - (b.memory.formationOrder ?? 0));
+    return ordered;
   }
 
   private static creepsAreInRangeOfEachOther(creeps: CreepBase[], range: number): boolean {
