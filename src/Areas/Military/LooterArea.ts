@@ -8,7 +8,7 @@ const LOOTER_FLAG_PREFIX = "Looter";
 const ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
 
 export interface LooterFlagConfig extends AttackFlagConfig {
-  spawnRoomName: string;
+  spawnRoomName?: string;
 }
 
 type LootTask =
@@ -37,7 +37,8 @@ export default class LooterArea extends SoldierArea {
   public static detectAllFlags(): LooterFlagConfig[] {
     return this.detectFlagsForPrefix(LOOTER_FLAG_PREFIX, LOOTER_FLAG_PREFIX, flag => {
       const parsed = LooterArea.parseLooterFlagName(flag.name);
-      if (!parsed.spawnRoomName) {
+      const hasSpawnSegment = flag.name.split("-").length >= 2;
+      if (!hasSpawnSegment) {
         return null;
       }
 
@@ -272,7 +273,7 @@ export default class LooterArea extends SoldierArea {
 
   private static parseLooterFlagName(name: string): { spawnRoomName?: string } {
     const parts = name.split("-");
-    const spawnRoomName = parts[1] && ROOM_NAME_PATTERN.test(parts[1]) ? parts[1] : undefined;
+    const spawnRoomName = parts[1] && parts[1] !== "X" && ROOM_NAME_PATTERN.test(parts[1]) ? parts[1] : undefined;
     return { spawnRoomName };
   }
 }

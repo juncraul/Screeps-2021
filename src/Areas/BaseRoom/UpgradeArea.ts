@@ -20,7 +20,7 @@ export default class UpgradeArea extends BaseArea {
     this.controller = controller;
     this.controllerLevel = controller.level;
     this.containerNextToController = GetRoomObjects.getContainerNextToController(controller.room);
-    this.linkNextToController = GetRoomObjects.getWithinRangeLink(controller.pos, 2);
+    this.linkNextToController = GetRoomObjects.getLinkNextToController(controller.room);
     this.containerConstructionSiteNextToController = GetRoomObjects.getWithinRangeConstructionSite(
       controller.pos,
       3,

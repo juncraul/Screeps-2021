@@ -74,6 +74,8 @@ export default class SpawnTask {
         return "Clerk";
       case CreepType.Scout:
         return "Scout";
+      case CreepType.Laboratorian:
+        return "Laboratorian";
     }
   }
 

@@ -8,25 +8,26 @@ export class SafeMode {
       return;
     }
 
-    if (controller.level < 3) return; // Safe mode is not available until controller level 3
+    if (controller.level < 3) return; // Safe mode should not be used until controller level 3
 
-    const hostilePlayers = room.find(FIND_HOSTILE_CREEPS, {
+    const hostileCreeps = room.find(FIND_HOSTILE_CREEPS, {
       filter: creep =>
         creep.owner &&
-        (towers.length === 0 || (creep.owner.username !== "Invader" && creep.owner.username !== "Source Keeper"))
+        (towers.length === 0 || (creep.owner.username !== "Invader" && creep.owner.username !== "Source Keeper")) &&
+        creep.getActiveBodyparts(ATTACK) + creep.getActiveBodyparts(RANGED_ATTACK) + creep.getActiveBodyparts(WORK) > 0
     });
     const towerEnergy = towers.reduce((sum, tower) => sum + tower.store.getUsedCapacity(RESOURCE_ENERGY), 0);
     const towersOutOfEnergy = towers.length > 0 && towerEnergy === 0;
 
     // Always manage the Defense flag so it is removed when the threat is gone.
-    this.updateDefenseFlag(room, hostilePlayers);
+    this.updateDefenseFlag(room, hostileCreeps);
 
     const testFlags = this.getDefenseTestFlags(room);
     if (testFlags.length > 0) {
       const testSafeModeTriggered = this.testFlagsHavePathToSpawn(room, testFlags);
       this.drawDefenseVisuals(
         room,
-        hostilePlayers.length,
+        hostileCreeps.length,
         testSafeModeTriggered,
         false,
         towersOutOfEnergy,
@@ -43,12 +44,12 @@ export class SafeMode {
       }
     }
 
-    if (hostilePlayers.length === 0) {
+    if (hostileCreeps.length === 0) {
       return;
     }
 
-    const spawnReachable = this.hostilesHavePathToSpawn(room, hostilePlayers);
-    const strongHostiles = this.hasStrongHostiles(hostilePlayers);
+    const spawnReachable = this.hostilesHavePathToSpawn(room, hostileCreeps);
+    const strongHostiles = this.hasStrongHostiles(hostileCreeps);
 
     if (spawnReachable) {
       this.removeDefenseTestFlags(room);
@@ -57,7 +58,7 @@ export class SafeMode {
     const breachDetected = spawnReachable;
 
     const shouldActivateSafeMode =
-      hostilePlayers.length > 0 &&
+      hostileCreeps.length > 0 &&
       breachDetected &&
       controller.safeMode === undefined &&
       controller.safeModeAvailable > 0 &&
@@ -71,7 +72,7 @@ export class SafeMode {
 
     this.drawDefenseVisuals(
       room,
-      hostilePlayers.length,
+      hostileCreeps.length,
       breachDetected,
       strongHostiles,
       towersOutOfEnergy,
@@ -207,16 +208,18 @@ export class SafeMode {
    * Places a "Defense-{roomName}" flag at the spawn when any hostile player is
    * within 15 tiles of a spawn. Removes the flag once no such threat is present.
    */
-  private static updateDefenseFlag(room: Room, hostilePlayers: Creep[]): void {
+  private static updateDefenseFlag(room: Room, hostileCreeps: Creep[]): void {
     const defenseFlagName = `Defense-${room.name}`;
     const existingFlag = Game.flags[defenseFlagName];
     const spawns: StructureSpawn[] = room.find(FIND_MY_SPAWNS);
 
-    const enemyBreachedOutsideWall = hostilePlayers.some(
+    const enemyBreachedOutsideWall = hostileCreeps.some(
       enemy => enemy.pos.x > 2 && enemy.pos.x < 47 && enemy.pos.y > 2 && enemy.pos.y < 47
     );
 
-    if (enemyBreachedOutsideWall && !existingFlag && spawns.length > 0) {
+    const safeModeIsActive = room.controller?.safeMode !== undefined;
+
+    if (enemyBreachedOutsideWall && !existingFlag && spawns.length > 0 && !safeModeIsActive) {
       room.createFlag(spawns[0].pos, defenseFlagName, COLOR_RED, COLOR_RED);
       console.log(`DefenseArea: Placed flag in ${room.name}`);
     } else if (!enemyBreachedOutsideWall && existingFlag) {

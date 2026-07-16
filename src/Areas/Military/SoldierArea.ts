@@ -58,7 +58,7 @@ export default class SoldierArea extends BaseArea {
   // Static: detect all Attack flags (cached per tick)
 
   public static detectAllFlags(): AttackFlagConfig[] {
-    const flags = _.filter(Game.flags, flag => flag.name === "Attack" || flag.name.startsWith("Attack-"));
+    const flags = _.filter(Game.flags, flag => flag.name.startsWith("Attack-") && flag.name.split("-").length >= 2);
     const currentStates: Record<string, SoldierFlagState> = {};
     const configs: AttackFlagConfig[] = [];
 
@@ -129,11 +129,11 @@ export default class SoldierArea extends BaseArea {
 
     visual.text("=== Attack Flags ===", x, y, title);
     y += 0.9;
-    visual.text("Name format: Attack-squadSize-powerRank-baseRoom-anyText", x, y, header);
+    visual.text("Name format: Attack-SpawnRoom-powerRank-anyText", x, y, header);
     y += 0.7;
-    visual.text("Example: Attack-4-2-E29S25-Healers => squad 4, power rank 2, base E29S25", x, y, plain);
+    visual.text("Example: Attack-E29S25-2-Healers => power rank 2, spawn room E29S25", x, y, plain);
     y += 0.7;
-    visual.text("Attack-4-2-Healers keeps default: spawn from any base", x, y, plain);
+    visual.text("Attack-X-2-Healers keeps default: spawn from any base", x, y, plain);
     y += 0.9;
 
     visual.text("Primary color (flag body):", x, y, header);
@@ -206,7 +206,12 @@ export default class SoldierArea extends BaseArea {
     const creepsAreInRoomWithDestination =
       firstFourCreeps.filter(c => c.pos.roomName === this.flag.targetRoom).length === firstFourCreeps.length;
     const formationMovementApplied = creepsAreInRoomWithDestination
-      ? QuadNavigation.tryToKiteTheEnemyAsFormation(firstFourCreeps, this.flag.position, this.flag.name, this.flag.secondaryColor === SecondaryColor.WHITE)
+      ? QuadNavigation.tryToKiteTheEnemyAsFormation(
+          firstFourCreeps,
+          this.flag.position,
+          this.flag.name,
+          this.flag.secondaryColor === SecondaryColor.WHITE
+        )
       : LineNaviagation.tryMoveAsFormation(firstFourCreeps, this.flag.position);
 
     for (const creep of this.creeps) {
@@ -259,15 +264,15 @@ export default class SoldierArea extends BaseArea {
     powerRank: number | null;
     baseRoomName?: string;
   } {
-    if (name === "Attack") {
-      return { squadSize: SQUAD_SIZE, powerRank: null };
-    }
     const parts = name.split("-");
-    const parsedSquad = parts[1];
+    const parsedSpawnRoom = parts[1];
     const parsedPowerRank = parts[2];
-    const squadSize = /^\d+$/.test(parsedSquad) ? parseInt(parsedSquad, 10) : SQUAD_SIZE;
+    const squadSize = SQUAD_SIZE;
     const powerRank = /^\d+$/.test(parsedPowerRank) ? parseInt(parsedPowerRank, 10) : null;
-    const baseRoomName = parts.slice(3).find(part => ROOM_NAME_PATTERN.test(part));
+    const baseRoomName =
+      parsedSpawnRoom && parsedSpawnRoom !== "X" && ROOM_NAME_PATTERN.test(parsedSpawnRoom)
+        ? parsedSpawnRoom
+        : undefined;
     return { squadSize, powerRank, baseRoomName };
   }
 
@@ -392,7 +397,7 @@ export default class SoldierArea extends BaseArea {
   private createMeleeBody(segments: number): BodyPartConstant[] {
     const body: BodyPartConstant[] = [];
     let toughParts = 0;
-    if (segments === 20) toughParts = 8;
+    segments = Math.min(segments, 18); // 18 Attack segments is the max for melee body (7 TOUGH + 18 ATTACK + 25 MOVE) 50 Body Parts
     if (segments === 18) toughParts = 7;
     if (segments === 16) toughParts = 6;
     if (segments === 14) toughParts = 5;

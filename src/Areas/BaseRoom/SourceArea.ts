@@ -31,6 +31,10 @@ export default class SourceArea extends HarvestArea {
     this.handleLinks();
   }
 
+  public handleSpawnTasks(): SpawnTask[] {
+    return super.handleSpawnTasks();
+  }
+
   protected handleSetup() {
     super.handleSetup();
 
@@ -76,13 +80,14 @@ export default class SourceArea extends HarvestArea {
       if (creep.isFull()) {
         if (this.containerConstructionSiteNextToHarvestArea) {
           creep.addTask(new CreepTask(Activity.Construct, this.containerConstructionSiteNextToHarvestArea.pos));
-        }
-        if (this.containerNextToHarvestArea) {
+        } else if (this.containerNextToHarvestArea) {
           if (this.containerNextToHarvestArea.store.getFreeCapacity() > 0) {
             creep.addTask(new CreepTask(Activity.Deposit, this.containerNextToHarvestArea.pos));
           } else {
             creep.addTask(new CreepTask(Activity.Drop, this.containerNextToHarvestArea.pos));
           }
+        } else {
+          creep.addTask(new CreepTask(Activity.Drop, creep.pos));
         }
       } else {
         if (this.containerConstructionSiteNextToHarvestArea) {
@@ -117,7 +122,7 @@ export default class SourceArea extends HarvestArea {
   private handleLinks() {
     if (!this.linkNextToSource || this.linkNextToSource.store.energy !== 800) return;
 
-    const linkForController = GetRoomObjects.getWithinRangeLink(this.controller.pos, 2);
+    const linkForController = GetRoomObjects.getLinkNextToController(this.room);
     const storage = GetRoomObjects.getRoomStorage(this.room);
     if (
       linkForController &&

@@ -36,7 +36,6 @@ export function handleHarvester(area: RemoteArea, creep: CreepBase): void {
 }
 
 export function createHarvester(area: RemoteArea): SpawnTask {
-  // if (area.roomName === "W6N3") console.log("Creating harvester for remote area", area.roomName);
   const bodyPartConstants: BodyPartConstant[] = [];
   let segments = Math.min(5, Math.floor((area.baseRoom.energyCapacityAvailable - 50) / 150));
   const baseControllerLevel = area.baseRoom.controller ? area.baseRoom.controller.level : 0;

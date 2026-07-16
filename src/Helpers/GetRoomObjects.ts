@@ -35,13 +35,23 @@ export class GetRoomObjects {
     const flags = _.filter(Game.flags, flag => flag.name.startsWith("Reserve"));
     const roomTargets: RemoteRoomTarget[] = [];
     flags.forEach(flag => {
+      const splitName = flag.name.split("-");
+      if (splitName.length < 2) {
+        return;
+      }
+
+      const spawnRoomSegment = splitName[1];
+      if (spawnRoomSegment !== "X" && !this.ROOM_NAME_PATTERN.test(spawnRoomSegment)) {
+        return;
+      }
+
       const mode = this.getRemoteRoomModeFromFlag(flag);
       if (!mode) {
         return;
       }
 
       const baseRoomNameFlag = this.getBaseRoomNameFromReserveFlag(flag.name);
-      if (baseRoom && baseRoomNameFlag !== baseRoom.name) {
+      if (baseRoom && baseRoomNameFlag && baseRoomNameFlag !== baseRoom.name) {
         return;
       }
 
@@ -78,6 +88,9 @@ export class GetRoomObjects {
     }
 
     const candidateBaseRoomName = splitName[1];
+    if (candidateBaseRoomName === "X") {
+      return undefined;
+    }
     if (!this.ROOM_NAME_PATTERN.test(candidateBaseRoomName)) {
       return undefined;
     }
@@ -85,13 +98,22 @@ export class GetRoomObjects {
     return candidateBaseRoomName;
   }
 
-  public static getAllRemoteRebuildTargets(): { remoteRoomName: string; baseRoomName: string; flag: Flag }[] {
-    const pattern = /^RemoteRebuild-([WE]\d+[NS]\d+)(?:-.+)?$/;
-    const targets: { remoteRoomName: string; baseRoomName: string; flag: Flag }[] = [];
+  public static getAllRemoteRebuildTargets(): { remoteRoomName: string; baseRoomName?: string; flag: Flag }[] {
+    const targets: { remoteRoomName: string; baseRoomName?: string; flag: Flag }[] = [];
     _.filter(Game.flags, flag => flag.name.startsWith("RemoteRebuild-")).forEach(flag => {
-      const match = pattern.exec(flag.name);
-      if (match) {
-        targets.push({ remoteRoomName: flag.pos.roomName, baseRoomName: match[1], flag });
+      const parts = flag.name.split("-");
+      const spawnRoomName = parts[1];
+      if (!spawnRoomName) {
+        return;
+      }
+
+      if (spawnRoomName === "X") {
+        targets.push({ remoteRoomName: flag.pos.roomName, baseRoomName: undefined, flag });
+        return;
+      }
+
+      if (this.ROOM_NAME_PATTERN.test(spawnRoomName)) {
+        targets.push({ remoteRoomName: flag.pos.roomName, baseRoomName: spawnRoomName, flag });
       }
     });
     return targets;
@@ -335,6 +357,18 @@ export class GetRoomObjects {
     const controller = room.controller;
     if (!controller) return null;
     return this.getWithinRangeContainer(controller.pos, 3);
+  }
+
+  public static getContainerNextToMineral(room: Room): StructureContainer | null {
+    const mineral = room.find(FIND_MINERALS)[0];
+    if (!mineral) return null;
+    return this.getWithinRangeContainer(mineral.pos, 1);
+  }
+
+  public static getLinkNextToController(room: Room): StructureLink | null {
+    const controller = room.controller;
+    if (!controller) return null;
+    return this.getWithinRangeLink(controller.pos, 3);
   }
 
   // --------------------------

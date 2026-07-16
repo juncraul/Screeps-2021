@@ -138,9 +138,12 @@ export function findClosestDeposit(area: RemoteArea, creep: CreepBase): Structur
     }
   }
 
+  const mineralContainer = GetRoomObjects.getContainerNextToMineral(area.baseRoom);
   const containers = area.baseRoom.find(FIND_STRUCTURES, {
     filter: structure =>
-      structure.structureType === STRUCTURE_CONTAINER && structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+      structure.structureType === STRUCTURE_CONTAINER &&
+      structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0 &&
+      structure.id !== mineralContainer?.id
   });
 
   for (const container of containers) {

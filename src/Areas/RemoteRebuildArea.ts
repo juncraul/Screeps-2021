@@ -6,12 +6,13 @@ import BaseArea from "./BaseArea";
 import { CreepBase } from "CreepBase";
 
 /**
- * RemoteRebuildArea — controlled by flags named "RemoteRebuild-<BaseRoom>" (with optional
- * cosmetic suffix, e.g. "RemoteRebuild-W32E25-First").
+ * RemoteRebuildArea — controlled by flags named "RemoteRebuild-<SpawnRoom|-X>" (with optional
+ * cosmetic suffix, e.g. "RemoteRebuild-W32E25-First" or "RemoteRebuild-X-First").
  *
  * The flag is placed INSIDE the remote room that needs help.
- * The base room (<BaseRoom> in the flag name) spawns maximum-size Constructor, Carrier,
- * Harvester and Upgrader creeps and sends them to the remote room.
+ * The spawn room (<SpawnRoom> in the flag name) spawns maximum-size Constructor, Carrier,
+ * Harvester and Upgrader creeps and sends them to the remote room. If SpawnRoom is X,
+ * any base room may spawn them.
  *
  * Once a creep arrives in the remote room its memory is updated so that the normal
  * ConstructionArea / CarryArea / SourceArea / UpgradeArea that run for that remote room
@@ -20,10 +21,10 @@ import { CreepBase } from "CreepBase";
  */
 export default class RemoteRebuildArea extends BaseArea {
   remoteRoomName: string;
-  baseRoomName: string;
+  baseRoomName?: string;
   flag: Flag;
 
-  constructor(remoteRoomName: string, baseRoomName: string, flag: Flag) {
+  constructor(remoteRoomName: string, baseRoomName: string | undefined, flag: Flag) {
     super("RemoteRebuildArea", remoteRoomName, new RoomPosition(25, 25, remoteRoomName), Game.rooms[remoteRoomName]);
     this.remoteRoomName = remoteRoomName;
     this.baseRoomName = baseRoomName;
@@ -32,6 +33,10 @@ export default class RemoteRebuildArea extends BaseArea {
 
   public handleSpawnTasks(): SpawnTask[] {
     const tasks: SpawnTask[] = [];
+    if (!this.baseRoomName) {
+      return tasks;
+    }
+
     const baseRoom = Game.rooms[this.baseRoomName];
     if (!baseRoom) return tasks;
 
@@ -120,11 +125,23 @@ export default class RemoteRebuildArea extends BaseArea {
     return sources.reduce((total, source) => total + this.getRemoteAreaCount("SourceArea", source.id), 0);
   }
 
+  private getRemoteAreaWorkBodyCount(memoryType: string, areaId: string): number {
+    const key = `${memoryType}-${areaId}`;
+    const creepNames: string[] = Helper.getCashedMemory(key, []);
+    return creepNames.reduce((total, name) => {
+      const creep = Game.creeps[name];
+      if (creep) {
+        return total + creep.getActiveBodyparts(WORK);
+      }
+      return total;
+    }, 0);
+  }
+
   private findSourceWithFewestHarvesters(sources: Source[]): Source | null {
     let minCount = Infinity;
     let targetSource: Source | null = null;
     for (const source of sources) {
-      const count = this.getRemoteAreaCount("SourceArea", source.id);
+      const count = this.getRemoteAreaWorkBodyCount("SourceArea", source.id);
       if (count < minCount) {
         minCount = count;
         targetSource = source;

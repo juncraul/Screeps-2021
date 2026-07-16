@@ -7,7 +7,7 @@ const ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
 const SOURCE_KEEPER_FLAG_PREFIX = "SourceKeeper";
 
 export interface SourceKeeperFlagConfig extends AttackFlagConfig {
-  spawnRoomName: string;
+  spawnRoomName?: string;
 }
 
 export default class SourceKeeperArea extends SoldierArea {
@@ -32,7 +32,8 @@ export default class SourceKeeperArea extends SoldierArea {
   public static detectAllFlags(): SourceKeeperFlagConfig[] {
     return this.detectFlagsForPrefix(SOURCE_KEEPER_FLAG_PREFIX, SOURCE_KEEPER_FLAG_PREFIX, flag => {
       const parsed = SourceKeeperArea.parseSourceKeeperFlagName(flag.name);
-      if (!parsed.spawnRoomName) {
+      const hasSpawnSegment = flag.name.split("-").length >= 2;
+      if (!hasSpawnSegment) {
         return null;
       }
 
@@ -51,7 +52,7 @@ export default class SourceKeeperArea extends SoldierArea {
   }
 
   public handleSpawnTasks(room: Room): SpawnTask[] {
-    if (this.flag.spawnRoomName !== room.name) {
+    if (this.flag.spawnRoomName && this.flag.spawnRoomName !== room.name) {
       return [];
     }
 
@@ -188,7 +189,7 @@ export default class SourceKeeperArea extends SoldierArea {
 
   private static parseSourceKeeperFlagName(name: string): { spawnRoomName?: string } {
     const parts = name.split("-");
-    const spawnRoomName = parts[1] && ROOM_NAME_PATTERN.test(parts[1]) ? parts[1] : undefined;
+    const spawnRoomName = parts[1] && parts[1] !== "X" && ROOM_NAME_PATTERN.test(parts[1]) ? parts[1] : undefined;
     return { spawnRoomName };
   }
 

@@ -60,12 +60,11 @@ All current flags are documented here so you only need this section.
 
 | Flag | Example | What it does | Spawn room selection |
 |---|---|---|---|
-| `Reserve[-BaseRoom]` (purple) | `Reserve-E29S25` | Reserve remote controller | Optional from name (`BaseRoom`) |
-| `Reserve[-BaseRoom]` (blue) | `Reserve-E29S25` | Claim remote controller | Optional from name (`BaseRoom`) |
-| `RemoteRebuild-BaseRoom[-AnyText]` | `RemoteRebuild-E29S25-First` | Rebuild remote room from base room | Required in name (`BaseRoom`) |
-| `Attack[-SquadSize][-BodySegments][-BaseRoom][-AnyText]` | `Attack-4-2-E29S25-Healers` | Soldier squad behavior | Optional from name (`BaseRoom`) |
-| `SourceKeeper-SpawnRoom` | `SourceKeeper-E29S25` | Source Keeper hunting squad | Required from name (`SpawnRoom`) |
-| `Looter-SpawnRoom` | `Looter-E29S25` | Looter carrier unit | Required from name (`SpawnRoom`) |
+| `Reserve-SpawnRoom[-AnyIgnoredText]` (purple/blue) | `Reserve-E29S25` | Reserve/claim remote controller | Required part 2 (`SpawnRoom`) or `X` |
+| `RemoteRebuild-SpawnRoom[-AnyIgnoredText]` | `RemoteRebuild-E29S25-First` | Rebuild remote room from spawn room | Required part 2 (`SpawnRoom`) or `X` |
+| `Attack-SpawnRoom[-PowerRank][-AnyIgnoredText]` | `Attack-E29S25-2-Healers` | Soldier squad behavior | Required part 2 (`SpawnRoom`) or `X` |
+| `SourceKeeper-SpawnRoom[-AnyIgnoredText]` | `SourceKeeper-E29S25` | Source Keeper hunting squad | Required part 2 (`SpawnRoom`) or `X` |
+| `Looter-SpawnRoom[-AnyIgnoredText]` | `Looter-E29S25` | Looter carrier unit | Required part 2 (`SpawnRoom`) or `X` |
 | `Defense-RoomName` | `Defense-E29S25` | Emergency in-room defense team | Auto-placed by SafeMode logic |
 | `Market-Sell-Energy-Amount-PriceModeOrValue` | `Market-Sell-Energy-10000-MarketValue` | Creates and tracks sell orders from terminal stock | Uses room where the flag is placed |
 | `ReRoute-TargetRoom-From-CurrentRoom[-AnyText]` | `ReRoute-E29S25-From-E30S25` | Forces cross-room movement through the flag room | N/A (movement helper) |
@@ -73,47 +72,72 @@ All current flags are documented here so you only need this section.
 
 ---
 
-### `Reserve[-BaseRoom]`
+### Unified SpawnRoom Convention
+
+For runtime flags that create/assign creeps, the second segment is now standardized as `SpawnRoom`:
+
+- `FlagType-SpawnRoom-...`
+- Use `X` when any spawn room is allowed.
+
+Examples:
+- `Attack-X-2-Raid`
+- `Reserve-E29S25`
+- `SourceKeeper-X`
+
+Exceptions (unchanged):
+1. `Market-*`
+2. `ReRoute-*`
+3. `Season-*`
+
+Note:
+- `Defense-*` remains auto-managed by SafeMode and is keyed by defended room.
+
+---
+
+### `Reserve-SpawnRoom[-AnyIgnoredText]`
 
 - File source: `src/Helpers/GetRoomObjects.ts`
 - `Reserve` flags are interpreted by color:
 1. **Primary color `COLOR_PURPLE`**: room is treated as **reserve target**.
 2. **Primary color `COLOR_BLUE`**: room is treated as **claim target**.
-- Optional base room binding is parsed from flag name part 2 (`Reserve-<BaseRoom>`), only when it matches room pattern `[WE]\d+[NS]\d+`.
+- Spawn room binding is parsed from part 2 (`Reserve-<SpawnRoom>`).
+- `Reserve-X` means any room may handle the remote.
 - For reserve flags, `secondaryColor === COLOR_BLUE` enables **mineral-only** remote mode.
 
 Examples:
-- `Reserve` → reserve/claim room where the flag is placed, spawn from any room.
-- `Reserve-E29S25` → same behavior, but only base room `E29S25` handles it.
+- `Reserve-E29S25` → only spawn room `E29S25` handles it.
+- `Reserve-X` → any spawn room may handle it.
 
 ---
 
-### `RemoteRebuild-BaseRoom[-AnyText]`
+### `RemoteRebuild-SpawnRoom[-AnyIgnoredText]`
 
 - File source: `src/Helpers/GetRoomObjects.ts`, `src/Areas/RemoteRebuildArea.ts`
 - Detects flags with prefix `RemoteRebuild-`.
-- `BaseRoom` is required and parsed from name (`RemoteRebuild-([WE]\d+[NS]\d+)`).
+- Part 2 is parsed as `SpawnRoom`.
+- `RemoteRebuild-X` is supported and allows any room to spawn rebuild transit creeps.
 - Flag must be placed **inside the remote room** that needs rebuilding.
-- The specified base room spawns transit rebuild creeps (Constructor, Carrier, Harvester, Upgrader), then they are reassigned into local area memories once they arrive.
+- The selected spawn room(s) spawn transit rebuild creeps (Constructor, Carrier, Harvester, Upgrader), then they are reassigned into local area memories once they arrive.
 
 Color behavior in `RemoteRebuildArea`:
 1. `COLOR_WHITE`: full rebuild set (constructor/carrier/harvester/upgrader).
 2. `COLOR_GREY`: carrier-only mode.
 
 Example:
-- `RemoteRebuild-E29S25-First` placed in remote room `W10N20` means base room `E29S25` rebuilds `W10N20`.
+- `RemoteRebuild-E29S25-First` placed in remote room `W10N20` means spawn room `E29S25` rebuilds `W10N20`.
+- `RemoteRebuild-X-First` means any spawn room can contribute.
 
 ---
 
-### `Attack[-SquadSize][-BodySegments][-BaseRoom][-AnyText]`
+### `Attack-SpawnRoom[-PowerRank][-AnyIgnoredText]`
 
 - File source: `src/Areas/Military/SoldierArea.ts`
 - Prefix: `Attack`.
 - Parsed format:
-1. `SquadSize` (default `5`)
-2. `BodySegments` (default role body)
-3. Optional `BaseRoom`
-- If omitted entirely (`Attack`), defaults are used.
+1. `SpawnRoom` (required part 2, or `X`)
+2. Optional `PowerRank` (default role body)
+3. Optional ignored suffix text
+- `SquadSize` currently defaults to `5`.
 
 Flag colors control behavior:
 
@@ -130,32 +154,32 @@ Secondary color (combat targeting):
 4. `WHITE` → no attack, move/hold
 
 Examples:
-- `Attack`
-- `Attack-4-2-E29S25-Healers`
-- `Attack-3-1` (spawn from any base)
+- `Attack-E29S25-2-Healers`
+- `Attack-X-1`
 
 ---
 
-### `SourceKeeper-SpawnRoom`
+### `SourceKeeper-SpawnRoom[-AnyIgnoredText]`
 
 - File source: `src/Areas/Military/SourceKeeperArea.ts`
 - Prefix: `SourceKeeper`.
-- Name part 2 is required spawn room (`SourceKeeper-<SpawnRoom>`).
+- Name part 2 is spawn room (`SourceKeeper-<SpawnRoom>`), or `X`.
 - Flag target room is always the room where the flag is placed.
-- Spawns a dedicated combat squad from the specified base room.
+- Spawns a dedicated combat squad from the selected spawn room(s).
 
 Example:
 - `SourceKeeper-E29S25`
+- `SourceKeeper-X`
 
 ---
 
-### `Looter-SpawnRoom`
+### `Looter-SpawnRoom[-AnyIgnoredText]`
 
 - File source: `src/Areas/Military/LooterArea.ts`
 - Prefix: `Looter`.
-- Name part 2 is required spawn room (`Looter-<SpawnRoom>`).
+- Name part 2 is spawn room (`Looter-<SpawnRoom>`), or `X`.
 - Flag target room is where the flag is placed.
-- Spawns looter creep(s) from specified spawn room and runs loot/return cycle.
+- Spawns looter creep(s) from selected spawn room(s) and runs loot/return cycle.
 
 Current behavior notes:
 1. Spawns looter role via `CreepType.Looter`.
@@ -164,6 +188,7 @@ Current behavior notes:
 
 Example:
 - `Looter-E29S25`
+- `Looter-X`
 
 ---
 

@@ -108,15 +108,12 @@ export default class StationaryFillerArea extends BaseArea {
     for (const plan of plans) {
       const planStartX = plan.x - 3;
       const planStartY = plan.y - 3;
-      const onlyOnePosition = this.extensionsAndSpawns.length < 7;
-      const positions = onlyOnePosition
-        ? [new RoomPosition(planStartX + 2, planStartY + 4, this.room.name)]
-        : [
-            new RoomPosition(planStartX + 2, planStartY + 4, this.room.name),
-            new RoomPosition(planStartX + 4, planStartY + 4, this.room.name),
-            new RoomPosition(planStartX + 2, planStartY + 2, this.room.name),
-            new RoomPosition(planStartX + 4, planStartY + 2, this.room.name)
-          ];
+      const positions = [
+        new RoomPosition(planStartX + 2, planStartY + 4, this.room.name),
+        new RoomPosition(planStartX + 4, planStartY + 4, this.room.name),
+        new RoomPosition(planStartX + 2, planStartY + 2, this.room.name),
+        new RoomPosition(planStartX + 4, planStartY + 2, this.room.name)
+      ];
 
       for (const pos of positions) {
         const key = `${pos.x}:${pos.y}`;
@@ -186,7 +183,9 @@ export default class StationaryFillerArea extends BaseArea {
     return new SpawnTask(CreepType.StationaryFiller, this.areaId, bodyPartConstants, this, null, null, [
       TOP_LEFT,
       TOP_RIGHT,
-      BOTTOM
+      BOTTOM_RIGHT,
+      BOTTOM,
+      BOTTOM_LEFT
     ]);
   }
 

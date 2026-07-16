@@ -1,6 +1,7 @@
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import HarvestArea from "./HarvestArea";
+import { Helper } from "Helpers/Helper";
 
 export default class MineralArea extends HarvestArea {
   mineral: Mineral;
@@ -47,7 +48,11 @@ export default class MineralArea extends HarvestArea {
     for (const creep of this.creeps) {
       if (!creep.isFree()) continue;
       if (this.containerNextToHarvestArea.store.getFreeCapacity() < 20) continue;
-      creep.addTask(new CreepTask(Activity.HarvestMineral, this.mineral.pos, this.containerNextToHarvestArea.pos));
+      if (Helper.isSamePosition(this.containerNextToHarvestArea.pos, creep.pos)) {
+        creep.addTask(new CreepTask(Activity.HarvestMineral, this.mineral.pos, this.containerNextToHarvestArea.pos));
+      } else {
+        creep.addTask(new CreepTask(Activity.Move, this.containerNextToHarvestArea.pos));
+      }
     }
   }
 

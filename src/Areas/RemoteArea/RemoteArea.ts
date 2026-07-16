@@ -40,7 +40,7 @@ export default class RemoteArea extends BaseArea {
   resources: Resource[];
   claimersPerRoom: number;
   harvestersPerSource: number;
-  carriersPerRoom: number;
+  carryBodyPartsPerRoom: number;
   repairersPerRoom: number;
   remoteMode: RemoteRoomMode;
   mineralOnly: boolean;
@@ -99,7 +99,7 @@ export default class RemoteArea extends BaseArea {
     this.claimersPerRoom = 1;
     // TODO: Find a proper way to increase harvester per source, we've incresed for this room because it is too far away from our base and we need more harvesters to make it work (creeps die too quickly)
     this.harvestersPerSource = 1; // Default value, can be adjusted based on strategy
-    this.carriersPerRoom = 1;
+    this.carryBodyPartsPerRoom = 1;
     this.repairersPerRoom = 1;
     this.remoteMode = remoteMode;
     this.mineralOnly = mineralOnly;
@@ -121,31 +121,33 @@ export default class RemoteArea extends BaseArea {
 
     if (remoteMode === RemoteRoomMode.Claim) {
       this.claimersPerRoom = this.room?.controller?.owner ? 0 : 1;
-      this.carriersPerRoom = 0;
+      this.carryBodyPartsPerRoom = 0;
+      this.harvestersPerSource = 0;
+      this.repairersPerRoom = 0;
     } else if (remoteMode === RemoteRoomMode.ReserveAttack) {
       this.harvestersPerSource = 0;
-      this.carriersPerRoom = 0;
+      this.carryBodyPartsPerRoom = 0;
       this.repairersPerRoom = 0;
     } else if (mineralOnly) {
       this.claimersPerRoom = 0;
       this.harvestersPerSource = 0;
-      this.carriersPerRoom = 0;
+      this.carryBodyPartsPerRoom = 0;
       this.repairersPerRoom = 0;
     } else {
       const energyInRoom = this.totalEnergyInRoom();
-      if (!this.baseRoomController || this.baseRoomController.level < 3) {
-        // We have smaller carriers at this level.
-        if (energyInRoom > 1000) {
-          this.carriersPerRoom = 3;
-        } else if (energyInRoom > 500) {
-          this.carriersPerRoom = 2;
-        }
+      if (energyInRoom > 4000) {
+        this.claimersPerRoom = 0;
+        this.harvestersPerSource = 0;
+        this.carryBodyPartsPerRoom = 20;
+      } else if (energyInRoom > 2000) {
+        this.claimersPerRoom = 0;
+        this.harvestersPerSource = 0;
+        this.carryBodyPartsPerRoom = 10;
+      } else if (energyInRoom > 1000) {
+        this.claimersPerRoom = 0;
+        this.carryBodyPartsPerRoom = 5;
       } else {
-        if (energyInRoom > 4000) {
-          this.carriersPerRoom = 3;
-        } else if (energyInRoom > 2000) {
-          this.carriersPerRoom = 2;
-        }
+        this.carryBodyPartsPerRoom = 3;
       }
     }
     if (this.baseRoom.controller && this.baseRoom.controller.level < 3) {
@@ -154,7 +156,6 @@ export default class RemoteArea extends BaseArea {
   }
 
   public handleSpawnTasks(): SpawnTask[] {
-    // if (this.roomName === "W6N3") console.log("handleSpawnTasks", this.roomName);
     const tasksForThisArea: SpawnTask[] = [];
     // Check if we have an invader flag
     const invaderFlag = Game.flags[RemoteArea.INVADER_DEFENDER + this.baseRoom.name];
@@ -174,17 +175,15 @@ export default class RemoteArea extends BaseArea {
     }
 
     // Handle Harvester spawning
-    if (
-      this.sources.length > 0 &&
-      this.getCreepCountByType(CreepType.Harvester) < this.harvestersPerSource * this.sources.length
-    ) {
+    const sourcesCount = this.sources.length === 0 ? 1 : this.sources.length; // we might not have visibility to the room yet, so assume 1 source if we don't know.
+    if (this.getCreepCountByType(CreepType.Harvester) < this.harvestersPerSource * sourcesCount) {
       tasksForThisArea.push(this.createHarvester());
     }
 
     // Handle Carrier spawning
-    const carrierCount = this.getCreepCountByType(CreepType.Carrier);
+    const carryBodyCount = this.getBodyCountByType(CreepType.Carrier, CARRY);
     if (
-      carrierCount < this.carriersPerRoom &&
+      carryBodyCount < this.carryBodyPartsPerRoom &&
       (this.containers.length > 0 || (this.controller && this.controller.level <= 3))
     ) {
       tasksForThisArea.push(this.createCarrier());
@@ -312,7 +311,12 @@ export default class RemoteArea extends BaseArea {
         plain
       );
       y += 0.7;
-      visual.text("Carriers " + this.getCreepCountByType(CreepType.Carrier) + "/" + this.carriersPerRoom, x, y, plain);
+      visual.text(
+        "Carry body parts " + this.getBodyCountByType(CreepType.Carrier, CARRY) + "/" + this.carryBodyPartsPerRoom,
+        x,
+        y,
+        plain
+      );
       y += 0.7;
       visual.text(
         "Repairers " + this.getCreepCountByType(CreepType.Repairer) + "/" + this.repairersPerRoom,
@@ -360,6 +364,42 @@ export default class RemoteArea extends BaseArea {
   }
 
   private setup() {
+    if (this.remoteMode === RemoteRoomMode.Claim) {
+      if (this.controller && this.controller.my) {
+        // Create RemoteRebuild Flag
+        const rebuildFlagName = `RemoteRebuild-${this.baseRoom.name}`;
+        if (!Game.flags[rebuildFlagName]) {
+          this.room.createFlag(this.controller.pos, rebuildFlagName);
+        }
+        // Check if we have spawn strucure or construction site in the room, if no, create a spawn.
+        const spawns = GetRoomObjects.getRoomSpawns(this.room, true);
+        const spawnConstructionSites = GetRoomObjects.getRoomConstructionSites(this.room).filter(
+          structureType => structureType.structureType === STRUCTURE_SPAWN
+        );
+        // Find remote flag
+        const remoteFlag = _.find(
+          Game.flags,
+          flag => flag.name.startsWith(`Reserve-${this.baseRoom.name}`) && flag.pos.roomName === this.roomName
+        );
+        if (spawns.length === 0 && spawnConstructionSites.length === 0) {
+          if (remoteFlag) {
+            this.room.createConstructionSite(
+              remoteFlag.pos.x,
+              remoteFlag.pos.y,
+              STRUCTURE_SPAWN,
+              `Spawn-${remoteFlag.room?.name ?? Game.time}-First`
+            );
+          }
+        }
+        if (spawns.length > 0 && remoteFlag) {
+          // Remove the Reserve Flag if we have a spawn in the roo
+          if (Game.flags[remoteFlag.name]) {
+            Game.flags[remoteFlag.name].remove();
+          }
+        }
+      }
+      return;
+    }
     if (this.mineralOnly) {
       // In mineral mode, ensure a container exists next to the mineral deposit.
       if (this.room && this.mineral && !this.mineralContainer) {
@@ -652,12 +692,21 @@ export default class RemoteArea extends BaseArea {
     return count;
   }
 
+  private getBodyCountByType(type: CreepType, bodyType: BodyPartConstant): number {
+    let count = 0;
+    for (const creep of this.creeps) {
+      if (creep.creepType === type) {
+        count += creep.getNumberOfBodyPart(bodyType);
+      }
+    }
+    return count;
+  }
+
   public createClaimer(): SpawnTask | null {
     return createClaimer(this);
   }
 
   public createHarvester(): SpawnTask {
-    // if (this.roomName === "W6N3") console.log("Creating harvester for remote area", this.roomName);
     return createHarvester(this);
   }
 

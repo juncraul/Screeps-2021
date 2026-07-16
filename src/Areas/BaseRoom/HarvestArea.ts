@@ -29,13 +29,13 @@ export default abstract class HarvestArea extends BaseArea {
     );
   }
 
-  public handleThisArea() {
+  protected handleThisArea() {
     this.handleSetup();
     this.handleCreeps();
     this.checkForSuicide();
   }
 
-  public handleSpawnTasks(): SpawnTask[] {
+  protected handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
     const allowedWorkerCount =
       this.maxWorkerCount + this.getNumberOfDyingCreeps() + (this.doWeNeedToReplaceWeakCreep() ? 1 : 0);
@@ -52,16 +52,37 @@ export default abstract class HarvestArea extends BaseArea {
 
   protected handleSetup() {
     if (this.controllerLevel < 3) return;
+    const spawns = GetRoomObjects.getRoomSpawns(this.room, true);
+    if (spawns.length === 0) return;
     if (!this.containerNextToHarvestArea && !this.containerConstructionSiteNextToHarvestArea) {
       const potentialPositionsNextToHarvestArea = Helper.getFreeAdjacentPositions(this.harvestPosition);
       // TODO: Need to work more on this logic, in case container gets destroyed and we already have extensions, a different place might be chosen.
       let maxPositionFound = -1;
       let positionForContainer: RoomPosition | null = null;
+      let pathLengthToSpawn = Infinity;
+      let positions: [RoomPosition, number, number][] = [];
       for (const position of potentialPositionsNextToHarvestArea) {
         const possibleExtensionsForFuture = Helper.getFreeAdjacentPositions(position).length - 1; // -1 because we leave one empty for pathing to the harvest area
+        const pathToSpawn = Helper.simplePathFinderWithObstacles(position, spawns[0].pos).path.length;
+        positions.push([position, possibleExtensionsForFuture, pathToSpawn]);
+      }
+      // Sort positions by possibleExtensionsForFuture descending, then by pathToSpawn ascending
+      positions = positions.sort((a, b) => {
+        if (b[1] !== a[1]) {
+          return b[1] - a[1]; // Sort by possibleExtensionsForFuture descending
+        }
+        return a[2] - b[2]; // Sort by pathToSpawn ascending
+      });
+      for (const [position, possibleExtensionsForFuture, pathToSpawn] of positions) {
         if (possibleExtensionsForFuture > maxPositionFound) {
           maxPositionFound = possibleExtensionsForFuture;
           positionForContainer = position;
+          pathLengthToSpawn = pathToSpawn;
+        } else if (possibleExtensionsForFuture >= maxPositionFound - 1 && pathToSpawn < pathLengthToSpawn - 6) {
+          // We can compromise 1 empty position, if the path to spawn is shorter with at least 6 steps.
+          maxPositionFound = possibleExtensionsForFuture;
+          positionForContainer = position;
+          pathLengthToSpawn = pathToSpawn;
         }
       }
       if (positionForContainer) {

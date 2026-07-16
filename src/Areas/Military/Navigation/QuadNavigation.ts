@@ -49,7 +49,8 @@ export default class QuadNavigation {
 
     const healerCannotKeepUp = focusedDamageMissing > focusedHealPotential || totalMissingHits > totalHealPotential;
     const isRetreating = previousState && previousState.tick === Game.time - 1 && previousState.isRetreating;
-    if (isRetreating) console.log(`[${memoryName}] Retreating from threat at ${threat?.pos} due to previous state.`);
+    if (isRetreating)
+      console.log(`[${memoryName}] Retreating from threat at ${String(threat?.pos)} due to previous state.`);
     const shouldRetreat = isRetreating
       ? totalMissingHits !== 0
       : mostDamagedPercentage < 0.6 && damageTaken > 0 && healerCannotKeepUp && !!threat;
@@ -62,7 +63,11 @@ export default class QuadNavigation {
 
     if (threat) {
       if (shouldRetreat) {
-        console.log(`[${memoryName}] Retreating from threat at ${threat.pos} due to damage taken and healer cannot keep up.`);
+        console.log(
+          `[${memoryName}] Retreating from threat at ${String(
+            threat.pos
+          )} due to damage taken and healer cannot keep up.`
+        );
         leader.say("😱"); // Retreat to destination
         return this.tryMoveAsFormation(quadCreeps, destination, memoryName, false);
       } else {

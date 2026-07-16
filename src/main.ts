@@ -38,7 +38,6 @@ export const loop = () => {
   if (Helper.getCashedMemory("PersistentWorld", false) && Game.cpu.bucket === 10000) {
     Game.cpu.generatePixel();
   }
-
   executeTestFlag();
 };
 
