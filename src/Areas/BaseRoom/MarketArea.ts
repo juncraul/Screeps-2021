@@ -1,6 +1,6 @@
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
-import BaseArea from "../BaseArea";
+import BaseArea from "./BaseArea";
 
 const MARKET_FLAG_PREFIX = "Market";
 const GREEN_FLAG_TTL = 10000;

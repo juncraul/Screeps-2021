@@ -1,5 +1,5 @@
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
-import BaseArea from "../../BaseArea";
+import BaseArea from "../../BaseRoom/BaseArea";
 import { CreepBase } from "CreepBase";
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
@@ -47,11 +47,11 @@ export default class DefenseArea extends BaseArea {
 
     const defenders = this.creeps.filter(c => c.creepType === CreepType.Defender);
     const rangers = this.creeps.filter(c => c.creepType === CreepType.DefenseRanger);
-    const healers = this.creeps.filter(c => c.creepType === CreepType.DefenseHealer);
+    // const healers = this.creeps.filter(c => c.creepType === CreepType.DefenseHealer);
 
     const defenderAlive = defenders.filter(c => !(c.ticksToLive !== undefined && c.ticksToLive < 150)).length;
     const rangerAlive = rangers.filter(c => !(c.ticksToLive !== undefined && c.ticksToLive < 150)).length;
-    const healerAlive = healers.filter(c => !(c.ticksToLive !== undefined && c.ticksToLive < 150)).length;
+    // const healerAlive = healers.filter(c => !(c.ticksToLive !== undefined && c.ticksToLive < 150)).length;
 
     if (defenderAlive < 1) {
       tasks.push(this.createDefenderCreep());
@@ -59,9 +59,10 @@ export default class DefenseArea extends BaseArea {
     if (rangerAlive < 1) {
       tasks.push(this.createRangerCreep());
     }
-    if (healerAlive < 1) {
-      tasks.push(this.createHealerCreep());
-    }
+    // Will disable healer for now, creeps will always stay under rampart anyway.
+    // if (healerAlive < 1) {
+    //   tasks.push(this.createHealerCreep());
+    // }
 
     return tasks;
   }
@@ -183,7 +184,7 @@ export default class DefenseArea extends BaseArea {
     }
 
     // Re-evaluate every tick: enemy can reposition, so we may need a different rampart.
-    const targetRampart = this.findBestDefenderRampart(target, creep, room);
+    const targetRampart = this.findBestDefenderRampart(target, creep, room, ranged);
     if (targetRampart && !this.isPosEqual(creep.pos, targetRampart.pos)) {
       this.moveThroughDefensiveRoute(creep.creep, targetRampart.pos, room);
     } else {
@@ -227,7 +228,12 @@ export default class DefenseArea extends BaseArea {
 
   // ─── Rampart helpers ─────────────────────────────────────────────────────
 
-  private findBestDefenderRampart(enemyPos: RoomPosition, creep: CreepBase, room: Room): StructureRampart | null {
+  private findBestDefenderRampart(
+    enemyPos: RoomPosition,
+    creep: CreepBase,
+    room: Room,
+    ranged: boolean
+  ): StructureRampart | null {
     const ramparts = room.find(FIND_MY_STRUCTURES, {
       filter: s => s.structureType === STRUCTURE_RAMPART
     });
@@ -237,8 +243,22 @@ export default class DefenseArea extends BaseArea {
     const interior = ramparts.filter(r => this.isInteriorPos(r.pos));
     const rampartPool = interior.length > 0 ? interior : ramparts;
 
-    const free = rampartPool.filter(r => !this.otherCreepOnPos(r.pos, creep.name));
-    const pool = free.length > 0 ? free : rampartPool;
+    let pool: AnyOwnedStructure[];
+    if (ranged) {
+      // Rangers yield range-≤1 positions to melee when melee defenders are present.
+      const hasMeleeDefender = this.creeps.some(c => c.creepType === CreepType.Defender && c.name !== creep.name);
+      const free = rampartPool.filter(r => !this.otherCreepOnPos(r.pos, creep.name));
+      if (hasMeleeDefender) {
+        const safeForRanger = free.filter(r => r.pos.getRangeTo(enemyPos) > 1);
+        pool = safeForRanger.length > 0 ? safeForRanger : free;
+      } else {
+        pool = free.length > 0 ? free : rampartPool;
+      }
+    } else {
+      // Melee can displace rangers: only treat other melee creeps as blocking a spot.
+      const free = rampartPool.filter(r => !this.otherCreepOnPos(r.pos, creep.name, CreepType.Defender));
+      pool = free.length > 0 ? free : rampartPool;
+    }
 
     const scored = pool.map(rampart => ({
       rampart,
@@ -257,6 +277,25 @@ export default class DefenseArea extends BaseArea {
       if (pathDiff !== 0) return pathDiff;
       return a.rampart.pos.getRangeTo(creep.pos) - b.rampart.pos.getRangeTo(creep.pos);
     });
+
+    // if (candidates.length === 0) return null;
+
+    // if (ranged) {
+    //   const numberOfMeleeDefenders = this.creeps.filter(c => c.creepType === CreepType.Defender).length;
+    //   const candidateIndex = candidates.length > numberOfMeleeDefenders ? numberOfMeleeDefenders : -1;
+    //   return (candidateIndex === -1 ? null : candidates[candidateIndex].rampart) as StructureRampart | null;
+    // }
+
+    // console.log("ranged", ranged);
+    // console.log(
+    //   "map rampart",
+    //   candidates.map(
+    //     c =>
+    //       `${c.rampart.pos.x},${c.rampart.pos.y} (enemy range: ${c.rampart.pos.getRangeTo(enemyPos)}, path length: ${
+    //         c.path.length
+    //       })`
+    //   )
+    // );
 
     return candidates[0].rampart as StructureRampart;
   }
@@ -449,8 +488,10 @@ export default class DefenseArea extends BaseArea {
     return pos.x >= 3 && pos.x <= 46 && pos.y >= 3 && pos.y <= 46;
   }
 
-  private otherCreepOnPos(pos: RoomPosition, excludeName: string): boolean {
-    return this.creeps.some(c => c.name !== excludeName && this.isPosEqual(c.pos, pos));
+  private otherCreepOnPos(pos: RoomPosition, excludeName: string, creepType: CreepType | null = null): boolean {
+    return this.creeps.some(
+      c => c.name !== excludeName && this.isPosEqual(c.pos, pos) && (creepType === null || c.creepType === creepType)
+    );
   }
 
   private isPosEqual(a: RoomPosition, b: RoomPosition): boolean {

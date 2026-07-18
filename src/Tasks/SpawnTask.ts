@@ -1,4 +1,4 @@
-import BaseArea from "Areas/BaseArea";
+import BaseArea from "Areas/BaseRoom/BaseArea";
 import { CreepType } from "CreepType";
 
 export { CreepType };

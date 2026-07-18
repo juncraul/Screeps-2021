@@ -1,7 +1,7 @@
 import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
-import BaseArea from "../BaseArea";
+import BaseArea from "./BaseArea";
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { CreepBase } from "CreepBase";
 
@@ -30,9 +30,8 @@ export default class StationaryFillerArea extends BaseArea {
 
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
-    const roomController = GetRoomObjects.getRoomController(this.room);
 
-    if (!roomController || roomController.level < 3) return tasksForThisArea;
+    if (this.containers.length === 0 || this.extensionsAndSpawns.length === 0) return tasksForThisArea; // No containers or extensions/spawns to work with, so no need to spawn creeps.
 
     // Only create creeps if we have a valid position
     if (this.stationaryPositions.length === 0) {

@@ -9,7 +9,8 @@ import { Helper } from "./Helper";
 export enum RemoteRoomMode {
   Reserve = "Reserve",
   Claim = "Claim",
-  ReserveAttack = "ReserveAttack"
+  ReserveAttack = "ReserveAttack",
+  StealResources = "StealResources"
 }
 
 export interface RemoteRoomTarget {
@@ -65,7 +66,7 @@ export class GetRoomObjects {
     return roomTargets;
   }
 
-  private static getRemoteRoomModeFromFlag(flag: Flag): RemoteRoomMode | null {
+  public static getRemoteRoomModeFromFlag(flag: Flag): RemoteRoomMode | null {
     if (flag.color === COLOR_RED) {
       return RemoteRoomMode.ReserveAttack;
     }
@@ -76,6 +77,10 @@ export class GetRoomObjects {
 
     if (flag.color === COLOR_PURPLE) {
       return RemoteRoomMode.Reserve;
+    }
+
+    if (flag.color === COLOR_GREY) {
+      return RemoteRoomMode.StealResources;
     }
 
     return null;

@@ -2,7 +2,7 @@ import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
-import BaseArea from "../BaseArea";
+import BaseArea from "./BaseArea";
 import { CreepBase } from "CreepBase";
 
 export default class UpgradeArea extends BaseArea {
@@ -119,12 +119,12 @@ export default class UpgradeArea extends BaseArea {
     );
     let carryBodyPartsNeeded = 1;
 
-    if (availableUpgradeEnergy > 100000) carryBodyPartsNeeded = 70;
-    else if (availableUpgradeEnergy >= 40000) carryBodyPartsNeeded = 60;
-    else if (availableUpgradeEnergy >= 30000) carryBodyPartsNeeded = 50;
-    else if (availableUpgradeEnergy >= 10000) carryBodyPartsNeeded = 40;
-    else if (availableUpgradeEnergy >= 5000) carryBodyPartsNeeded = 30;
-    else if (availableUpgradeEnergy >= 2000) carryBodyPartsNeeded = 20;
+    if (availableUpgradeEnergy > 100000) carryBodyPartsNeeded = 60;
+    else if (availableUpgradeEnergy >= 40000) carryBodyPartsNeeded = 50;
+    else if (availableUpgradeEnergy >= 30000) carryBodyPartsNeeded = 40;
+    else if (availableUpgradeEnergy >= 10000) carryBodyPartsNeeded = 30;
+    else if (availableUpgradeEnergy >= 5000) carryBodyPartsNeeded = 20;
+    else if (availableUpgradeEnergy >= 2000) carryBodyPartsNeeded = 15;
     else if (availableUpgradeEnergy >= 1000) carryBodyPartsNeeded = 10;
     else if (availableUpgradeEnergy >= 500) carryBodyPartsNeeded = 7;
     else if (availableUpgradeEnergy < 500) carryBodyPartsNeeded = 4;

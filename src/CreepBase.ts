@@ -4,6 +4,8 @@ import CreepTask, { Activity } from "Tasks/CreepTask";
 import { CreepType } from "CreepType";
 import BaseRoomStats from "Areas/BaseRoom/BaseRoomStats";
 
+const MOVE_TO_REUSE = 5;
+
 export class CreepBase {
   private static readonly HARVEST_DIRECT_COLLECT_INTENT = "__harvest_direct__";
 
@@ -189,6 +191,12 @@ export class CreepBase {
     const source: Source | null = CreepTask.getSourceFromTarget(this.task!.targetPlace);
     if (source) {
       this.harvest(source);
+      if (this.pos.inRangeTo(source, 2)) {
+        const path = PathFinder.search(this.pos, { pos: source.pos, range: 1 });
+        if (path.incomplete) {
+          this.completeTask("⛏️❗");
+        }
+      }
     }
     if (this.carryCapacity > 0 && this.carryCapacity === this.carryCurrent) {
       this.completeTask("⛏️✔️");
@@ -242,8 +250,12 @@ export class CreepBase {
 
   private activityMove(): void {
     const roomPosition = CreepTask.getRoomPositionFromTarget(this.task!.targetPlace);
-    const result = this.moveTo(roomPosition);
-    if (result === OK && Helper.isInRange(this.pos, roomPosition, 1) && !Helper.positionIsWalkable(roomPosition)) {
+    if (!roomPosition) {
+      this.completeTask("👣✔️");
+      return;
+    }
+    this.moveTo(roomPosition, { reusePath: MOVE_TO_REUSE });
+    if (Helper.isInRange(this.pos, roomPosition, 1) && !Helper.positionIsWalkable(roomPosition)) {
       this.completeTask("X");
     }
 
@@ -347,13 +359,13 @@ export class CreepBase {
   }
 
   private activityMoveDifferentRoom(): void {
-    const targetPos: RoomPosition = CreepTask.getRoomPositionFromTarget(this.task!.targetPlace);
+    const targetPos: RoomPosition | null = CreepTask.getRoomPositionFromTarget(this.task!.targetPlace);
     const currentRoom = this.room.name;
     if (targetPos.roomName === currentRoom) {
       if (this.creep.pos.x !== 0 && this.creep.pos.x !== 49 && this.creep.pos.y !== 0 && this.creep.pos.y !== 49) {
         this.completeTask("👣✔️");
       } else {
-        this.moveTo(targetPos);
+        this.moveTo(targetPos, { reusePath: MOVE_TO_REUSE });
       }
       return;
     }
@@ -367,11 +379,15 @@ export class CreepBase {
 
     const exitDir = Game.map.findExit(this.creep.room.name, targetPos.roomName);
     if (exitDir === ERR_NO_PATH || exitDir === ERR_INVALID_ARGS) return;
-    const exits = this.creep.room.find(exitDir);
+    let exits = this.creep.room.find(exitDir);
 
     // TODO: CPU This is very inefficient it calculates path trhough all possible exits every tick, will need to improve.
     let bestCost = Infinity;
     let bestExit: RoomPosition | null = null;
+    if (Game.cpu.bucket < 1000 && exits.length > 0) {
+      console.log("CPU is low, only checking one exit for pathfinding.");
+      exits = [exits[0]]; // This is so that we only check through one exit if CPU is low, this will make the creep take a longer path but will save CPU.
+    }
     for (const exit of exits) {
       const result = PathFinder.search(
         this.creep.pos,
@@ -414,7 +430,7 @@ export class CreepBase {
 
     moveTarget = bestExit || exits[0];
 
-    this.moveTo(moveTarget, { visualizePathStyle: { stroke: "#ffffff" } });
+    this.moveTo(moveTarget, { visualizePathStyle: { stroke: "#ffffff" }, reusePath: MOVE_TO_REUSE });
   }
 
   private activityReserve(): void {
@@ -550,7 +566,11 @@ export class CreepBase {
     } else if (collectTarget && "store" in collectTarget) {
       const targetResource = this.getStoreMineralResourceType(collectTarget, specificMineral);
       if (targetResource) {
-        this.withdraw(collectTarget, targetResource);
+        const limitAmount = this.task!.value ?? undefined;
+        const result = this.withdraw(collectTarget, targetResource, limitAmount);
+        if (result === OK) {
+          this.completeTask("Min Col✔️");
+        }
       }
     }
 
@@ -680,7 +700,7 @@ export class CreepBase {
       this.markEnergySpendIntent("build");
     }
     if (result === ERR_NOT_IN_RANGE) {
-      this.moveTo(structure.pos);
+      this.moveTo(structure.pos, { reusePath: MOVE_TO_REUSE });
     }
     return result;
   }
@@ -691,7 +711,7 @@ export class CreepBase {
       this.markEnergySpendIntent("repair");
     }
     if (result === ERR_NOT_IN_RANGE) {
-      this.moveTo(structure.pos);
+      this.moveTo(structure.pos, { reusePath: MOVE_TO_REUSE });
     }
     return result;
   }
@@ -708,7 +728,7 @@ export class CreepBase {
       this.creep.memory.baseRoomCollectIntentCategory = CreepBase.HARVEST_DIRECT_COLLECT_INTENT;
     }
     if (result === ERR_NOT_IN_RANGE) {
-      this.moveTo(source.pos);
+      this.moveTo(source.pos, { reusePath: MOVE_TO_REUSE });
     }
     return result;
   }
@@ -777,7 +797,7 @@ export class CreepBase {
       this.markEnergySpendIntent(this.getTransferCategory(target));
     }
     if (result === ERR_NOT_IN_RANGE) {
-      this.moveTo(target.pos);
+      this.moveTo(target.pos, { reusePath: MOVE_TO_REUSE });
     }
     return result;
   }
@@ -816,7 +836,7 @@ export class CreepBase {
       this.markEnergyCollectIntent("withdraw");
     }
     if (result === ERR_NOT_IN_RANGE) {
-      this.moveTo(target.pos);
+      this.moveTo(target.pos, { reusePath: MOVE_TO_REUSE });
     }
     return result;
   }
@@ -847,7 +867,7 @@ export class CreepBase {
       this.markEnergyCollectIntent("pickup");
     }
     if (result === ERR_NOT_IN_RANGE) {
-      this.moveTo(resource.pos);
+      this.moveTo(resource.pos, { reusePath: MOVE_TO_REUSE });
     }
     return result;
   }
@@ -873,7 +893,7 @@ export class CreepBase {
     if (Game.time % 100 === 0 && controller.sign?.username !== Helper.getUserName()) {
       const result = this.creep.signController(controller, "Upgraded by me!");
       if (result === ERR_NOT_IN_RANGE) {
-        this.moveTo(controller.pos);
+        this.moveTo(controller.pos, { reusePath: MOVE_TO_REUSE });
       }
       return result;
     }
@@ -882,7 +902,7 @@ export class CreepBase {
       this.markEnergySpendIntent("upgrade");
     }
     if (result === ERR_NOT_IN_RANGE) {
-      this.moveTo(controller.pos);
+      this.moveTo(controller.pos, { reusePath: MOVE_TO_REUSE });
     }
     return result;
   }
@@ -890,7 +910,7 @@ export class CreepBase {
   public attackController(controller: StructureController): ScreepsReturnCode {
     const result = this.creep.attackController(controller);
     if (result === ERR_NOT_IN_RANGE) {
-      this.moveTo(controller.pos);
+      this.moveTo(controller.pos, { reusePath: MOVE_TO_REUSE });
     }
     return result;
   }
@@ -899,13 +919,13 @@ export class CreepBase {
     if (Game.time % 100 === 0 && controller.sign?.username !== Helper.getUserName()) {
       const result = this.creep.signController(controller, "Reserved by me, no touchy touchy!");
       if (result === ERR_NOT_IN_RANGE) {
-        this.moveTo(controller.pos);
+        this.moveTo(controller.pos, { reusePath: MOVE_TO_REUSE });
       }
       return result;
     }
     const result = this.creep.reserveController(controller);
     if (result === ERR_NOT_IN_RANGE) {
-      this.moveTo(controller.pos);
+      this.moveTo(controller.pos, { reusePath: MOVE_TO_REUSE });
     } else if (result === ERR_INVALID_TARGET) {
       this.creep.attackController(controller);
     }
@@ -915,7 +935,7 @@ export class CreepBase {
   public claim(controller: StructureController): ScreepsReturnCode | ERR_ACCESS_DENIED {
     const result = this.creep.claimController(controller);
     if (result === ERR_NOT_IN_RANGE) {
-      this.moveTo(controller.pos);
+      this.moveTo(controller.pos, { reusePath: MOVE_TO_REUSE });
     }
     return result;
   }
@@ -976,92 +996,6 @@ export class CreepBase {
     return result;
   }
 
-  //     rangedAttack(creep: Creep | Structure) {
-  //       let result = this.creep.rangedAttack(creep);
-  //       if (result == ERR_NOT_IN_RANGE) {
-  //         this.moveTo(creep.pos);
-  //       }
-  //       this.memory.targetId = creep.id;
-  //       return result;
-  //     }
-
-  //     heal(creep: Creep) {
-  //       let result = this.creep.heal(creep);
-  //       if (result == ERR_NOT_IN_RANGE) {
-  //         this.moveTo(creep.pos);
-  //       }
-  //       this.memory.targetId = creep.id;
-  //       return result;
-  //     }
-
-  //     rangedHeal(creep: Creep) {
-  //       let result = this.creep.rangedHeal(creep);
-  //       if (result == ERR_NOT_IN_RANGE) {
-  //         this.moveTo(creep.pos);
-  //       }
-  //       this.memory.targetId = creep.id;
-  //       return result;
-  //     }
-
-  //     sign(controller: StructureController, text: string) {
-  //       let result = this.creep.signController(controller, text);
-  //       if (result == ERR_NOT_IN_RANGE) {
-  //         this.moveTo(controller.pos);
-  //       }
-  //       this.memory.targetId = controller.id;
-  //       return result;
-  //     }
-
-  //     moveTo(destination: RoomPosition, movementOption: MovementOption = {}) {
-  //       if (this.memory.useCashedPath) {
-  //         let creepInSamePosition = JSON.stringify(this.creep.memory.previousPosition) == JSON.stringify(this.creep.pos);
-  //         let newDestination = JSON.stringify(this.creep.memory.moveDestination) != JSON.stringify(destination);
-  //         if (!this.creep.memory.path || creepInSamePosition) {
-  //           this.creep.memory.path = PathLogic.getPath(this.creep.pos, destination, newDestination ? false : creepInSamePosition, this.id == "put a real id");
-  //           this.creep.memory.moveDestination = destination;
-  //         }
-  //         this.creep.memory.previousPosition = this.creep.pos;
-  //         let result = this.creep.moveByPath(this.creep.memory.path);
-  //         return result;
-  //       }
-  //       else {
-  //         if (movementOption.range) {
-  //           let distanceToDestination = this.creep.pos.getRangeTo(destination);
-  //           if (distanceToDestination <= movementOption.range) {
-  //             return NO_ACTION;
-  //           }
-  //         }
-  //         if (movementOption.stroke) {
-  //           return this.creep.moveTo(destination, { reusePath: 10, visualizePathStyle: { stroke: movementOption.stroke } });
-  //         }
-  //         else {
-  //           return this.creep.moveTo(destination);
-  //         }
-  //       }
-  //     };
-
-  //     private moveToDifferentRoom(destination: string) {
-  //       return this.creep.moveTo(new RoomPosition(25, 25, destination));
-  //     }
-
-  //     moveToRemoteRoom(roomName: string) {
-  //       let path = Tasks.getFarAwayRoomPath(roomName);
-  //       if (path.length == 0) {
-  //         this.moveToDifferentRoom(roomName);
-  //       } else {
-  //         let foundCurrentRoom = false;
-  //         for (let currenRoomIndex in path) {
-  //           if (foundCurrentRoom) {
-  //             this.moveToDifferentRoom(path[currenRoomIndex]);
-  //             break;
-  //           }
-  //           if (path[currenRoomIndex] == this.room.name) {
-  //             foundCurrentRoom = true;
-  //           }
-  //         }
-  //       }
-  //     }
-
   public getNumberOfBoostedBodyPart(bodyType: BodyPartConstant): number {
     let total = 0;
     for (const part of this.creep.body) {
@@ -1081,14 +1015,6 @@ export class CreepBase {
     }
     return total;
   }
-
-  //     static getActiveBodyPartsFromArrayOfProbes(probes: Probe[], bodyPart: BodyPartConstant) {
-  //     var bodyParts = 0;
-  //       for (var i = 0; i < probes.length; i++) {
-  //         bodyParts += probes[i].creep.getActiveBodyparts(bodyPart);
-  //     }
-  //     return bodyParts;
-  //   }
 
   public transferCreepToArea(areaIdFrom: string, areaIdTo: string): void {
     this.registerCreepToArea(areaIdTo);

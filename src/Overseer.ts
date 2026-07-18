@@ -11,7 +11,7 @@ import { BaseBuilder } from "BaseBuilder/BaseBuilder";
 import RemoteArea from "Areas//RemoteArea/RemoteArea";
 import RemoteRebuildArea from "Areas/RemoteRebuildArea";
 import UtilityArea from "Areas/BaseRoom/UtilityArea";
-import SeasonArea from "Areas/SeasonArea";
+import SeasonArea from "Areas/BaseRoom/SeasonArea";
 import RepairArea from "Areas/BaseRoom/RepairArea";
 import SoldierArea from "./Areas/Military/SoldierArea";
 import DefenseArea from "./Areas/Military/Defense/DefenseArea";

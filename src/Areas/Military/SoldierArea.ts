@@ -1,13 +1,12 @@
 import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
-import BaseArea from "./../BaseArea";
+import BaseArea from "../BaseRoom/BaseArea";
 import { CreepBase } from "../../CreepBase";
-import { GetRoomObjects } from "Helpers/GetRoomObjects";
+import { GetRoomObjects, RemoteRoomMode } from "Helpers/GetRoomObjects";
 import LineNaviagation from "./Navigation/LineNaviagation";
 import QuadNavigation from "./Navigation/QuadNavigation";
 
-const SQUAD_SIZE = 5;
 const ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
 const EXCEPTION_PLAYER_NAMES = ["nekey975"];
 const TICKS_TO_LIVE_THRESHOLD = 250;
@@ -131,7 +130,7 @@ export default class SoldierArea extends BaseArea {
     y += 0.9;
     visual.text("Name format: Attack-SpawnRoom-powerRank-anyText", x, y, header);
     y += 0.7;
-    visual.text("Example: Attack-E29S25-2-Healers => power rank 2, spawn room E29S25", x, y, plain);
+    visual.text("Example: Attack-E29S25-4-10-Healers => 2-creep squad,power rank 10, spawn room E29S25", x, y, plain);
     y += 0.7;
     visual.text("Attack-X-2-Healers keeps default: spawn from any base", x, y, plain);
     y += 0.9;
@@ -266,8 +265,8 @@ export default class SoldierArea extends BaseArea {
   } {
     const parts = name.split("-");
     const parsedSpawnRoom = parts[1];
-    const parsedPowerRank = parts[2];
-    const squadSize = SQUAD_SIZE;
+    const squadSize = parseInt(parts[2], 10);
+    const parsedPowerRank = parts[3];
     const powerRank = /^\d+$/.test(parsedPowerRank) ? parseInt(parsedPowerRank, 10) : null;
     const baseRoomName =
       parsedSpawnRoom && parsedSpawnRoom !== "X" && ROOM_NAME_PATTERN.test(parsedSpawnRoom)
@@ -519,10 +518,16 @@ export default class SoldierArea extends BaseArea {
     // We need to filter players we don't want to attack, like our allies or exceptions.
     const enemyCreeps = room
       .find(FIND_HOSTILE_CREEPS)
-      .filter(creep => !EXCEPTION_PLAYER_NAMES.includes(creep.owner.username));
+      .filter(creep => !this.onEdge(creep.pos) && !EXCEPTION_PLAYER_NAMES.includes(creep.owner.username));
     const enemyStructures = room
       .find(FIND_HOSTILE_STRUCTURES)
       .filter(structure => structure.owner && !EXCEPTION_PLAYER_NAMES.includes(structure.owner.username));
+    for (const creep of enemyCreeps) {
+      room.visual.circle(creep.pos.x, creep.pos.y, { fill: "transparent", radius: 0.55, stroke: "#ff0000" });
+    }
+    for (const structure of enemyStructures) {
+      room.visual.circle(structure.pos.x, structure.pos.y, { fill: "transparent", radius: 0.55, stroke: "#ff0000" });
+    }
     if (enemyCreeps.length > 0) {
       const target = pos.findClosestByPath(enemyCreeps);
       if (target) {
@@ -543,6 +548,9 @@ export default class SoldierArea extends BaseArea {
     const enemyStructures = room
       .find(FIND_HOSTILE_STRUCTURES)
       .filter(structure => structure.owner && !EXCEPTION_PLAYER_NAMES.includes(structure.owner.username));
+    for (const structure of enemyStructures) {
+      room.visual.circle(structure.pos.x, structure.pos.y, { fill: "transparent", radius: 0.55, stroke: "#ff0000" });
+    }
     if (enemyStructures.length > 0) {
       const target = pos.findClosestByPath(enemyStructures);
       if (target) {
@@ -555,9 +563,19 @@ export default class SoldierArea extends BaseArea {
   private attackCreeps(pos: RoomPosition): Creep | null {
     const room = pos.roomName ? Game.rooms[pos.roomName] : null;
     if (!room) return null;
+    const flagsInRoom = Object.values(Game.flags).filter(
+      flag => flag.pos.roomName === pos.roomName && flag.name.startsWith("Reserve")
+    );
+    const roomIsRemoteSteal = flagsInRoom.some(
+      f => GetRoomObjects.getRemoteRoomModeFromFlag(f) === RemoteRoomMode.StealResources
+    );
     const enemyCreeps = room
       .find(FIND_HOSTILE_CREEPS)
-      .filter(creep => !EXCEPTION_PLAYER_NAMES.includes(creep.owner.username));
+      .filter(creep => !this.onEdge(creep.pos) && !EXCEPTION_PLAYER_NAMES.includes(creep.owner.username))
+      .filter(creep => roomIsRemoteSteal && !this.creepExcludedFromRemoteStealCombat(creep));
+    for (const creep of enemyCreeps) {
+      room.visual.circle(creep.pos.x, creep.pos.y, { fill: "transparent", radius: 0.55, stroke: "#ff0000" });
+    }
     if (enemyCreeps.length > 0) {
       const target = pos.findClosestByPath(enemyCreeps);
       if (target) {
@@ -565,5 +583,18 @@ export default class SoldierArea extends BaseArea {
       }
     }
     return null;
+  }
+
+  private onEdge(pos: RoomPosition): boolean {
+    return pos.x === 0 || pos.x === 49 || pos.y === 0 || pos.y === 49;
+  }
+
+  private creepExcludedFromRemoteStealCombat(creep: Creep): boolean {
+    if (creep.getActiveBodyparts(HEAL) > 0) return false;
+    if (creep.getActiveBodyparts(ATTACK) > 0) return false;
+    if (creep.getActiveBodyparts(RANGED_ATTACK) > 0) return false;
+    if (creep.getActiveBodyparts(WORK) > 0) return true;
+    if (creep.getActiveBodyparts(CLAIM) > 0) return true;
+    return false;
   }
 }

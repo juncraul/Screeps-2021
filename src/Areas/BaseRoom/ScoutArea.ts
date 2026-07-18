@@ -1,7 +1,7 @@
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
-import BaseArea from "../BaseArea";
+import BaseArea from "./BaseArea";
 import { Helper } from "Helpers/Helper";
 
 interface ScoutSourceIntel {
@@ -41,6 +41,7 @@ type ScoutIntelMemory = Record<string, ScoutRoomIntel>;
 
 export default class ScoutArea extends BaseArea {
   private static readonly MANAGED_FLAG_PREFIX = "Reserve";
+  private static readonly SCOUT_FLAG_PREFIX = "Scout";
 
   baseRoom: Room;
   roomIntel: ScoutIntelMemory;
@@ -58,6 +59,10 @@ export default class ScoutArea extends BaseArea {
   }
 
   public handleSpawnTasks(): SpawnTask[] {
+    const baseController = this.baseRoom.controller;
+    if (!baseController || baseController.level >= 3) {
+      return [];
+    }
     const activeScouts = this.creeps.filter(creep => !(creep.ticksToLive !== undefined && creep.ticksToLive < 100));
     if (activeScouts.length >= 1) {
       return [];
@@ -153,16 +158,9 @@ export default class ScoutArea extends BaseArea {
 
   private syncManagedFlag(room: Room, intel: ScoutRoomIntel): void {
     const flagName = this.getManagedFlagName(room.name);
-    const existingFlag = Game.flags[flagName];
+    const existingFlags = this.getAllRemoteFlags(room.name);
 
-    // if (!intel.claimable) {
-    //   if (existingFlag) {
-    //     existingFlag.remove();
-    //   }
-    //   return;
-    // }
-
-    if (existingFlag || !intel.controller) {
+    if (existingFlags.length > 0 || !intel.controller) {
       return;
     }
 
@@ -234,6 +232,12 @@ export default class ScoutArea extends BaseArea {
 
   private getManagedFlagName(roomName: string): string {
     return `${ScoutArea.MANAGED_FLAG_PREFIX}-${this.baseRoom.name}-Scout-${roomName}`;
+  }
+
+  private getAllRemoteFlags(roomName: string): Flag[] {
+    return Object.values(Game.flags).filter(
+      flag => flag.room?.name === roomName && flag.name.startsWith(`${ScoutArea.MANAGED_FLAG_PREFIX}`)
+    );
   }
 
   private createScout(): SpawnTask {

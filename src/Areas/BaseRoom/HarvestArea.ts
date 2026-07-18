@@ -2,7 +2,7 @@ import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask from "Tasks/SpawnTask";
-import BaseArea from "../BaseArea";
+import BaseArea from "./BaseArea";
 
 export default abstract class HarvestArea extends BaseArea {
   controllerLevel: number;

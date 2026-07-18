@@ -38,6 +38,17 @@ export const loop = () => {
   if (Helper.getCashedMemory("PersistentWorld", false) && Game.cpu.bucket === 10000) {
     Game.cpu.generatePixel();
   }
+
+  // Remove all construction sites.
+  // const room = Game.rooms["E47S7"];
+  // const getAllRampartsAndWallsToDelete = room.find(FIND_CONSTRUCTION_SITES, {
+  //   filter: structure => {
+  //     return structure.structureType === STRUCTURE_WALL || structure.structureType === STRUCTURE_RAMPART;
+  //   }
+  // });
+  // getAllRampartsAndWallsToDelete.forEach(structure => {
+  //   structure.remove();
+  // });
   executeTestFlag();
 };
 

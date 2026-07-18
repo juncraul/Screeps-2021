@@ -27,6 +27,12 @@ export function handleCarrier(area: RemoteArea, creep: CreepBase): void {
         return;
       }
 
+      const tombstone = findTombstoneWithEnergy(area, creep);
+      if (tombstone) {
+        creep.addTask(new CreepTask(Activity.Collect, tombstone.pos));
+        return;
+      }
+
       const sourceContainer = findContainerWithEnergy(area, creep, 150);
       if (sourceContainer) {
         creep.addTask(new CreepTask(Activity.Collect, sourceContainer.pos));
@@ -108,6 +114,25 @@ export function findNearbyRemoteEnergy(area: RemoteArea, creep: CreepBase): Stru
   }
 
   return null;
+}
+
+export function findTombstoneWithEnergy(area: RemoteArea, creep: CreepBase): Tombstone | null {
+  let bestTombstone: Tombstone | null = null;
+  let bestDistance = Infinity;
+  const tombstones = area.room.find(FIND_TOMBSTONES, {
+    filter: tombstone => tombstone.store.getUsedCapacity(RESOURCE_ENERGY) > 0
+  });
+  for (const tombstone of tombstones) {
+    if (tombstone.store.energy > 0) {
+      const distance = creep.pos.getRangeTo(tombstone.pos);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestTombstone = tombstone;
+      }
+    }
+  }
+
+  return bestTombstone;
 }
 
 export function findClosestDeposit(area: RemoteArea, creep: CreepBase): Structure | Creep | null {

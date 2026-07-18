@@ -1,6 +1,6 @@
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { Helper } from "Helpers/Helper";
-import { CreepBase } from "../CreepBase";
+import { CreepBase } from "../../CreepBase";
 
 export default class BaseArea {
   memoryType: string;

@@ -25,18 +25,22 @@ export default class CreepTask implements ICreepTask {
   }
 
   public static getSourceFromTarget(target: RoomPosition): Source | null {
+    if (!Game.rooms[target.roomName]) return null;
     return new RoomPosition(target.x, target.y, target.roomName).findInRange(FIND_SOURCES, 0)[0];
   }
 
   public static getMineralFromTarget(target: RoomPosition): Mineral | null {
+    if (!Game.rooms[target.roomName]) return null;
     return new RoomPosition(target.x, target.y, target.roomName).findInRange(FIND_MINERALS, 0)[0];
   }
 
   public static getConstructionSiteFromTarget(target: RoomPosition): ConstructionSite | null {
+    if (!Game.rooms[target.roomName]) return null;
     return new RoomPosition(target.x, target.y, target.roomName).findInRange(FIND_MY_CONSTRUCTION_SITES, 0)[0];
   }
 
   public static getStructureFromTargetNoRoadNoRampart(target: RoomPosition): Structure | null {
+    if (!Game.rooms[target.roomName]) return null;
     return new RoomPosition(target.x, target.y, target.roomName).findInRange(FIND_STRUCTURES, 0, {
       filter(structure) {
         return structure.structureType !== STRUCTURE_ROAD && structure.structureType !== STRUCTURE_RAMPART;
@@ -45,26 +49,32 @@ export default class CreepTask implements ICreepTask {
   }
 
   public static getStructureFromTarget(target: RoomPosition): Structure | null {
+    if (!Game.rooms[target.roomName]) return null;
     return new RoomPosition(target.x, target.y, target.roomName).findInRange(FIND_STRUCTURES, 0)[0];
   }
 
   public static getStructuresFromTarget(target: RoomPosition): Structure[] {
+    if (!Game.rooms[target.roomName]) return [];
     return new RoomPosition(target.x, target.y, target.roomName).findInRange(FIND_STRUCTURES, 0);
   }
 
   public static getResourceFromTarget(target: RoomPosition): Resource | null {
+    if (!Game.rooms[target.roomName]) return null;
     return new RoomPosition(target.x, target.y, target.roomName).findInRange(FIND_DROPPED_RESOURCES, 0)[0];
   }
 
   public static getRuinFromTarget(target: RoomPosition): Ruin | null {
+    if (!Game.rooms[target.roomName]) return null;
     return new RoomPosition(target.x, target.y, target.roomName).findInRange(FIND_RUINS, 0)[0];
   }
 
   public static getTombstoneFromTarget(target: RoomPosition): Tombstone | null {
+    if (!Game.rooms[target.roomName]) return null;
     return new RoomPosition(target.x, target.y, target.roomName).findInRange(FIND_TOMBSTONES, 0)[0];
   }
 
   public static getControllerFromTarget(target: RoomPosition): StructureController | null {
+    if (!Game.rooms[target.roomName]) return null;
     const structure: Structure | null = new RoomPosition(
       target.x,
       target.y,
@@ -79,6 +89,7 @@ export default class CreepTask implements ICreepTask {
   }
 
   public static getCreepFromTarget(target: RoomPosition): Creep | null {
+    if (!Game.rooms[target.roomName]) return null;
     return new RoomPosition(target.x, target.y, target.roomName).findInRange(FIND_CREEPS, 0)[0];
   }
 }

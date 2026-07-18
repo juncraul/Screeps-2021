@@ -31,14 +31,15 @@ export default class LineNaviagation {
     path.push(...search.path);
 
     if (search.incomplete) {
-      const lastPos = path[path.length - 1];
+      let lastPos = path[path.length - 1];
       path.pop();
       if (lastPos.x === 1) path.push(new RoomPosition(0, lastPos.y, lastPos.roomName));
       if (lastPos.x === 48) path.push(new RoomPosition(49, lastPos.y, lastPos.roomName));
       if (lastPos.y === 1) path.push(new RoomPosition(lastPos.x, 0, lastPos.roomName));
       if (lastPos.y === 48) path.push(new RoomPosition(lastPos.x, 49, lastPos.roomName));
 
-      if (Game.map.getRoomTerrain(lastPos.roomName).get(lastPos.x, lastPos.y) !== TERRAIN_MASK_WALL) {
+      lastPos = path[path.length - 1];
+      if (Game.map.getRoomTerrain(lastPos.roomName).get(lastPos.x, lastPos.y) === TERRAIN_MASK_WALL) {
         path.pop(); // remove it as it is a wall.
       }
     }
@@ -47,6 +48,11 @@ export default class LineNaviagation {
       const pos = path[i];
       leader.room.visual.circle(pos.x, pos.y, { fill: "transparent", radius: 0.5, stroke: "#ff0000" });
       leader.room.visual.text(i.toString(), pos.x, pos.y, { color: "#ff0000", font: 0.5 });
+    }
+
+    // Check if creeps have fatique
+    if (creeps.some(creep => creep.creep.fatigue > 0)) {
+      return true;
     }
 
     for (const creep of line) {

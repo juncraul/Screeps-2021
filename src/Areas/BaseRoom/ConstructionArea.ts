@@ -1,7 +1,8 @@
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
-import BaseArea from "../BaseArea";
+import BaseArea from "./BaseArea";
+import { CreepBase } from "CreepBase";
 
 export default class ConstructionArea extends BaseArea {
   controller: StructureController;
@@ -38,39 +39,44 @@ export default class ConstructionArea extends BaseArea {
 
   public handleCreeps() {
     for (const creep of this.creeps) {
-      const threasholdToCollectFrom = Math.min(200, creep.carryCapacity);
-      if (creep.isEmpty() && creep.isFree()) {
-        let foundSomewhereToCollectFrom = false;
-        for (let j = 0; j < this.containersToCollectFrom.length; j++) {
-          if (this.containersToCollectFrom[j].store.energy < threasholdToCollectFrom) continue;
-          creep.addTask(new CreepTask(Activity.Collect, this.containersToCollectFrom[j].pos));
-          foundSomewhereToCollectFrom = true;
-          continue; // This is so that not all creeps get sent to same container.
+      const threasholdToCollectFrom = Math.min(100, creep.carryCapacity / 2);
+      this.interupCurrentTaskIfNeeded(creep);
+      if (!creep.isFree()) continue;
+      if (creep.isEmpty()) {
+        const closestContainer = creep.pos.findClosestByPath(
+          this.containersToCollectFrom.filter(c => c.store.energy > threasholdToCollectFrom)
+        );
+        if (closestContainer) {
+          creep.addTask(new CreepTask(Activity.Collect, closestContainer.pos));
+          continue;
         }
-        const closestDroppedResource = creep.pos.findClosestByPath(this.droppedResourcesToCollectFrom);
-        if (closestDroppedResource && closestDroppedResource.amount > threasholdToCollectFrom) {
+        const closestDroppedResource = creep.pos.findClosestByPath(
+          this.droppedResourcesToCollectFrom.filter(r => r.amount > threasholdToCollectFrom)
+        );
+        if (closestDroppedResource) {
           creep.addTask(new CreepTask(Activity.Pickup, closestDroppedResource.pos));
-          foundSomewhereToCollectFrom = true;
+          continue;
         }
-        if (!foundSomewhereToCollectFrom && this.storage && this.storage.store.energy > threasholdToCollectFrom) {
+        if (this.storage && this.storage.store.energy > threasholdToCollectFrom) {
           creep.addTask(new CreepTask(Activity.Collect, this.storage.pos)); // TODO:Add Energy type in here.
+          continue;
         }
         // If there is no energy to collect from anywhere, then we should send the creep to harvest from a source. Only if there is no spawn, otherwise spawn should create a harvester
         const spawn = GetRoomObjects.getRoomSpawns(this.room);
-        if (!foundSomewhereToCollectFrom && spawn.length > 0) {
+        if (spawn.length === 0) {
           const sources = this.room.find(FIND_SOURCES);
           if (sources.length > 0) {
             creep.addTask(new CreepTask(Activity.Harvest, sources[0].pos));
+            continue;
           }
         }
-        if (!foundSomewhereToCollectFrom) {
-          const closestSource = creep.pos.findClosestByPath(FIND_SOURCES_ACTIVE);
-          if (closestSource) {
-            creep.addTask(new CreepTask(Activity.Move, GetRoomObjects.getXStepTowardsSpawn(closestSource.pos, 3)));
-          }
+        const closestSource = creep.pos.findClosestByPath(FIND_SOURCES_ACTIVE);
+        if (closestSource && !creep.pos.inRangeTo(closestSource, 3)) {
+          creep.addTask(new CreepTask(Activity.Move, GetRoomObjects.getXStepTowardsSpawn(closestSource.pos, 3)));
+          continue;
         }
       }
-      if (!creep.isEmpty() && creep.isFree()) {
+      if (!creep.isEmpty()) {
         const constructionArea = this.getConstructionClosestByPoint(creep.pos);
         if (constructionArea) {
           creep.addTask(new CreepTask(Activity.Construct, constructionArea.pos));
@@ -82,8 +88,24 @@ export default class ConstructionArea extends BaseArea {
     }
   }
 
+  private interupCurrentTaskIfNeeded(creep: CreepBase) {
+    if (!creep.task) return;
+    if (creep.task.activity === Activity.Harvest && Game.time % 10 === 0) {
+      // We should cancel the harvest as there might be energy somewhere else.
+      creep.task = null;
+    }
+  }
+
   private getConstructionClosestByPoint(position: RoomPosition) {
-    // Pick non-road construction sites first, then road construction sites. This is because we want to prioritize non-road construction sites first.
+    const spawnConstructionSites = position.findClosestByRange(FIND_MY_CONSTRUCTION_SITES, {
+      filter: (constructionSite: ConstructionSite) => constructionSite.structureType === STRUCTURE_SPAWN
+    });
+    if (spawnConstructionSites) return spawnConstructionSites;
+    const towerConstructionSites = position.findClosestByRange(FIND_MY_CONSTRUCTION_SITES, {
+      filter: (constructionSite: ConstructionSite) => constructionSite.structureType === STRUCTURE_TOWER
+    });
+    if (towerConstructionSites) return towerConstructionSites;
+    // Then pick non-road construction sites first, then road construction sites.
     const nonRoadConstructionSites = position.findClosestByRange(FIND_MY_CONSTRUCTION_SITES, {
       filter: (constructionSite: ConstructionSite) => constructionSite.structureType !== STRUCTURE_ROAD
     });

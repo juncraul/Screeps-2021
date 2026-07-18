@@ -2,7 +2,7 @@ import { Helper } from "Helpers/Helper";
 import { GetRoomObjects, RemoteRoomMode } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
-import BaseArea from "./../BaseArea";
+import BaseArea from "../BaseRoom/BaseArea";
 import { CreepBase } from "CreepBase";
 import {
   assignHarvesterToSource,
@@ -28,7 +28,8 @@ import { createMineralCarrier, handleMineralCarrier } from "./RemoteMineralCarri
 export default class RemoteArea extends BaseArea {
   private static readonly ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
   private static readonly ROAD_WORK_DONE = "RemoteArea-RoadWorkDone-";
-  private static readonly INVADER_DEFENDER = "Attack-1-6-Invader-";
+  private static readonly INVADER_DEFENDER_WEAK = "Attack-X-1-3-Invader-";
+  private static readonly INVADER_DEFENDER_STRONG = "Attack-X-1-6-Invader-";
 
   controller: StructureController | null;
   roomName: string;
@@ -48,35 +49,6 @@ export default class RemoteArea extends BaseArea {
   mineralContainer: StructureContainer | null;
   mineralType: ResourceConstant | null;
   roadWorkDone: boolean;
-
-  public static addRemoteRoomCollectedEnergy(roomName: string, amount: number): void {
-    if (amount <= 0) {
-      return;
-    }
-
-    const economy = Memory.remoteRoomEconomy ?? {};
-    const current = economy[roomName] ?? { energyCollected: 0, energySpent: 0 };
-    current.energyCollected += amount;
-    economy[roomName] = current;
-    Memory.remoteRoomEconomy = economy;
-  }
-
-  public static addRemoteRoomExpense(roomName: string, amount: number): void {
-    if (amount <= 0) {
-      return;
-    }
-
-    const economy = Memory.remoteRoomEconomy ?? {};
-    const current = economy[roomName] ?? { energyCollected: 0, energySpent: 0 };
-    current.energySpent += amount;
-    economy[roomName] = current;
-    Memory.remoteRoomEconomy = economy;
-  }
-
-  public static getRemoteRoomEconomy(roomName: string): RemoteRoomEconomy {
-    const economy = Memory.remoteRoomEconomy ?? {};
-    return economy[roomName] ?? { energyCollected: 0, energySpent: 0 };
-  }
 
   constructor(roomName: string, remoteMode: RemoteRoomMode, baseRoomName?: string, mineralOnly = false) {
     super("RemoteArea", roomName, new RoomPosition(25, 25, roomName), Game.rooms[roomName]);
@@ -133,7 +105,7 @@ export default class RemoteArea extends BaseArea {
       this.harvestersPerSource = 0;
       this.carryBodyPartsPerRoom = 0;
       this.repairersPerRoom = 0;
-    } else {
+    } else if (remoteMode === RemoteRoomMode.Reserve) {
       const energyInRoom = this.totalEnergyInRoom();
       if (energyInRoom > 4000) {
         this.claimersPerRoom = 0;
@@ -149,6 +121,11 @@ export default class RemoteArea extends BaseArea {
       } else {
         this.carryBodyPartsPerRoom = 3;
       }
+    } else if (remoteMode === RemoteRoomMode.StealResources) {
+      this.claimersPerRoom = 0;
+      this.harvestersPerSource = 0;
+      this.carryBodyPartsPerRoom = 10;
+      this.repairersPerRoom = 0;
     }
     if (this.baseRoom.controller && this.baseRoom.controller.level < 3) {
       this.claimersPerRoom = 0;
@@ -158,9 +135,11 @@ export default class RemoteArea extends BaseArea {
   public handleSpawnTasks(): SpawnTask[] {
     const tasksForThisArea: SpawnTask[] = [];
     // Check if we have an invader flag
-    const invaderFlag = Game.flags[RemoteArea.INVADER_DEFENDER + this.baseRoom.name];
-    if (invaderFlag) {
-      return [];
+    if (this.room) {
+      const invaderFlags = this.getAllInvaderFlags();
+      if (invaderFlags.length > 0) {
+        return [];
+      }
     }
 
     if (this.mineralOnly) {
@@ -367,7 +346,7 @@ export default class RemoteArea extends BaseArea {
     if (this.remoteMode === RemoteRoomMode.Claim) {
       if (this.controller && this.controller.my) {
         // Create RemoteRebuild Flag
-        const rebuildFlagName = `RemoteRebuild-${this.baseRoom.name}`;
+        const rebuildFlagName = `RemoteRebuild-${this.baseRoom.name}-${this.roomName}`;
         if (!Game.flags[rebuildFlagName]) {
           this.room.createFlag(this.controller.pos, rebuildFlagName);
         }
@@ -379,7 +358,7 @@ export default class RemoteArea extends BaseArea {
         // Find remote flag
         const remoteFlag = _.find(
           Game.flags,
-          flag => flag.name.startsWith(`Reserve-${this.baseRoom.name}`) && flag.pos.roomName === this.roomName
+          flag => flag.name.startsWith(`Reserve-`) && flag.pos.roomName === this.roomName
         );
         if (spawns.length === 0 && spawnConstructionSites.length === 0) {
           if (remoteFlag) {
@@ -399,8 +378,7 @@ export default class RemoteArea extends BaseArea {
         }
       }
       return;
-    }
-    if (this.mineralOnly) {
+    } else if (this.mineralOnly) {
       // In mineral mode, ensure a container exists next to the mineral deposit.
       if (this.room && this.mineral && !this.mineralContainer) {
         const site = GetRoomObjects.getWithinRangeConstructionSite(this.mineral.pos, 2, STRUCTURE_CONTAINER);
@@ -410,23 +388,24 @@ export default class RemoteArea extends BaseArea {
         }
       }
       return;
-    }
-    // Check controller level from base room
-    if (this.baseRoom.controller && this.baseRoom.controller.level >= 4) {
-      this.createRemoteRoadConnections();
-    }
+    } else if (this.remoteMode === RemoteRoomMode.Reserve) {
+      // Check controller level from base room
+      if (this.baseRoom.controller && this.baseRoom.controller.level >= 4) {
+        this.createRemoteRoadConnections();
+      }
 
-    // Do not create containers if base room controller level is less than 2
-    if (this.baseRoom.controller && this.baseRoom.controller.level < 3) return;
+      // Do not create containers if base room controller level is less than 2
+      if (this.baseRoom.controller && this.baseRoom.controller.level < 3) return;
 
-    for (const source of this.sources) {
-      const container = GetRoomObjects.getWithinRangeContainer(source.pos, 2);
-      const constructionSite = GetRoomObjects.getWithinRangeConstructionSite(source.pos, 1, STRUCTURE_CONTAINER);
+      for (const source of this.sources) {
+        const container = GetRoomObjects.getWithinRangeContainer(source.pos, 2);
+        const constructionSite = GetRoomObjects.getWithinRangeConstructionSite(source.pos, 1, STRUCTURE_CONTAINER);
 
-      if (!container && !constructionSite) {
-        const positionForContainer = Helper.getFreeAdjacentPositions(source.pos)[0];
-        if (positionForContainer) {
-          this.room.createConstructionSite(positionForContainer, STRUCTURE_CONTAINER);
+        if (!container && !constructionSite) {
+          const positionForContainer = Helper.getFreeAdjacentPositions(source.pos)[0];
+          if (positionForContainer) {
+            this.room.createConstructionSite(positionForContainer, STRUCTURE_CONTAINER);
+          }
         }
       }
     }
@@ -548,20 +527,20 @@ export default class RemoteArea extends BaseArea {
     const invaderCores = this.room.find(FIND_HOSTILE_STRUCTURES, {
       filter: structure => structure.structureType === STRUCTURE_INVADER_CORE
     });
-    const invaderFlag = Game.flags[RemoteArea.INVADER_DEFENDER + this.baseRoom.name + "-" + this.roomName];
+    const invaderFlags = this.getAllInvaderFlags();
     if (hostileInvaders.length === 0 && invaderCores.length === 0) {
-      // Threat gone: remove managed invader-defense flag.
-      if (invaderFlag) {
-        invaderFlag.remove();
+      // Threat gone: remove managed invader-defense flags.
+      for (const flag of invaderFlags) {
+        flag.remove();
       }
       return;
     }
 
     // Create a managed invader-defense flag.
-    if (!invaderFlag) {
+    if (invaderFlags.length === 0) {
       const targetPos = hostileInvaders[0] ? hostileInvaders[0].pos : invaderCores[0].pos;
-      const flagName = `${RemoteArea.INVADER_DEFENDER}${this.baseRoom.name}-${this.roomName}`;
-      targetPos.createFlag(flagName, COLOR_RED, COLOR_RED);
+      const flagName = this.getInvaderFlagName();
+      targetPos.createFlag(flagName, COLOR_RED, COLOR_BLUE);
     }
   }
 
@@ -772,5 +751,55 @@ export default class RemoteArea extends BaseArea {
       }
     }
     return totalEnergy;
+  }
+
+  private getInvaderFlagName(): string {
+    const invaders = this.room?.find(FIND_HOSTILE_CREEPS, {
+      filter: creep => creep.owner && creep.owner.username === "Invader"
+    });
+    const strongInvader = invaders?.some(creep => creep.getActiveBodyparts(ATTACK) >= 2);
+    const invaderFlag =
+      strongInvader || invaders.length > 1 ? RemoteArea.INVADER_DEFENDER_STRONG : RemoteArea.INVADER_DEFENDER_WEAK;
+    return `${invaderFlag.replace("X", this.baseRoom.name)}-${this.roomName}`;
+  }
+
+  private getAllInvaderFlags(): Flag[] {
+    const strongFlag =
+      Game.flags[`${RemoteArea.INVADER_DEFENDER_STRONG.replace("X", this.baseRoom.name)}-${this.roomName}`];
+    const weakFlag =
+      Game.flags[`${RemoteArea.INVADER_DEFENDER_WEAK.replace("X", this.baseRoom.name)}-${this.roomName}`];
+    const flags: Flag[] = [];
+    if (strongFlag) flags.push(strongFlag);
+    if (weakFlag) flags.push(weakFlag);
+    return flags;
+  }
+
+  public static addRemoteRoomCollectedEnergy(roomName: string, amount: number): void {
+    if (amount <= 0) {
+      return;
+    }
+
+    const economy = Memory.remoteRoomEconomy ?? {};
+    const current = economy[roomName] ?? { energyCollected: 0, energySpent: 0 };
+    current.energyCollected += amount;
+    economy[roomName] = current;
+    Memory.remoteRoomEconomy = economy;
+  }
+
+  public static addRemoteRoomExpense(roomName: string, amount: number): void {
+    if (amount <= 0) {
+      return;
+    }
+
+    const economy = Memory.remoteRoomEconomy ?? {};
+    const current = economy[roomName] ?? { energyCollected: 0, energySpent: 0 };
+    current.energySpent += amount;
+    economy[roomName] = current;
+    Memory.remoteRoomEconomy = economy;
+  }
+
+  public static getRemoteRoomEconomy(roomName: string): RemoteRoomEconomy {
+    const economy = Memory.remoteRoomEconomy ?? {};
+    return economy[roomName] ?? { energyCollected: 0, energySpent: 0 };
   }
 }

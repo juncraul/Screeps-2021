@@ -62,7 +62,7 @@ All current flags are documented here so you only need this section.
 |---|---|---|---|
 | `Reserve-SpawnRoom[-AnyIgnoredText]` (purple/blue) | `Reserve-E29S25` | Reserve/claim remote controller | Required part 2 (`SpawnRoom`) or `X` |
 | `RemoteRebuild-SpawnRoom[-AnyIgnoredText]` | `RemoteRebuild-E29S25-First` | Rebuild remote room from spawn room | Required part 2 (`SpawnRoom`) or `X` |
-| `Attack-SpawnRoom[-PowerRank][-AnyIgnoredText]` | `Attack-E29S25-2-Healers` | Soldier squad behavior | Required part 2 (`SpawnRoom`) or `X` |
+| `Attack-SpawnRoom[-SquadSize][-PowerRank][-AnyIgnoredText]` | `Attack-E29S25-4-5-Healers` | Soldier squad behavior | Required part 2 (`SpawnRoom`) or `X` |
 | `SourceKeeper-SpawnRoom[-AnyIgnoredText]` | `SourceKeeper-E29S25` | Source Keeper hunting squad | Required part 2 (`SpawnRoom`) or `X` |
 | `Looter-SpawnRoom[-AnyIgnoredText]` | `Looter-E29S25` | Looter carrier unit | Required part 2 (`SpawnRoom`) or `X` |
 | `Defense-RoomName` | `Defense-E29S25` | Emergency in-room defense team | Auto-placed by SafeMode logic |

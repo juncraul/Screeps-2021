@@ -2,7 +2,7 @@ import { Helper } from "Helpers/Helper";
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
-import BaseArea from "./BaseArea";
+import BaseArea from "./BaseRoom/BaseArea";
 import { CreepBase } from "CreepBase";
 
 /**
@@ -45,6 +45,12 @@ export default class RemoteRebuildArea extends BaseArea {
 
     // For each role check: in-transit count + already-registered count in the remote room.
     // Only request a new spawn when both are 0.
+    const harvesterInTransit = this.creeps.filter(c => c.memory.role === "Harvester").length;
+    const harvesterInRemote = remoteRoom ? this.getRemoteHarvesterCount(remoteRoom) : 0;
+    if (harvesterInTransit + harvesterInRemote < 3 && this.flag.color === COLOR_WHITE) {
+      tasks.push(this.createHarvester());
+    }
+
     const constructorInTransit = this.creeps.filter(c => c.memory.role === "Constructor").length;
     const constructorInRemote = this.getRemoteAreaCount("ConstructionArea", this.remoteRoomName);
     if (constructorInTransit + constructorInRemote < 3 && this.flag.color === COLOR_WHITE) {
@@ -55,23 +61,16 @@ export default class RemoteRebuildArea extends BaseArea {
     const carrierInRemote = this.getRemoteAreaCount("CarryArea", this.remoteRoomName);
     const containersInRemote = remoteRoom ? GetRoomObjects.getRoomContainers(remoteRoom).length : 0;
     if (
-      carrierInTransit + carrierInRemote < 3 &&
-      containersInRemote > 2 && // We need more than 2 containers in the remote room before we start sending carriers. 2 containers for source and 1 container for other stuff.
+      ((carrierInTransit + carrierInRemote < 3 && containersInRemote > 2) || carrierInTransit + carrierInRemote < 1) && // We want at least 1 carrier even if there are no containers, but if there are containers we want 3 carriers.
       (this.flag.color === COLOR_WHITE || this.flag.color === COLOR_GREY)
     ) {
       tasks.push(this.createCarrier(cap));
     }
 
-    const harvesterInTransit = this.creeps.filter(c => c.memory.role === "Harvester").length;
-    const harvesterInRemote = remoteRoom ? this.getRemoteHarvesterCount(remoteRoom) : 0;
-    if (harvesterInTransit + harvesterInRemote < 3 && this.flag.color === COLOR_WHITE) {
-      tasks.push(this.createHarvester());
-    }
-
     const upgraderInTransit = this.creeps.filter(c => c.memory.role === "Upgrader").length;
     const remoteController = remoteRoom?.controller;
     const upgraderInRemote = remoteController ? this.getRemoteAreaCount("UpgradeArea", remoteController.id) : 0;
-    if (upgraderInTransit + upgraderInRemote < 2 && this.flag.color === COLOR_WHITE) {
+    if (upgraderInTransit + upgraderInRemote < 1 && this.flag.color === COLOR_WHITE) {
       tasks.push(this.createUpgrader());
     }
 

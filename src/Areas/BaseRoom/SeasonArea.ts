@@ -2,7 +2,7 @@ import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
-import { CreepBase } from "../CreepBase";
+import { CreepBase } from "../../CreepBase";
 
 const SEASON_AREA_ID = "SeasonArea-Global";
 const EXPLORATION_EXPIRATION_TICKS = 2500;
@@ -178,7 +178,9 @@ export default class SeasonArea extends BaseArea {
     const adjacentRooms = Game.map.describeExits(currentRoom);
     if (!adjacentRooms) return null;
 
-    const roomNames = Object.values(adjacentRooms).filter(room => room !== undefined) as string[];
+    const roomNames = Object.values(adjacentRooms).filter(
+      room => room !== undefined && Game.map.getRoomStatus(room).status !== "closed"
+    ) as string[];
 
     return this.pickAdjacentRoomWeightedByLastVisited(roomNames);
   }

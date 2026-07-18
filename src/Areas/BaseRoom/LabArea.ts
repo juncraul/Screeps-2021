@@ -2,7 +2,7 @@ import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { CreepBase } from "CreepBase";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
-import BaseArea from "../BaseArea";
+import BaseArea from "./BaseArea";
 
 const MIN_TERMINAL_RESOURCE = 5000;
 const LAB_REAGENT_TARGET = 1000;
@@ -91,7 +91,16 @@ export default class LabArea extends BaseArea {
 
     const terminalExcess = this.getTerminalExcessResource();
     if (terminalExcess) {
-      creep.addTask(new CreepTask(Activity.CollectMineral, terminal.pos, null, terminalExcess));
+      creep.addTask(
+        new CreepTask(
+          Activity.CollectMineral,
+          terminal.pos,
+          null,
+          terminalExcess.resource,
+          false,
+          terminalExcess.amount
+        )
+      );
       return;
     }
 
@@ -436,7 +445,7 @@ export default class LabArea extends BaseArea {
     return selected;
   }
 
-  private getTerminalExcessResource(): ResourceConstant | null {
+  private getTerminalExcessResource(): { resource: ResourceConstant; amount: number } | null {
     if (!this.terminal) {
       return null;
     }
@@ -456,7 +465,10 @@ export default class LabArea extends BaseArea {
       }
     }
 
-    return selected;
+    if (!selected) {
+      return null;
+    }
+    return { resource: selected, amount: largestExcess };
   }
 
   private getLabLayout(): { inputLabA: StructureLab; inputLabB: StructureLab; outputLabs: StructureLab[] } | null {

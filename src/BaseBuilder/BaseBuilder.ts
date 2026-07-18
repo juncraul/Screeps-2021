@@ -311,7 +311,7 @@ export class BaseBuilder {
         // Construct only once every 10th tick
         this.buildBase(anchor, layoutToBeUsed, controller.level, false);
         this.createContainerRoadConnections(room, anchor, layoutToBeUsed, controller.level, false);
-        if (controller.level >= 3) {
+        if (controller.level >= 3 && Game.time % 1000 === 0) {
           // Build walls only if the controller is at least level 3 because that's when we can build Cannons.
           this.createWall(room, false);
         }
@@ -612,8 +612,57 @@ export class BaseBuilder {
     previewInsteadOfBuild: boolean
   ) {
     const roomTerrain = Game.map.getRoomTerrain(room.name);
-    if (roomTerrain.get(x, y) !== TERRAIN_MASK_WALL)
+    if (roomTerrain.get(x, y) !== TERRAIN_MASK_WALL && !this.isDeadEndWall(room, x, y)) {
       this.createConstructionSite(room, x, y, build, previewInsteadOfBuild);
+    }
+  }
+
+  private static isDeadEndWall(room: Room, x: number, y: number): boolean {
+    if (!room.controller) return false;
+    if (x === 48 || x === 1 || y === 48 || y === 1) return false;
+    x = x === 47 ? 46 : x;
+    x = x === 2 ? 3 : x;
+    y = y === 47 ? 46 : y;
+    y = y === 2 ? 3 : y;
+    const controllerPath = PathFinder.search(
+      new RoomPosition(x, y, room.name),
+      { pos: room.controller.pos, range: 1 },
+      {
+        roomCallback: roomName => {
+          const room = Game.rooms[roomName];
+          if (!room) return false;
+
+          const costs = new PathFinder.CostMatrix();
+
+          // Avoid where we place walls
+          for (let i = 2; i <= 47; i++) {
+            costs.set(2, i, 255);
+            costs.set(47, i, 255);
+            costs.set(i, 2, 255);
+            costs.set(i, 47, 255);
+          }
+
+          return costs;
+        }
+      }
+    );
+    // Enable this for debugging dead-end wall placement. It will draw the path to the controller and indicate whether it is reachable or not.
+    // room.visual.circle(x, y, { fill: "transparent", radius: 0.4, stroke: "#bfe70b" });
+    // for (const path of controllerPath.path) {
+    //   room.visual.circle(path.x, path.y, { fill: "transparent", radius: 0.4, stroke: "#ff0000" });
+    // }
+    // if (controllerPath.incomplete) {
+    //   room.visual.text("Dead End Found", room.controller.pos.x, room.controller.pos.y, {
+    //     color: "#ff0000",
+    //     font: 0.5
+    //   });
+    // } else {
+    //   room.visual.text("Controller can be reached", room.controller.pos.x, room.controller.pos.y, {
+    //     color: "#11a11d",
+    //     font: 0.5
+    //   });
+    // }
+    return controllerPath.incomplete;
   }
 
   private static createConstructionSite(
