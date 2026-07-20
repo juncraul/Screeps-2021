@@ -22,18 +22,19 @@ declare global {
   }
 }
 
-/**
- * Good for anything that isn't a diagonal, as it searches all adjacent tiles when finding distance.
- */
-Room.prototype.distanceTransform = function (
-  this: Room,
-  initialCM: CostMatrix,
-  enableVisuals: boolean,
-  x1 = 0,
-  y1 = 0,
-  x2 = ROOM_DIMENSIONS - 1,
-  y2 = ROOM_DIMENSIONS - 1
-): CostMatrix {
+if (typeof Room !== "undefined") {
+  /**
+   * Good for anything that isn't a diagonal, as it searches all adjacent tiles when finding distance.
+   */
+  Room.prototype.distanceTransform = function (
+    this: Room,
+    initialCM: CostMatrix,
+    enableVisuals: boolean,
+    x1 = 0,
+    y1 = 0,
+    x2 = ROOM_DIMENSIONS - 1,
+    y2 = ROOM_DIMENSIONS - 1
+  ): CostMatrix {
   const distanceCM = new PathFinder.CostMatrix();
 
   let x: number;
@@ -94,21 +95,23 @@ Room.prototype.distanceTransform = function (
     }
   }
 
-  return distanceCM;
-};
+    return distanceCM;
+  };
+}
 
-/**
- * Good for finding open diamond-shaped areas, as it ignores adjacent diagonal tiles when finding distance.
- */
-Room.prototype.diagonalDistanceTransform = function (
-  this: Room,
-  initialCM: CostMatrix,
-  enableVisuals: boolean,
-  x1 = 0,
-  y1 = 0,
-  x2 = ROOM_DIMENSIONS - 1,
-  y2 = ROOM_DIMENSIONS - 1
-): CostMatrix {
+if (typeof Room !== "undefined") {
+  /**
+   * Good for finding open diamond-shaped areas, as it ignores adjacent diagonal tiles when finding distance.
+   */
+  Room.prototype.diagonalDistanceTransform = function (
+    this: Room,
+    initialCM: CostMatrix,
+    enableVisuals: boolean,
+    x1 = 0,
+    y1 = 0,
+    x2 = ROOM_DIMENSIONS - 1,
+    y2 = ROOM_DIMENSIONS - 1
+  ): CostMatrix {
   const distanceCM = new PathFinder.CostMatrix();
 
   let x: number;
@@ -162,7 +165,8 @@ Room.prototype.diagonalDistanceTransform = function (
     }
   }
 
-  return distanceCM;
-};
+    return distanceCM;
+  };
+}
 
 export {};

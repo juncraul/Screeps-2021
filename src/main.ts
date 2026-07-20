@@ -53,6 +53,7 @@ export const loop = () => {
 };
 
 export function executeTestFlag() {
+  if (!Game.flags) return;
   const testFlag = Game.flags.Test;
   if (!testFlag) return;
   Game.flags["Attack-W7N3-4-1"].setPosition(new RoomPosition(5, 26, "W7N3"));

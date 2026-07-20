@@ -36,7 +36,15 @@ const structureTypes = [
   "lab"
 ];
 
-function toBaseLayout(config: LayoutConfig): BaseLayout {
+function toBaseLayout(config: LayoutConfig | undefined): BaseLayout {
+  if (!config) {
+    return {
+      data: {
+        anchor: { x: 0, y: 0 }
+      }
+    };
+  }
+
   const layout: BaseLayout = {
     data: {
       anchor: config.anchor,

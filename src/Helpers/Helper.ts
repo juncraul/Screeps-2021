@@ -196,7 +196,7 @@ export class Helper {
       }
 
       if (previewInsteadOfBuild) {
-        room.visual.structure(step.x, step.y, STRUCTURE_ROAD);
+        (room.visual as any).structure(step.x, step.y, STRUCTURE_ROAD);
         return;
       }
 

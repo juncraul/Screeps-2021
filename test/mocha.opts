@@ -1,5 +1,5 @@
 --require test/setup-mocha.js
---require ts-node/register
+--require ts-node/register/transpile-only
 --require tsconfig-paths/register
 --ui bdd
 

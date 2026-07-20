@@ -687,7 +687,7 @@ export class BaseBuilder {
       }
     }
     if (previewInsteadOfBuild) {
-      room.visual.structure(x, y, type);
+      (room.visual as any).structure(x, y, type);
     } else {
       switch (type) {
         case STRUCTURE_WALL:

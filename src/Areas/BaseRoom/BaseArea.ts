@@ -64,12 +64,16 @@ export default class BaseArea {
         containers.push(potentialContainer);
       }
     }
+    const mineralContainer = GetRoomObjects.getContainerNextToMineral(Game.rooms[this.areaPos.roomName]);
+    const controllerContainer = GetRoomObjects.getContainerNextToController(Game.rooms[this.areaPos.roomName]);
     // Get all the containers on the edge which are used by remote carries.
     const edgeContainers: StructureContainer[] = Game.rooms[this.areaPos.roomName].find(FIND_STRUCTURES, {
       filter: s =>
         s.structureType === STRUCTURE_CONTAINER &&
         (s.pos.x <= 4 || s.pos.x >= 45 || s.pos.y <= 4 || s.pos.y >= 45) &&
-        !containers.some(c => c.id === s.id)
+        !containers.some(c => c.id === s.id) &&
+        s.id !== mineralContainer?.id &&
+        s.id !== controllerContainer?.id
     });
     containers.push(...edgeContainers);
 
