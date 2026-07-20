@@ -143,7 +143,7 @@ export class CreepBase {
       this.creep.say(`Dead in ${this.willSuicideAtTick - Game.time}`);
       if (Game.time >= this.willSuicideAtTick) {
         this.creep.say("💀");
-        console.log(`Creep ${this.name} is suiciding at tick ${Game.time} as scheduled.`);
+        console.log(`Creep ${this.name} is suiciding at tick ${Game.time} as scheduled. Room: ${this.room.name}`);
         this.suicide();
       }
     }

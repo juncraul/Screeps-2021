@@ -24,6 +24,165 @@ export interface RemoteRoomTarget {
 export class GetRoomObjects {
   public static readonly ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
   public static readonly REROUTE_FLAG_PATTERN = /^ReRoute-([WE]\d+[NS]\d+)-From-([WE]\d+[NS]\d+)(?:-.+)?$/;
+  private static readonly ROOM_OBJECT_CACHE_REFRESH_TICKS = 100;
+
+  private static ensureRoomsMemory(): Record<string, RoomObjectsMemory> {
+    if (!Memory.Rooms) {
+      Memory.Rooms = {};
+    }
+    return Memory.Rooms;
+  }
+
+  private static shouldRefreshRoomObjectCache(room: Room, cache: RoomObjectsMemory): boolean {
+    if (!cache.lastUpdatedTick || Game.time - cache.lastUpdatedTick >= this.ROOM_OBJECT_CACHE_REFRESH_TICKS) {
+      return true;
+    }
+
+    // Force one cache rebuild in this tick when structure topology changed last tick.
+    if (
+      cache.lastUpdatedTick < Game.time &&
+      (!cache.lastTimeTopologyWasChecked || cache.lastTimeTopologyWasChecked < Game.time) &&
+      this.hasStructureTopologyChangeEvent(room, cache)
+    ) {
+      return true;
+    }
+
+    if (!!room.controller !== !!cache.controller) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private static hasStructureTopologyChangeEvent(room: Room, cache: RoomObjectsMemory): boolean {
+    const events = room.getEventLog();
+    cache.lastTimeTopologyWasChecked = Game.time;
+    Memory.Rooms![room.name] = cache; // Update the cache with the new lastTimeTopologyWasChecked value.
+
+    for (const event of events) {
+      if (event.event === EVENT_OBJECT_DESTROYED) {
+        const destroyedType = event.data && (event.data.type as string | undefined);
+        if (destroyedType === "structure" || destroyedType === "constructionSite") {
+          console.log(`Event: Room ${room.name} structure type ${event.data?.type} destroyed ${destroyedType}.`);
+          return true;
+        }
+      }
+
+      if (event.event === EVENT_BUILD) {
+        if (event.data.incomplete === false) {
+          // Note: No point in using event.data?.targetId because that is the CONSTRUCTION_SITE id, which is not the same as the STRUCTURE id.
+          console.log(`Event: Room ${room.name} structure type ${event.data?.structureType} built. Finished built.`);
+          return true;
+        }
+        // Enable this if you want to see the progress of construction sites being built, but it will spam the console a lot.
+        // const structureObject = Game.getObjectById(event.data?.targetId as Id<ConstructionSite>);
+        // if (!structureObject) return false;
+        // if (structureObject.progress < structureObject.progressTotal) {
+        //   console.log(
+        //     `Event: Room ${room.name} structure type ${event.data?.structureType} built, id ${
+        //       event.data?.targetId
+        //     }. Progress ${structureObject?.progress ?? "unknown"}.`
+        //   );
+        // }
+      }
+    }
+
+    return false;
+  }
+
+  private static getClosestStructureIdInRange(
+    structures: Structure[],
+    structureType: StructureConstant,
+    targetPos: RoomPosition,
+    range: number
+  ): string | null {
+    let closestId: string | null = null;
+    let closestRange = Infinity;
+
+    for (const structure of structures) {
+      if (structure.structureType !== structureType) {
+        continue;
+      }
+
+      const dist = targetPos.getRangeTo(structure.pos);
+      if (dist > range || dist >= closestRange) {
+        continue;
+      }
+
+      closestRange = dist;
+      closestId = structure.id;
+    }
+
+    return closestId;
+  }
+
+  private static buildRoomObjectCache(room: Room): RoomObjectsMemory {
+    const structures = room.find(FIND_STRUCTURES);
+    const controller = room.controller;
+    const sources = room.find(FIND_SOURCES);
+    const minerals = room.find(FIND_MINERALS);
+    const exits = room.find(FIND_EXIT);
+
+    const sourceInfos: RoomObjectSourceInfoMemory[] = sources.map(source => ({
+      id: source.id,
+      x: source.pos.x,
+      y: source.pos.y,
+      containerId: this.getClosestStructureIdInRange(structures, STRUCTURE_CONTAINER, source.pos, 2),
+      linkId: this.getClosestStructureIdInRange(structures, STRUCTURE_LINK, source.pos, 2)
+    }));
+
+    const controllerInfo: RoomObjectControllerInfoMemory | null = controller
+      ? {
+          id: controller.id,
+          x: controller.pos.x,
+          y: controller.pos.y,
+          containerId: this.getClosestStructureIdInRange(structures, STRUCTURE_CONTAINER, controller.pos, 3),
+          linkId: this.getClosestStructureIdInRange(structures, STRUCTURE_LINK, controller.pos, 3)
+        }
+      : null;
+
+    const mineralInfos: RoomObjectMineralInfoMemory[] = minerals.map(mineral => ({
+      id: mineral.id,
+      x: mineral.pos.x,
+      y: mineral.pos.y,
+      containerId: this.getClosestStructureIdInRange(structures, STRUCTURE_CONTAINER, mineral.pos, 1)
+    }));
+
+    const exitInfos: RoomObjectExitInfoMemory[] = exits.map(exit => ({
+      x: exit.x,
+      y: exit.y
+    }));
+
+    return {
+      lastTimeTopologyWasChecked: Game.time,
+      lastUpdatedTick: Game.time,
+      roomName: room.name,
+      controller: controllerInfo,
+      sources: sourceInfos,
+      minerals: mineralInfos,
+      exits: exitInfos
+    };
+  }
+
+  private static getRoomObjectCache(room: Room): RoomObjectsMemory {
+    const roomsMemory = this.ensureRoomsMemory();
+    const cached = roomsMemory[room.name];
+
+    if (!cached || this.shouldRefreshRoomObjectCache(room, cached)) {
+      const rebuilt = this.buildRoomObjectCache(room);
+      roomsMemory[room.name] = rebuilt;
+      return rebuilt;
+    }
+
+    return cached;
+  }
+
+  private static getTypedObjectById<T extends _HasId>(id: string | null | undefined): T | null {
+    if (!id) {
+      return null;
+    }
+    return Game.getObjectById(id as Id<T>);
+  }
 
   // --------------------------
   // Get All Functions
@@ -182,11 +341,32 @@ export class GetRoomObjects {
   // Functions to return objects within the room
   // --------------------------
   public static getRoomController(room: Room): StructureController | null {
-    return room.controller ? room.controller : null;
+    const cache = this.getRoomObjectCache(room);
+    if (!cache.controller) {
+      return null;
+    }
+
+    const controller = this.getTypedObjectById<StructureController>(cache.controller.id);
+    return controller || room.controller || null;
   }
 
   public static getRoomSources(room: Room): Source[] {
-    return room.find(FIND_SOURCES);
+    const cache = this.getRoomObjectCache(room);
+    const sources: Source[] = [];
+
+    for (const sourceInfo of cache.sources) {
+      const source = this.getTypedObjectById<Source>(sourceInfo.id);
+      if (source) {
+        sources.push(source);
+      }
+    }
+
+    return sources;
+  }
+
+  public static getRoomExits(room: Room): RoomPosition[] {
+    const cache = this.getRoomObjectCache(room);
+    return cache.exits.map(exit => new RoomPosition(exit.x, exit.y, room.name));
   }
 
   public static getRoomConstructions(room: Room, mine?: boolean): ConstructionSite[] {
@@ -369,21 +549,31 @@ export class GetRoomObjects {
   }
 
   public static getContainerNextToController(room: Room): StructureContainer | null {
-    const controller = room.controller;
-    if (!controller) return null;
-    return this.getWithinRangeContainer(controller.pos, 3);
+    const cache = this.getRoomObjectCache(room);
+    if (!cache.controller) {
+      return null;
+    }
+
+    return this.getTypedObjectById<StructureContainer>(cache.controller.containerId);
   }
 
   public static getContainerNextToMineral(room: Room): StructureContainer | null {
-    const mineral = room.find(FIND_MINERALS)[0];
-    if (!mineral) return null;
-    return this.getWithinRangeContainer(mineral.pos, 1);
+    const cache = this.getRoomObjectCache(room);
+    const mineral = cache.minerals[0];
+    if (!mineral) {
+      return null;
+    }
+
+    return this.getTypedObjectById<StructureContainer>(mineral.containerId);
   }
 
   public static getLinkNextToController(room: Room): StructureLink | null {
-    const controller = room.controller;
-    if (!controller) return null;
-    return this.getWithinRangeLink(controller.pos, 3);
+    const cache = this.getRoomObjectCache(room);
+    if (!cache.controller) {
+      return null;
+    }
+
+    return this.getTypedObjectById<StructureLink>(cache.controller.linkId);
   }
 
   // --------------------------

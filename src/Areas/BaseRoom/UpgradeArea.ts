@@ -150,7 +150,7 @@ export default class UpgradeArea extends BaseArea {
 
     const storage = GetRoomObjects.getRoomStorage(this.room);
     if (storage) {
-      availableEnergy += storage.store.getUsedCapacity(RESOURCE_ENERGY);
+      availableEnergy += Math.max(0, storage.store.getUsedCapacity(RESOURCE_ENERGY) - 10000);
     }
 
     return availableEnergy;

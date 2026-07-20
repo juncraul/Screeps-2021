@@ -67,6 +67,44 @@ interface BaseRoomEnergySnapshot {
   energySpent: number;
 }
 
+interface RoomObjectControllerInfoMemory {
+  id: string;
+  x: number;
+  y: number;
+  containerId: string | null;
+  linkId: string | null;
+}
+
+interface RoomObjectSourceInfoMemory {
+  id: string;
+  x: number;
+  y: number;
+  containerId: string | null;
+  linkId: string | null;
+}
+
+interface RoomObjectMineralInfoMemory {
+  id: string;
+  x: number;
+  y: number;
+  containerId: string | null;
+}
+
+interface RoomObjectExitInfoMemory {
+  x: number;
+  y: number;
+}
+
+interface RoomObjectsMemory {
+  lastTimeTopologyWasChecked: number;
+  lastUpdatedTick: number;
+  roomName: string;
+  controller: RoomObjectControllerInfoMemory | null;
+  sources: RoomObjectSourceInfoMemory[];
+  minerals: RoomObjectMineralInfoMemory[];
+  exits: RoomObjectExitInfoMemory[];
+}
+
 interface RoomDefenseState {
   wallAndRampartCount: number;
   coreStructureDamaged: number;
@@ -86,6 +124,7 @@ interface Memory {
   uuid: number;
   log: any;
   Keys: any; // TODO: Find a proper type for this
+  Rooms?: Record<string, RoomObjectsMemory>;
   roomVisuals: boolean;
   scoreHistory: ScoreCollectionRecord[];
   seasonExploredRooms?: ExploredRoom[];

@@ -249,7 +249,7 @@ export default class SoldierArea extends BaseArea {
     const creepsAreInRoomWithDestination =
       firstFourCreeps.filter(c => c.pos.roomName === flag.targetRoom).length === firstFourCreeps.length;
     if (
-      firstFourCreeps.some(creep => creep.pos.roomName === "W6N3") || // Add any room to force it.
+      firstFourCreeps.some(creep => creep.pos.roomName === "X") || // Add any room to force it.
       shouldApplyEdgeNavigation
     ) {
       return EdgeNavigation.tryToAttackFromEdge(firstFourCreeps, flag.position, flag.name);
