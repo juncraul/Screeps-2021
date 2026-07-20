@@ -174,6 +174,17 @@ export default class CarryArea extends BaseArea {
       return true;
     }
 
+    const tombstones = creep.room.find(FIND_TOMBSTONES, {
+      filter: tombstone => tombstone.store.getUsedCapacity(RESOURCE_ENERGY) > 0
+    });
+    if (tombstones.length > 0) {
+      const closestTombstone = creep.pos.findClosestByPath(tombstones);
+      if (closestTombstone) {
+        creep.addTask(new CreepTask(Activity.Collect, closestTombstone.pos));
+        return true;
+      }
+    }
+
     // Check if this room has stationary fillers, this is because we don't have utilities in these rooms.
     const stationaryFillers = GetRoomObjects.usesLayoutFixedExtension(this.room);
     if (stationaryFillers) {
@@ -213,8 +224,8 @@ export default class CarryArea extends BaseArea {
       if (this.depositToConstructionWorkers(creep)) return;
       if (this.depositToStorage(creep)) return;
     } else {
-      if (this.depositToSpawningArea(creep)) return;
       if (this.depositToTowers(creep)) return;
+      if (this.depositToSpawningArea(creep)) return;
       if (this.depositToUpgradeArea(creep)) return;
       if (this.depositToConstructionWorkers(creep)) return;
       if (this.depositToStorage(creep)) return;
@@ -304,6 +315,7 @@ export default class CarryArea extends BaseArea {
   }
 
   private depositToUpgradeArea(creep: CreepBase): boolean {
+    if (this.storage && this.storage.store.getUsedCapacity(RESOURCE_ENERGY) < 10000) return false; // Don't deposit to UpgradeArea if storage is less than 10000.
     // Deposit to creeps in UpgradeArea if we don't have a container next to the controller.
     if (this.containerNextToController && this.containerNextToController.store.getFreeCapacity(RESOURCE_ENERGY) > 500) {
       creep.addTask(new CreepTask(Activity.Deposit, this.containerNextToController.pos));

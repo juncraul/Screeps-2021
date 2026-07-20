@@ -24,6 +24,8 @@ import BaseRoomStats from "Areas/BaseRoom/BaseRoomStats";
 import ScoutArea from "Areas/BaseRoom/ScoutArea";
 import { Helper } from "Helpers/Helper";
 
+const SCOUT_FLAG = "Scout";
+
 export default class Overseer implements IOverseer {
   public refresh(): void {
     const roomsWithSpawns = GetRoomObjects.getAllClaimedRooms();
@@ -46,6 +48,7 @@ export default class Overseer implements IOverseer {
   private overseeRoom(room: Room): SpawnTask[] {
     // Used for debugging wall repair order
     // GetRoomObjects.getClosestWallRampartToRepairAll(room);
+    this.setupRoom(room);
     const roomHasSpawn = GetRoomObjects.getRoomSpawns(room, true).length > 0;
     const scout = this.handleScoutArea(room, roomHasSpawn);
     const remoteRooms = GetRoomObjects.getAllRoomsToRemote(room);
@@ -171,6 +174,16 @@ export default class Overseer implements IOverseer {
     });
 
     return [...defense.tasks, ...ordered, ...remaining];
+  }
+
+  private setupRoom(room: Room) {
+    if (!room.controller) return;
+    if (room.controller.level === 1) {
+      const scoutFlagName = `${SCOUT_FLAG}-${room.name}`;
+      if (!Game.flags[scoutFlagName]) {
+        Game.rooms[room.name].createFlag(25, 25, scoutFlagName, COLOR_WHITE, COLOR_WHITE);
+      }
+    }
   }
 
   private handleHarvestArea(

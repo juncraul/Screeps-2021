@@ -10,7 +10,8 @@ export enum RemoteRoomMode {
   Reserve = "Reserve",
   Claim = "Claim",
   ReserveAttack = "ReserveAttack",
-  StealResources = "StealResources"
+  StealResources = "StealResources",
+  Ignore = "Ignore"
 }
 
 export interface RemoteRoomTarget {
@@ -81,6 +82,10 @@ export class GetRoomObjects {
 
     if (flag.color === COLOR_GREY) {
       return RemoteRoomMode.StealResources;
+    }
+
+    if (flag.color === COLOR_WHITE) {
+      return RemoteRoomMode.Ignore;
     }
 
     return null;
@@ -336,6 +341,11 @@ export class GetRoomObjects {
       }
     });
     return structuresFiltered;
+  }
+
+  public static getWithinRangeHostileCreeps(roomPosition: RoomPosition, range: number): Creep[] {
+    const creeps = roomPosition.findInRange(FIND_HOSTILE_CREEPS, range);
+    return creeps;
   }
 
   public static getWithinRangeContainer(pos: RoomPosition, range: number): StructureContainer | null {

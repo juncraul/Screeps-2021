@@ -54,47 +54,48 @@ export const loop = () => {
 
 export function executeTestFlag() {
   const testFlag = Game.flags.Test;
-  if (testFlag) {
-    const exitDir = Game.map.findExit(testFlag.pos.roomName, "E23N15");
-    if (exitDir === ERR_NO_PATH || exitDir === ERR_INVALID_ARGS) return;
-    const room = Game.rooms[testFlag.pos.roomName];
-    const exits = room.find(exitDir);
+  if (!testFlag) return;
+  Game.flags["Attack-W7N3-4-1"].setPosition(new RoomPosition(5, 26, "W7N3"));
+  testFlag.remove();
+  //   const exitDir = Game.map.findExit(testFlag.pos.roomName, "E23N15");
+  //   if (exitDir === ERR_NO_PATH || exitDir === ERR_INVALID_ARGS) return;
+  //   const room = Game.rooms[testFlag.pos.roomName];
+  //   const exits = room.find(exitDir);
 
-    // const moveTarget = exits[0];
-    let bestCost = Infinity;
-    let bestPath: PathFinderPath | null = null;
-    let costMatrix: CostMatrix;
-    for (const exit of exits) {
-      const result = Helper.simplePathFinderWithObstacles(testFlag.pos, exit);
-      if (result.cost < bestCost) {
-        bestCost = result.cost;
-        bestPath = result;
-      }
-    }
+  //   // const moveTarget = exits[0];
+  //   let bestCost = Infinity;
+  //   let bestPath: PathFinderPath | null = null;
+  //   let costMatrix: CostMatrix;
+  //   for (const exit of exits) {
+  //     const result = Helper.simplePathFinderWithObstacles(testFlag.pos, exit);
+  //     if (result.cost < bestCost) {
+  //       bestCost = result.cost;
+  //       bestPath = result;
+  //     }
+  //   }
 
-    for (let i = 0; i < 50; i++) {
-      for (let j = 0; j < 50; j++) {
-        if (costMatrix!) {
-          const cost = costMatrix!.get(i, j);
-          room.visual.text(cost.toString(), i, j, { font: 0.5, color: "#ff0000" });
-        }
-      }
-    }
+  //   for (let i = 0; i < 50; i++) {
+  //     for (let j = 0; j < 50; j++) {
+  //       if (costMatrix!) {
+  //         const cost = costMatrix!.get(i, j);
+  //         room.visual.text(cost.toString(), i, j, { font: 0.5, color: "#ff0000" });
+  //       }
+  //     }
+  //   }
 
-    if (!bestPath) {
-      console.log("No path found");
-      return;
-    }
+  //   if (!bestPath) {
+  //     console.log("No path found");
+  //     return;
+  //   }
 
-    // visualize path
-    Game.rooms[testFlag.pos.roomName].visual.poly(
-      bestPath.path.filter(p => p.roomName === testFlag.pos.roomName),
-      { stroke: "#ffffff" }
-    );
-    Game.rooms[testFlag.pos.roomName].visual.text(
-      `Path length: ${bestPath.path.length}, cost: ${bestPath.cost}`,
-      testFlag.pos.x,
-      testFlag.pos.y - 1
-    );
-  }
+  //   // visualize path
+  //   Game.rooms[testFlag.pos.roomName].visual.poly(
+  //     bestPath.path.filter(p => p.roomName === testFlag.pos.roomName),
+  //     { stroke: "#ffffff" }
+  //   );
+  //   Game.rooms[testFlag.pos.roomName].visual.text(
+  //     `Path length: ${bestPath.path.length}, cost: ${bestPath.cost}`,
+  //     testFlag.pos.x,
+  //     testFlag.pos.y - 1
+  //   );
 }

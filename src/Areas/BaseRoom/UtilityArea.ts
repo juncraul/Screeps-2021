@@ -2,6 +2,7 @@ import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
+import StationaryFillerArea from "./StationaryFillerArea";
 
 export default class UtilityArea extends BaseArea {
   maxWorkerCount: number;
@@ -9,6 +10,9 @@ export default class UtilityArea extends BaseArea {
   terminal: StructureTerminal | null;
   link: StructureLink | null;
   labs: StructureLab[];
+  spawns: StructureSpawn[];
+  extensions: StructureExtension[];
+  extensionsAndSpawns: (StructureExtension | StructureSpawn)[];
 
   constructor(storage: StructureStorage) {
     super("UtilityArea", storage.room.name, storage.pos, storage.room);
@@ -17,6 +21,9 @@ export default class UtilityArea extends BaseArea {
     this.terminal = GetRoomObjects.getRoomTerminal(storage.room);
     this.link = GetRoomObjects.getWithinRangeLink(storage.pos, 3);
     this.labs = GetRoomObjects.getRoomLabs(storage.room);
+    this.spawns = GetRoomObjects.getRoomSpawns(storage.room, true);
+    this.extensions = GetRoomObjects.getRoomExtensions(this.room, true);
+    this.extensionsAndSpawns = [...this.spawns, ...this.extensions];
   }
 
   public handleThisArea() {
@@ -24,7 +31,7 @@ export default class UtilityArea extends BaseArea {
   }
 
   public handleSpawnTasks(): SpawnTask[] {
-    if (GetRoomObjects.usesLayoutFixedExtension(this.room)) return []; // We don't need utility if we have stationary fillers, they will handle the energy transfer.
+    if (this.room.controller && this.room.controller.level < 5) return [];
 
     const tasksForThisArea: SpawnTask[] = [];
     if (
@@ -64,26 +71,28 @@ export default class UtilityArea extends BaseArea {
 
   private getWhereToDeposit(
     currentPosition: RoomPosition
-  ): StructureSpawn | StructureExtension | StructureTower | null {
-    let extensions: StructureExtension[] = this.room.find(FIND_MY_STRUCTURES, {
-      filter: structure => structure.structureType === STRUCTURE_EXTENSION
-    });
-    let spawns: StructureSpawn[] = this.room.find(FIND_MY_STRUCTURES, {
-      filter: structure => structure.structureType === STRUCTURE_SPAWN
-    });
+  ): StructureSpawn | StructureExtension | StructureTower | StructureContainer | null {
+    const stationaryFillerExtensionsAndSpawns = StationaryFillerArea.getExtensionsAndSpawnsFromStationaryFillerArea(
+      this.room
+    );
+    const extensionsAndSpawnsToDepositTo = this.extensionsAndSpawns.filter(
+      structure =>
+        !stationaryFillerExtensionsAndSpawns.includes(structure) && structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+    );
     const towers: StructureTower[] = this.room.find(FIND_MY_STRUCTURES, {
-      filter: structure => structure.structureType === STRUCTURE_TOWER && structure.energy < 950
+      filter: structure => structure.structureType === STRUCTURE_TOWER && structure.energy < 850
     });
 
     if (towers.find(tower => tower.energy < 50)) {
       // If any tower is below 50 energy, prioritize it over extensions and spawns
-      extensions = [];
-      spawns = [];
+      extensionsAndSpawnsToDepositTo.length = 0;
     }
 
-    const structures = [...extensions, ...spawns, ...towers].filter(
-      structure => structure.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+    const containersNextToSpawns = StationaryFillerArea.getContainers(this.room).filter(
+      container => container.store.getFreeCapacity(RESOURCE_ENERGY) > 100
     );
+
+    const structures = [...extensionsAndSpawnsToDepositTo, ...towers, ...containersNextToSpawns];
     if (structures.length === 0) {
       return null;
     }
@@ -105,7 +114,9 @@ export default class UtilityArea extends BaseArea {
   private createCreepForThisArea(): SpawnTask | null {
     const bodyPartConstants: BodyPartConstant[] = [];
     const haveUtilityCreeps = this.creeps.length > 0;
-    const segments = haveUtilityCreeps ? Math.min(15, Math.floor(this.room.energyCapacityAvailable / 100)) : 1; // Carry-50; Move-50
+    const segments = haveUtilityCreeps
+      ? Math.min(10, Math.floor(this.room.energyCapacityAvailable / 100))
+      : Math.min(10, Math.floor(this.room.energyAvailable / 100)); // Carry-50; Move-50
     if (segments < 1) {
       console.log(`Error: Trying to spawn a carrier with segments ${segments} less than 1`);
       return null;

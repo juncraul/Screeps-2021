@@ -171,8 +171,8 @@ export default class UpgradeArea extends BaseArea {
       segments = 5;
     } else if (this.controllerLevel <= 6 && segments > 10) {
       segments = 10;
-    } else if (segments > 20) {
-      segments = 20;
+    } else if (segments >= 10) {
+      segments = 10;
     }
 
     const carryParts = this.containerNextToController ? 1 : segments;

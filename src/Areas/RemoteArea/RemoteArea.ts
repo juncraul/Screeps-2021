@@ -110,14 +110,14 @@ export default class RemoteArea extends BaseArea {
       if (energyInRoom > 4000) {
         this.claimersPerRoom = 0;
         this.harvestersPerSource = 0;
-        this.carryBodyPartsPerRoom = 20;
+        this.carryBodyPartsPerRoom = 30;
       } else if (energyInRoom > 2000) {
         this.claimersPerRoom = 0;
         this.harvestersPerSource = 0;
-        this.carryBodyPartsPerRoom = 10;
+        this.carryBodyPartsPerRoom = 15;
       } else if (energyInRoom > 1000) {
         this.claimersPerRoom = 0;
-        this.carryBodyPartsPerRoom = 5;
+        this.carryBodyPartsPerRoom = 10;
       } else {
         this.carryBodyPartsPerRoom = 3;
       }
@@ -125,6 +125,11 @@ export default class RemoteArea extends BaseArea {
       this.claimersPerRoom = 0;
       this.harvestersPerSource = 0;
       this.carryBodyPartsPerRoom = 10;
+      this.repairersPerRoom = 0;
+    } else if (remoteMode === RemoteRoomMode.Ignore) {
+      this.claimersPerRoom = 0;
+      this.harvestersPerSource = 0;
+      this.carryBodyPartsPerRoom = 0;
       this.repairersPerRoom = 0;
     }
     if (this.baseRoom.controller && this.baseRoom.controller.level < 3) {
@@ -540,7 +545,8 @@ export default class RemoteArea extends BaseArea {
     if (invaderFlags.length === 0) {
       const targetPos = hostileInvaders[0] ? hostileInvaders[0].pos : invaderCores[0].pos;
       const flagName = this.getInvaderFlagName();
-      targetPos.createFlag(flagName, COLOR_RED, COLOR_BLUE);
+      // Should attack everything as sometimes a core appears.
+      targetPos.createFlag(flagName, COLOR_RED, COLOR_RED);
     }
   }
 

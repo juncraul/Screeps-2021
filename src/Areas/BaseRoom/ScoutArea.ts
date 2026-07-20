@@ -41,7 +41,6 @@ type ScoutIntelMemory = Record<string, ScoutRoomIntel>;
 
 export default class ScoutArea extends BaseArea {
   private static readonly MANAGED_FLAG_PREFIX = "Reserve";
-  private static readonly SCOUT_FLAG_PREFIX = "Scout";
 
   baseRoom: Room;
   roomIntel: ScoutIntelMemory;
@@ -160,7 +159,7 @@ export default class ScoutArea extends BaseArea {
     const flagName = this.getManagedFlagName(room.name);
     const existingFlags = this.getAllRemoteFlags(room.name);
 
-    if (existingFlags.length > 0 || !intel.controller) {
+    if (existingFlags.length > 0 || !intel.controller || intel.hostileCount > 0 || !intel.claimable) {
       return;
     }
 

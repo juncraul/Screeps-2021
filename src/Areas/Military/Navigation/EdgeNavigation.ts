@@ -58,7 +58,7 @@ export default class EdgeNavigation {
     const healerCannotKeepUp = focusedDamageMissing > focusedHealPotential || totalMissingHits > totalHealPotential;
 
     console.log(
-      `[EdgeNavigation-${memoryName}] damageTaken=${damageTaken} missingHits=${totalMissingHits} ` +
+      `[${kiteStateKey}] damageTaken=${damageTaken} missingHits=${totalMissingHits} ` +
         `healPotential=${totalHealPotential} focusedHeal=${focusedHealPotential} isEdgeNav=${String(isEdgeNavigating)}`
     );
 
@@ -67,7 +67,7 @@ export default class EdgeNavigation {
     // Stay retreating until fully healed; start retreating on heavy damage under heal pressure.
     const shouldRetreat = wasRetreating
       ? !allFullyHealed
-      : mostDamagedPercentage < 0.6 && damageTaken > 0 && healerCannotKeepUp;
+      : mostDamagedPercentage < 0.4 && damageTaken > 0 && healerCannotKeepUp;
 
     Helper.setCashedMemory(kiteStateKey, { tick: Game.time, totalHits, isRetreating: shouldRetreat });
 
@@ -103,6 +103,7 @@ export default class EdgeNavigation {
     const slots = this.getEdgeSlots(edge, creeps.length, destination);
     this.assignCreepsToSlots(creeps, slots, destination.roomName);
     this.attackFromEdge(creeps, destination.roomName);
+    this.bringAllCreepsToTheLeaderRoom(creeps, destination.roomName);
 
     return true;
   }
@@ -188,25 +189,55 @@ export default class EdgeNavigation {
   /** Assigns each creep to its nearest unoccupied slot and moves it there. */
   private static assignCreepsToSlots(creeps: CreepBase[], slots: RoomPosition[], roomName: string): void {
     const room = Game.rooms[roomName];
-    const assigned = new Set<number>();
 
-    for (const creep of creeps) {
-      let bestIdx = -1;
-      let bestRange = Infinity;
-      for (let i = 0; i < slots.length; i++) {
-        if (assigned.has(i)) continue;
-        const range = creep.pos.getRangeTo(slots[i]);
-        if (range < bestRange) {
-          bestRange = range;
-          bestIdx = i;
+    if (creeps.length !== slots.length) {
+      console.log(
+        `[EdgeNavigation] Warning: number of creeps (${creeps.length}) does not match number of slots (${slots.length})`
+      );
+      return;
+    }
+    if (slots.length === 0) {
+      console.log(`[EdgeNavigation] Warning: no slots available`);
+      return;
+    }
+    const horizontalSlots = slots.filter(s => s.x === 1 || s.x === 48).length > 0;
+
+    const edgePriority = (v: number) => (v === 0 || v === 49 ? -1 : 0);
+    // if y or x is the same then prioritize the one that the other axis is 0 or 49
+    creeps = creeps.sort((a, b) => {
+      if (horizontalSlots) {
+        // Primary: y
+        if (a.pos.y !== b.pos.y) {
+          return a.pos.y - b.pos.y;
         }
-      }
-      if (bestIdx === -1) continue;
-      assigned.add(bestIdx);
 
-      const slot = slots[bestIdx];
+        // Same y -> prioritize x on an edge
+        const edgeCmp = edgePriority(a.pos.x) - edgePriority(b.pos.x);
+        if (edgeCmp !== 0) return edgeCmp;
+
+        // Then normal x ordering
+        return a.pos.x - b.pos.x;
+      } else {
+        // Primary: x
+        if (a.pos.x !== b.pos.x) {
+          return a.pos.x - b.pos.x;
+        }
+
+        // Same x -> prioritize y on an edge
+        const edgeCmp = edgePriority(a.pos.y) - edgePriority(b.pos.y);
+        if (edgeCmp !== 0) return edgeCmp;
+
+        // Then normal y ordering
+        return a.pos.y - b.pos.y;
+      }
+    });
+
+    // let creepCantReach: CreepBase | null = null;
+    for (let i = 0; i < slots.length; i++) {
+      const creep = creeps[i];
+      const slot = slots[i];
       if (room) {
-        room.visual.text(String(bestIdx), slot.x, slot.y, {
+        room.visual.text(String(i), slot.x, slot.y, {
           align: "center",
           opacity: 0.5,
           font: 0.5,
@@ -215,12 +246,40 @@ export default class EdgeNavigation {
         });
       }
 
+      if (
+        !creep.pos.inRangeTo(slot, 1) &&
+        (creep.pos.x === 0 || creep.pos.x === 49 || creep.pos.y === 0 || creep.pos.y === 49)
+      ) {
+        console.log(
+          `[EdgeNavigation] can't reach ${creep.creep.name} at pos (${creep.pos.x},${creep.pos.y}) moving to slot ${i} at (${slot.x},${slot.y})`
+        );
+        // creepCantReach = creep;
+      }
+
       if (!Helper.isSamePosition(creep.pos, slot)) {
-        creep.creep.moveTo(slot, {
-          range: 0,
-          reusePath: 0,
-          visualizePathStyle: { stroke: "#ff9900", opacity: 0.5 }
-        });
+        // creep.creep.moveTo(slot, {
+        //   range: 0,
+        //   reusePath: 0,
+        //   visualizePathStyle: { stroke: "#ff9900", opacity: 0.5 }
+        // });
+        const path = PathFinder.search(
+          creep.creep.pos,
+          { pos: slot, range: 0 },
+          {
+            roomCallback: roomName => {
+              const room = Game.rooms[roomName];
+              if (!room) return false;
+
+              const costs = new PathFinder.CostMatrix();
+
+              for (let y = 0; y < 50; y++) {
+                costs.set(47, y, 255);
+              }
+              return costs;
+            }
+          }
+        );
+        creep.creep.moveByPath(path.path);
       }
     }
   }
@@ -297,5 +356,40 @@ export default class EdgeNavigation {
       if (range <= 3) return parts * RANGED_HEAL_POWER;
       return 0;
     });
+  }
+
+  private static bringAllCreepsToTheLeaderRoom(creeps: CreepBase[], roomName: string): void {
+    const leader = creeps[0];
+    for (const creep of creeps) {
+      if (creep.pos.roomName !== roomName) {
+        creep.creep.moveTo(leader.pos, {
+          range: 0,
+          reusePath: 0,
+          visualizePathStyle: { stroke: "#ff9900", opacity: 0.5 }
+        });
+      }
+    }
+  }
+
+  public static shouldApplyEdgeNavigation(creeps: CreepBase[], destination: RoomPosition): boolean {
+    if (Game.rooms[destination.roomName] && Game.rooms[destination.roomName].controller?.my) return false;
+    const creepsThatAreInRoomWithDestination = creeps.filter(c => c.pos.roomName === destination.roomName);
+    for (const creep of creepsThatAreInRoomWithDestination) {
+      if (!(creep.pos.x <= 1 || creep.pos.x >= 48 || creep.pos.y <= 1 || creep.pos.y >= 48)) continue;
+      for (let i = -1; i <= 1; i++) {
+        for (let j = -1; j <= 1; j++) {
+          const x = creep.pos.x + i;
+          const y = creep.pos.y + j;
+          if (x < 2 || x > 47 || y < 2 || y > 47) continue;
+          const pos = new RoomPosition(x, y, destination.roomName);
+          const isRampartOrWallStructure =
+            pos
+              .lookFor(LOOK_STRUCTURES)
+              .filter(s => s.structureType === STRUCTURE_RAMPART || s.structureType === STRUCTURE_WALL).length > 0;
+          if (isRampartOrWallStructure) return true;
+        }
+      }
+    }
+    return false;
   }
 }

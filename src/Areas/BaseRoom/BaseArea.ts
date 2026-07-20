@@ -67,7 +67,7 @@ export default class BaseArea {
     // Get all the containers on the edge which are used by remote carries.
     const edgeContainers: StructureContainer[] = Game.rooms[this.areaPos.roomName].find(FIND_STRUCTURES, {
       filter: s =>
-        s.structureType === STRUCTURE_CONTAINER && (s.pos.x < 3 || s.pos.x > 47 || s.pos.y < 3 || s.pos.y > 47)
+        s.structureType === STRUCTURE_CONTAINER && (s.pos.x <= 4 || s.pos.x >= 45 || s.pos.y <= 4 || s.pos.y >= 45)
     });
     containers.push(...edgeContainers);
 

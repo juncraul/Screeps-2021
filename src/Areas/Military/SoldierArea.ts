@@ -6,6 +6,7 @@ import { CreepBase } from "../../CreepBase";
 import { GetRoomObjects, RemoteRoomMode } from "Helpers/GetRoomObjects";
 import LineNaviagation from "./Navigation/LineNaviagation";
 import QuadNavigation from "./Navigation/QuadNavigation";
+import EdgeNavigation from "./Navigation/EdgeNavigation";
 
 const ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
 const EXCEPTION_PLAYER_NAMES = ["nekey975"];
@@ -31,8 +32,8 @@ export interface AttackFlagConfig {
   position: RoomPosition;
   targetRoom: string;
   baseRoomName?: string;
-  primaryColor: number;
-  secondaryColor: number;
+  primaryColor: ColorConstant;
+  secondaryColor: ColorConstant;
   squadSize: number;
   powerRank: number | null;
 }
@@ -197,21 +198,11 @@ export default class SoldierArea extends BaseArea {
 
   public handleThisArea(): void {
     this.runHealerPassiveEffect();
-    this.runDismantlerPassiveEffect();
+    this.runAttackerPassiveEffect();
 
     // const combatAssigned = this.assignCombatTask(Game.flags[this.flag.name]);
     // const targetPosition = combatAssigned ? combatAssigned.pos : this.flag.position;
-    const firstFourCreeps = this.creeps.slice(0, 4);
-    const creepsAreInRoomWithDestination =
-      firstFourCreeps.filter(c => c.pos.roomName === this.flag.targetRoom).length === firstFourCreeps.length;
-    const formationMovementApplied = creepsAreInRoomWithDestination
-      ? QuadNavigation.tryToKiteTheEnemyAsFormation(
-          firstFourCreeps,
-          this.flag.position,
-          this.flag.name,
-          this.flag.secondaryColor === SecondaryColor.WHITE
-        )
-      : LineNaviagation.tryMoveAsFormation(firstFourCreeps, this.flag.position);
+    const formationMovementApplied = SoldierArea.managedToApplyAFormationMovement(this.creeps, this.flag);
 
     for (const creep of this.creeps) {
       if (formationMovementApplied) {
@@ -239,11 +230,7 @@ export default class SoldierArea extends BaseArea {
         continue;
       }
 
-      if (creep.creepType === CreepType.Healer) {
-        creep.addTask(new CreepTask(Activity.Move, this.flag.position));
-      } else {
-        creep.addTask(new CreepTask(Activity.Move, this.flag.position));
-      }
+      creep.addTask(new CreepTask(Activity.Move, this.flag.position));
 
       if (creep.creepType !== CreepType.Healer) {
         const combatAssigned = this.assignCombatTask(Game.flags[this.flag.name]);
@@ -255,6 +242,47 @@ export default class SoldierArea extends BaseArea {
   }
 
   // Private static helpers
+
+  private static managedToApplyAFormationMovement(creeps: CreepBase[], flag: AttackFlagConfig): boolean {
+    const firstFourCreeps = SoldierArea.getOrderedFormationCreeps(creeps.slice(0, 4));
+    const shouldApplyEdgeNavigation = EdgeNavigation.shouldApplyEdgeNavigation(firstFourCreeps, flag.position);
+    const creepsAreInRoomWithDestination =
+      firstFourCreeps.filter(c => c.pos.roomName === flag.targetRoom).length === firstFourCreeps.length;
+    if (
+      firstFourCreeps.some(creep => creep.pos.roomName === "W6N3") || // Add any room to force it.
+      shouldApplyEdgeNavigation
+    ) {
+      return EdgeNavigation.tryToAttackFromEdge(firstFourCreeps, flag.position, flag.name);
+    } else if (creepsAreInRoomWithDestination) {
+      return QuadNavigation.tryToKiteTheEnemyAsFormation(
+        firstFourCreeps,
+        flag.position,
+        flag.name,
+        flag.secondaryColor
+      );
+    } else {
+      return LineNaviagation.tryMoveAsFormation(firstFourCreeps, flag.position);
+    }
+  }
+
+  private static getOrderedFormationCreeps(creeps: CreepBase[]): CreepBase[] {
+    if (creeps.length === 0) return [];
+    const designatedLeader =
+      creeps.find(creep => creep.creepType === CreepType.Melee) ??
+      creeps.find(creep => creep.creepType === CreepType.Dismantler) ??
+      creeps.slice().sort((a, b) => a.ticksToLive! - b.ticksToLive!)[0];
+
+    const followers = creeps
+      .filter(creep => creep.name !== designatedLeader.name)
+      .sort((a, b) => a.ticksToLive! - b.ticksToLive!);
+
+    const ordered = [designatedLeader, ...followers];
+    for (let i = 0; i < ordered.length; i++) {
+      ordered[i].memory.formationOrder = i;
+    }
+
+    return ordered;
+  }
 
   private static parseAttackFlagName(
     name: string
@@ -404,6 +432,8 @@ export default class SoldierArea extends BaseArea {
     if (segments === 10) toughParts = 3;
     if (segments === 8) toughParts = 2;
     if (segments === 6) toughParts = 1;
+    if (segments === 4) toughParts = 1;
+    if (segments === 2) toughParts = 1;
     for (let i = 0; i < toughParts; i++) {
       body.push(TOUGH);
       body.push(MOVE);
@@ -425,8 +455,17 @@ export default class SoldierArea extends BaseArea {
   }
 
   private createHealerBody(segments: number): BodyPartConstant[] {
-    if (segments === 0) segments = 6; // 0 is used for maximum segments.
     const body: BodyPartConstant[] = [];
+    let toughParts = 0;
+    if (segments === 1) toughParts = 0;
+    if (segments === 2) toughParts = 1;
+    if (segments === 3) toughParts = 1;
+    if (segments >= 4) toughParts = 2;
+    for (let i = 0; i < toughParts; i++) {
+      body.push(TOUGH);
+      body.push(MOVE);
+    }
+    if (segments === 0) segments = 6; // 0 is used for maximum segments.
     for (let i = 0; i < segments; i++) {
       body.push(HEAL); // HEAL-200; MOVE-50  plain=1  road=1  swamp=5
       body.push(MOVE);
@@ -450,25 +489,59 @@ export default class SoldierArea extends BaseArea {
     }
   }
 
-  private runDismantlerPassiveEffect(): void {
+  private runAttackerPassiveEffect(): void {
     // TODO: It does not work properly, it should distroy all the roads in the path without affecting move.
     if (this.flag.secondaryColor === SecondaryColor.WHITE) return;
     const dismantlers = this.creeps.filter(
       creep => creep.creepType === CreepType.Dismantler && creep.pos.roomName === this.flag.targetRoom
     );
     for (const dismantler of dismantlers) {
-      // Find strcture to dismantle at range 1
-      const target = GetRoomObjects.getWithinRangeStructures(dismantler.pos, 1, STRUCTURE_ROAD);
+      if (!Game.rooms[dismantler.creep.pos.roomName].controller?.my) {
+        const target = GetRoomObjects.getWithinRangeStructures(dismantler.pos, 1, STRUCTURE_ROAD);
+        if (target.length > 0) {
+          dismantler.creep.dismantle(target[0]);
+        }
+      }
+    }
+    const melees = this.creeps.filter(
+      creep => creep.creepType === CreepType.Melee && creep.pos.roomName === this.flag.targetRoom
+    );
+    for (const melee of melees) {
+      const target = GetRoomObjects.getWithinRangeHostileCreeps(melee.pos, 1);
       if (target.length > 0) {
-        dismantler.dismantle(target[0]);
+        melee.creep.attack(target[0]);
+        continue;
+      }
+      // TODO: should also exclude remote rooms.
+      if (!Game.rooms[melee.creep.pos.roomName].controller?.my) {
+        const target = GetRoomObjects.getWithinRangeStructures(melee.pos, 1, STRUCTURE_ROAD);
+        if (target.length > 0) {
+          melee.creep.attack(target[0]);
+        }
+      }
+    }
+    const rangers = this.creeps.filter(
+      creep => creep.creepType === CreepType.Ranged && creep.pos.roomName === this.flag.targetRoom
+    );
+    for (const ranger of rangers) {
+      const target = GetRoomObjects.getWithinRangeHostileCreeps(ranger.pos, 3);
+      if (target.length > 0) {
+        ranger.creep.attack(target[0]);
+        continue;
+      }
+      if (!Game.rooms[ranger.creep.pos.roomName].controller?.my) {
+        const target = GetRoomObjects.getWithinRangeStructures(ranger.pos, 3, STRUCTURE_ROAD);
+        if (target.length > 0) {
+          ranger.creep.rangedAttack(target[0]);
+        }
       }
     }
   }
 
   private healMostDamagedTarget(healer: CreepBase): void {
-    const candidates = this.getHealerTargets();
+    let candidates = this.getHealerTargets();
     if (candidates.length === 0) candidates.push(healer.creep); // Do self-heal
-
+    candidates = candidates.filter(c => c.pos.inRangeTo(healer.pos, 3)); // Only heal targets within range 3
     const target = candidates.sort((a, b) => {
       const missingA = a.hitsMax - a.hits;
       const missingB = b.hitsMax - b.hits;
@@ -477,6 +550,7 @@ export default class SoldierArea extends BaseArea {
       }
       return healer.pos.getRangeTo(a.pos) - healer.pos.getRangeTo(b.pos);
     })[0];
+    if (!target) return;
 
     const range = healer.pos.getRangeTo(target.pos);
     if (range <= 1) {

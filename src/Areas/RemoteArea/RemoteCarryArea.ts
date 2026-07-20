@@ -174,6 +174,8 @@ export function findClosestDeposit(area: RemoteArea, creep: CreepBase): Structur
   for (const container of containers) {
     const distance = creep.pos.getRangeTo(container.pos);
     if (distance < bestDistance) {
+      // If the best structure is a link, we want to prioritize it over containers that are only slightly closer.
+      if (bestStructure && bestStructure.structureType === STRUCTURE_LINK && distance >= bestDistance - 3) continue;
       bestDistance = distance;
       bestStructure = container;
     }

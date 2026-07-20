@@ -672,6 +672,10 @@ export class BaseBuilder {
     type: BuildableStructureConstant,
     previewInsteadOfBuild: boolean
   ) {
+    const existingStructure = room.lookForAt(LOOK_STRUCTURES, x, y)[0];
+    if (existingStructure) return;
+    const existingConstructionSite = room.lookForAt(LOOK_CONSTRUCTION_SITES, x, y)[0];
+    if (existingConstructionSite) return;
     const constructionRampart = this.getBaseBuildData(room.name).ramparts;
     if (
       constructionRampart.filter(obj => {
@@ -801,13 +805,15 @@ export class BaseBuilder {
       const container = GetRoomObjects.getWithinRangeContainer(source.pos, 1);
       if (!container) continue;
       const surroundingPositions = Helper.getWalkableAdjacentPositions(container.pos);
-      let linkNextToSourcePos = GetRoomObjects.getWithinRangeLink(source.pos, 2)?.pos;
-      if (!linkNextToSourcePos) {
-        linkNextToSourcePos = Helper.getWalkableAdjacentPositions(container.pos)[0];
-      }
       let roadFromContainerPos = GetRoomObjects.getWithinRangeStructures(container.pos, 1, STRUCTURE_ROAD)[0]?.pos;
       if (!roadFromContainerPos) {
         roadFromContainerPos = GetRoomObjects.getXStepTowardsSpawn(container.pos, 1);
+      }
+      let linkNextToSourcePos = GetRoomObjects.getWithinRangeLink(source.pos, 2)?.pos;
+      if (!linkNextToSourcePos) {
+        linkNextToSourcePos = surroundingPositions.filter(
+          pos => roadFromContainerPos && !Helper.isSamePosition(pos, roadFromContainerPos)
+        )[0];
       }
 
       for (const pos of surroundingPositions) {

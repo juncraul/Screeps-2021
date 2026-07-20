@@ -1,20 +1,17 @@
 import { CreepBase } from "../../../CreepBase";
-import { CreepType } from "../../../CreepType";
 import { Helper } from "Helpers/Helper";
 
 export default class QuadNavigation {
   public static tryToKiteTheEnemyAsFormation(
-    quadCreeps: CreepBase[],
+    quad: CreepBase[],
     destination: RoomPosition,
     memoryName: string,
-    pacifist: boolean
+    flagColor: ColorConstant
   ): boolean {
-    if (quadCreeps.length < 4) {
+    if (quad.length < 4) {
       return false;
     }
 
-    const ordered = this.getOrderedFormationCreeps(quadCreeps);
-    const quad = ordered.slice(0, 4);
     if (!this.creepsAreInRangeOfEachOther(quad, 4)) {
       return false;
     }
@@ -41,16 +38,16 @@ export default class QuadNavigation {
     const focusedHealPotential = mostDamaged ? this.getPotentialHealOnTarget(quad, mostDamaged) : 0;
     const focusedDamageMissing = mostDamaged ? mostDamaged.hitsMax - mostDamaged.hits : 0;
 
-    if (!pacifist) {
+    if (flagColor !== COLOR_WHITE) {
       console.log(
-        `[${memoryName}] Kite State: Damage Taken: ${damageTaken}, Total Missing Hits: ${totalMissingHits}, Total Heal Potential: ${totalHealPotential}, Focused Heal Potential: ${focusedHealPotential}, Focused Damage Missing: ${focusedDamageMissing}`
+        `[${kiteStateKey}] Kite State: Damage Taken: ${damageTaken}, Total Missing Hits: ${totalMissingHits}, Total Heal Potential: ${totalHealPotential}, Focused Heal Potential: ${focusedHealPotential}, Focused Damage Missing: ${focusedDamageMissing}`
       );
     }
 
     const healerCannotKeepUp = focusedDamageMissing > focusedHealPotential || totalMissingHits > totalHealPotential;
     const isRetreating = previousState && previousState.tick === Game.time - 1 && previousState.isRetreating;
     if (isRetreating)
-      console.log(`[${memoryName}] Retreating from threat at ${String(threat?.pos)} due to previous state.`);
+      console.log(`[${kiteStateKey}] Retreating from threat at ${String(threat?.pos)} due to previous state.`);
     const shouldRetreat = isRetreating
       ? totalMissingHits !== 0
       : mostDamagedPercentage < 0.6 && damageTaken > 0 && healerCannotKeepUp && !!threat;
@@ -64,40 +61,38 @@ export default class QuadNavigation {
     if (threat) {
       if (shouldRetreat) {
         console.log(
-          `[${memoryName}] Retreating from threat at ${String(
+          `[${kiteStateKey}] Retreating from threat at ${String(
             threat.pos
           )} due to damage taken and healer cannot keep up.`
         );
         leader.say("😱"); // Retreat to destination
-        return this.tryMoveAsFormation(quadCreeps, destination, memoryName, false);
+        return this.tryMoveAsFormation(quad, destination, memoryName, false);
       } else {
-        if (!pacifist) {
+        if (flagColor !== COLOR_WHITE) {
           if (leader.pos.inRangeTo(threat?.pos ?? leader.pos, 1)) {
             return true; // We arrived at the enemy. We are done with navigation.
           } else {
             leader.say("⚔️👣"); // Move towards threat
-            return this.tryMoveAsFormation(quadCreeps, threat.pos, memoryName, true);
+            return this.tryMoveAsFormation(quad, threat.pos, memoryName, true);
           }
         }
       }
     }
 
     leader.say("👣🚩"); // Move towards destination
-    return this.tryMoveAsFormation(quadCreeps, destination, memoryName, true);
+    return this.tryMoveAsFormation(quad, destination, memoryName, true);
   }
 
   private static tryMoveAsFormation(
-    creeps: CreepBase[],
+    quad: CreepBase[],
     destination: RoomPosition,
     memoryName: string,
     rotateTowardsTarget: boolean
   ): boolean {
-    if (creeps.length < 4) {
+    if (quad.length < 4) {
       return false;
     }
 
-    const ordered = this.getOrderedFormationCreeps(creeps);
-    const quad = ordered.slice(0, 4);
     if (!this.creepsAreInRangeOfEachOther(quad, 4)) {
       return false; // If the creeps are not in range of each other, then we should not try to move as a formation.
     }
@@ -122,7 +117,7 @@ export default class QuadNavigation {
     }
 
     // Check if creeps have fatique
-    if (creeps.some(creep => creep.creep.fatigue > 0)) {
+    if (quad.some(creep => creep.creep.fatigue > 0)) {
       return true;
     }
 
@@ -176,29 +171,11 @@ export default class QuadNavigation {
       }
     }
 
-    for (const trailing of ordered.slice(4)) {
+    for (const trailing of quad.slice(4)) {
       trailing.creep.moveTo(anchor, { reusePath: 0, range: 1 });
     }
 
     return true;
-  }
-
-  private static getOrderedFormationCreeps(creeps: CreepBase[]): CreepBase[] {
-    const designatedLeader =
-      creeps.find(creep => creep.creepType === CreepType.Melee) ??
-      creeps.find(creep => creep.creepType === CreepType.Dismantler) ??
-      creeps.slice().sort((a, b) => a.ticksToLive! - b.ticksToLive!)[0];
-
-    const followers = creeps
-      .filter(creep => creep.name !== designatedLeader.name)
-      .sort((a, b) => a.ticksToLive! - b.ticksToLive!);
-
-    const ordered = [designatedLeader, ...followers];
-    for (let i = 0; i < ordered.length; i++) {
-      ordered[i].memory.formationOrder = i;
-    }
-
-    return ordered;
   }
 
   private static isQuadAssembled(quad: CreepBase[]): boolean {
@@ -706,6 +683,11 @@ export default class QuadNavigation {
         }
       }
     }
+    return true;
+  }
+
+  public static isQuadAbleToReachDestinationInTime(creeps: CreepBase[], destination: RoomPosition): boolean {
+    const allowedExtraCostForAQuad = 5;
     return true;
   }
 }

@@ -63,9 +63,10 @@ export default class SourceArea extends HarvestArea {
       if (canCreateLink) {
         const positionForLink = Helper.getFreeAdjacentPositions(this.containerNextToHarvestArea.pos)[0];
         if (positionForLink) {
+          console.log("SourceArea: will create link", positionForLink.toString());
           this.room.createConstructionSite(positionForLink, STRUCTURE_LINK);
         } else {
-          console.log("SourceArea: No position for link next to source");
+          console.log("SourceArea: No position for link next to source", this.source.pos.toString());
         }
       }
     }
