@@ -120,6 +120,43 @@ interface SoldierFlagState {
   secondaryColor: number;
 }
 
+interface SoldierKiteState {
+  tick: number;
+  totalHits: number;
+  isRetreating: boolean;
+}
+
+interface SoldierCompositionMemory {
+  squadSize: number;
+  baseRoomName?: string;
+  powerRank: number | null;
+  primaryColor: number;
+  secondaryColor: number;
+  targetRoom: string;
+  creepNames: string[];
+  roleCounts: Record<string, number>;
+  dyingCount: number;
+}
+
+interface SoldierNavigationMemory {
+  lastStyle?: "edge" | "quad" | "line";
+  edgeMode?: boolean;
+  edgeKiteState?: SoldierKiteState;
+  quadKiteState?: SoldierKiteState;
+  quadSlots?: string[];
+}
+
+interface SoldierAreaMemory {
+  flagState?: SoldierFlagState;
+  composition?: SoldierCompositionMemory;
+  navigation?: SoldierNavigationMemory;
+  lastUpdatedTick?: number;
+}
+
+interface AreasMemory {
+  Soldiers?: Record<string, SoldierAreaMemory>;
+}
+
 interface Memory {
   uuid: number;
   log: any;
@@ -132,6 +169,7 @@ interface Memory {
   scoutIntel?: Record<string, ScoutRoomIntel>;
   soldierFlagState?: SoldierFlagState;
   soldierFlagStates?: Record<string, SoldierFlagState>;
+  Areas?: AreasMemory;
   remoteRoomEconomy?: Record<string, RemoteRoomEconomy>;
   baseRoomStats?: Record<string, BaseRoomEnergyStats>;
   roomDefenseStates?: Record<string, RoomDefenseState>;

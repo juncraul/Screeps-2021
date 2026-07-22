@@ -9,11 +9,11 @@ export default class BaseArea {
   creeps: CreepBase[];
   room: Room;
 
-  constructor(memoryType: string, areaId: string, areaPos: RoomPosition, room: Room) {
+  constructor(memoryType: string, areaId: string, areaPos: RoomPosition, room: Room, creepsMemoryKey?: string) {
     this.memoryType = memoryType;
     this.areaId = areaId;
     this.areaPos = areaPos;
-    this.creeps = this.getCreepsAssignedToThisArea();
+    this.creeps = this.getCreepsAssignedToThisArea(creepsMemoryKey);
     this.room = room;
   }
 
@@ -24,19 +24,20 @@ export default class BaseArea {
     return creepName;
   }
 
-  getCreepsAssignedToThisArea(): CreepBase[] {
-    const creepsNames: string[] = Helper.getCashedMemory(`${this.memoryType}-${this.areaId}`, []);
+  getCreepsAssignedToThisArea(creepsMemoryKey?: string): CreepBase[] {
+    const key = creepsMemoryKey ?? `${this.memoryType}-${this.areaId}`;
+    const creepsNames: string[] = Helper.getCashedMemory(key, []);
     const creeps: CreepBase[] = [];
     for (let i: number = creepsNames.length - 1; i >= 0; i--) {
       const creep: Creep | null = Game.creeps[creepsNames[i]];
-      if (creep && creep.hits > 0) {
+      if (creep && (creep.hits > 0 || creep.spawning === true)) {
         creeps.push(new CreepBase(creep));
       } else {
         // Clean up any dead creeps.
         creepsNames.splice(i, 1);
       }
     }
-    Helper.setCashedMemory(`${this.memoryType}-${this.areaId}`, creepsNames);
+    Helper.setCashedMemory(key, creepsNames);
     return creeps;
   }
 

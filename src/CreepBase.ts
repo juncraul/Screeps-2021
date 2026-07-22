@@ -372,10 +372,14 @@ export class CreepBase {
 
     const reRouteRoom = GetRoomObjects.getReRouteRoom(targetPos.roomName, currentRoom);
     // If a ReRoute flag exists for this (target, from) pair, route through that room first.
-    let moveTarget =
-      reRouteRoom && reRouteRoom !== currentRoom && reRouteRoom !== targetPos.roomName
-        ? new RoomPosition(25, 25, reRouteRoom)
-        : targetPos;
+    if (reRouteRoom && reRouteRoom !== currentRoom && reRouteRoom !== targetPos.roomName) {
+      this.moveTo(new RoomPosition(25, 25, reRouteRoom), {
+        reusePath: MOVE_TO_REUSE,
+        visualizePathStyle: { stroke: "#ff01f2" }
+      });
+      return;
+    }
+    let moveTarget = targetPos;
 
     const exitDir = Game.map.findExit(this.creep.room.name, targetPos.roomName);
     if (exitDir === ERR_NO_PATH || exitDir === ERR_INVALID_ARGS) return;

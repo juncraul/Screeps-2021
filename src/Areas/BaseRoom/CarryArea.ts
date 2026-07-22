@@ -333,24 +333,36 @@ export default class CarryArea extends BaseArea {
     return false;
   }
 
-  private calculateMaxWorkerCount(): number {
+  private carryBodyNeededTotal(): number {
+    const roomEnergyToCollect = this.getTotalCollectableEnergy();
+    let carryBodyPartsNeeded: number;
+    if (roomEnergyToCollect >= 2500) carryBodyPartsNeeded = 25;
+    else if (roomEnergyToCollect >= 2000) carryBodyPartsNeeded = 20;
+    else if (roomEnergyToCollect >= 1000) carryBodyPartsNeeded = 15;
+    else if (roomEnergyToCollect >= 500) carryBodyPartsNeeded = 10;
+    else carryBodyPartsNeeded = 5;
+    return carryBodyPartsNeeded;
+  }
+
+  private carryBodyNeededLeft(): number {
     const creeps = this.creeps.filter(creep => (creep.ticksToLive ?? 0) > 200);
     const carryBodyPartsFromCreeps = creeps.reduce((total, creep) => total + creep.creep.getActiveBodyparts(CARRY), 0);
-    const roomEnergyToCollect = this.getTotalCollectableEnergy();
-    let carryBodyPartsNeeded = 1;
-    if (roomEnergyToCollect >= 2500) carryBodyPartsNeeded = 30;
-    else if (roomEnergyToCollect >= 2000) carryBodyPartsNeeded = 25;
-    else if (roomEnergyToCollect >= 1000) carryBodyPartsNeeded = 20;
-    else if (roomEnergyToCollect >= 500) carryBodyPartsNeeded = 10;
-    else if (roomEnergyToCollect < 500) carryBodyPartsNeeded = 5;
-    if (carryBodyPartsFromCreeps >= carryBodyPartsNeeded) return creeps.length;
-    return creeps.length + 1;
+    const carryBodyPartsNeeded = this.carryBodyNeededTotal();
+    return Math.max(carryBodyPartsNeeded - carryBodyPartsFromCreeps, 0);
+  }
+
+  private calculateMaxWorkerCount(): number {
+    const carryBodyPartsNeededLeft = this.carryBodyNeededLeft();
+    if (carryBodyPartsNeededLeft === 0) return this.creeps.length;
+    return this.creeps.length + 1;
   }
 
   private createCreepForThisArea(): SpawnTask | null {
     const bodyPartConstants: BodyPartConstant[] = [];
     const leaveAmountEnergyUnused = this.room.energyCapacityAvailable / 100 > 10 ? 300 : 0; // Don't wait for a full refill if we have a lot of energy capacity, but if we have less than 1000 energy capacity, wait for a full refill.
     let segments = Math.floor((this.room.energyCapacityAvailable - leaveAmountEnergyUnused) / 100); // Carry-50; Move-50
+    const carryBodyPartsNeededLeft = this.carryBodyNeededLeft();
+    segments = Math.min(segments, carryBodyPartsNeededLeft);
     segments = Math.min(segments, 15);
     if (this.creeps.length === 0) {
       // Note: In this situation, there is no way to fill extensions
@@ -361,7 +373,6 @@ export default class CarryArea extends BaseArea {
     //   if (segments > 1) segments = 1; // Don't spawn more than 1 segment if controller is level 1, because we can't fill extensions anyway.
     // }
     if (segments < 1) {
-      console.log(`Error: Trying to spawn a carrier with segments ${segments} less than 1`);
       return null;
     } else {
       for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);

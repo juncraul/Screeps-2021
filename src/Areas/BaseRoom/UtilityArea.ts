@@ -118,7 +118,9 @@ export default class UtilityArea extends BaseArea {
       ? Math.min(10, Math.floor(this.room.energyCapacityAvailable / 100))
       : Math.min(10, Math.floor(this.room.energyAvailable / 100)); // Carry-50; Move-50
     if (segments < 1) {
-      console.log(`Error: Trying to spawn a carrier with segments ${segments} less than 1`);
+      console.log(
+        `Error UtilityArea: Room ${this.room.name} Trying to spawn an utility with segments ${segments} less than 1`
+      );
       return null;
     } else {
       const moveParts = segments / 2;

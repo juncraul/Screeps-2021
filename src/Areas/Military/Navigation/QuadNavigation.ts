@@ -1,5 +1,11 @@
 import { CreepBase } from "../../../CreepBase";
 import { Helper } from "Helpers/Helper";
+import {
+  getSoldierQuadKiteState,
+  getSoldierQuadSlots,
+  setSoldierQuadKiteState,
+  setSoldierQuadSlots
+} from "../SoldierAreaMemory";
 
 export default class QuadNavigation {
   public static tryToKiteTheEnemyAsFormation(
@@ -23,10 +29,7 @@ export default class QuadNavigation {
     const totalHits = _.sum(quad, creep => creep.hits);
 
     const kiteStateKey = `QuadNavigation-KiteState-${memoryName}`;
-    const previousState = Helper.getCashedMemory<{ tick: number; totalHits: number; isRetreating: boolean } | null>(
-      kiteStateKey,
-      null
-    );
+    const previousState = getSoldierQuadKiteState(memoryName) ?? null;
     const damageTaken =
       previousState && previousState.tick === Game.time - 1 ? Math.max(0, previousState.totalHits - totalHits) : 0;
 
@@ -52,7 +55,7 @@ export default class QuadNavigation {
       ? totalMissingHits !== 0
       : mostDamagedPercentage < 0.6 && damageTaken > 0 && healerCannotKeepUp && !!threat;
 
-    Helper.setCashedMemory(kiteStateKey, { tick: Game.time, totalHits, isRetreating: shouldRetreat });
+    setSoldierQuadKiteState(memoryName, { tick: Game.time, totalHits, isRetreating: shouldRetreat });
 
     if (quad.some(creep => creep.creep.fatigue > 0)) {
       return true;
@@ -108,7 +111,7 @@ export default class QuadNavigation {
       this.regroupQuad(quad, leader.pos, regroupSlots);
       return true;
     } else {
-      Helper.setCashedMemory(`QuadNavigation-${memoryName}`, []);
+      setSoldierQuadSlots(memoryName, []);
     }
 
     const anchor = this.getQuadAnchor(quad);
@@ -221,7 +224,7 @@ export default class QuadNavigation {
       return null;
     }
 
-    const memorySlots = Helper.getCashedMemory<string[]>(`QuadNavigation-${memoryName}`, []);
+    const memorySlots = getSoldierQuadSlots(memoryName);
     const slots = memorySlots.map(slot => {
       const [x, y, roomName] = slot.split(":");
       return new RoomPosition(parseInt(x, 10), parseInt(y, 10), roomName);
@@ -260,8 +263,8 @@ export default class QuadNavigation {
     }
 
     if (squadPositions.length === 4) {
-      Helper.setCashedMemory(
-        `QuadNavigation-${memoryName}`,
+      setSoldierQuadSlots(
+        memoryName,
         squadPositions.map(slot => `${slot.x}:${slot.y}:${slot.roomName}`)
       );
       return squadPositions;

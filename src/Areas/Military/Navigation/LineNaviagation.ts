@@ -8,8 +8,7 @@ export default class LineNaviagation {
       return false;
     }
 
-    const ordered = this.getOrderedFormationCreeps(creeps);
-    const line = ordered.slice(0, 4);
+    const line = creeps.slice(0, 4);
     if (!this.creepsAreInRangeOfEachOther(line, 6)) {
       return false;
     }
@@ -60,24 +59,6 @@ export default class LineNaviagation {
     }
 
     return true;
-  }
-
-  private static getOrderedFormationCreeps(creeps: CreepBase[]): CreepBase[] {
-    const designatedLeader =
-      creeps.find(creep => creep.creepType === CreepType.Melee) ??
-      creeps.find(creep => creep.creepType === CreepType.Dismantler) ??
-      creeps.slice().sort((a, b) => a.ticksToLive! - b.ticksToLive!)[0];
-
-    const followers = creeps
-      .filter(creep => creep.name !== designatedLeader.name)
-      .sort((a, b) => a.ticksToLive! - b.ticksToLive!);
-
-    const ordered = [designatedLeader, ...followers];
-    for (let i = 0; i < ordered.length; i++) {
-      ordered[i].memory.formationOrder = i;
-    }
-
-    return ordered;
   }
 
   private static creepsAreInRangeOfEachOther(creeps: CreepBase[], range: number): boolean {

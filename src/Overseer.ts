@@ -106,12 +106,9 @@ export default class Overseer implements IOverseer {
       CreepType.StationaryFiller,
       CreepType.StationaryFiller,
       CreepType.StationaryFiller,
-      CreepType.StationaryFiller,
-      CreepType.StationaryFiller,
-      CreepType.StationaryFiller,
-      CreepType.StationaryFiller,
-      CreepType.Carrier,
-      CreepType.Harvester
+      CreepType.Harvester,
+      CreepType.Utility,
+      CreepType.Carrier
     ];
     const existing: Record<number, number> = {
       [CreepType.Harvester]: harvest.existing,

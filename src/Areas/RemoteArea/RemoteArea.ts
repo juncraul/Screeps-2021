@@ -28,8 +28,8 @@ import { createMineralCarrier, handleMineralCarrier } from "./RemoteMineralCarri
 export default class RemoteArea extends BaseArea {
   private static readonly ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
   private static readonly ROAD_WORK_DONE = "RemoteArea-RoadWorkDone-";
-  private static readonly INVADER_DEFENDER_WEAK = "Attack-X-1-3-Invader-";
-  private static readonly INVADER_DEFENDER_STRONG = "Attack-X-1-6-Invader-";
+  private static readonly INVADER_DEFENDER_WEAK = "Attack-X-1-3-Invader";
+  private static readonly INVADER_DEFENDER_STRONG = "Attack-X-1-6-Invader";
 
   controller: StructureController | null;
   roomName: string;
@@ -543,7 +543,11 @@ export default class RemoteArea extends BaseArea {
 
     // Create a managed invader-defense flag.
     if (invaderFlags.length === 0) {
-      const targetPos = hostileInvaders[0] ? hostileInvaders[0].pos : invaderCores[0].pos;
+      const targetPos = hostileInvaders[0]
+        ? this.room.controller
+          ? this.room.controller.pos
+          : new RoomPosition(25, 25, this.roomName)
+        : invaderCores[0].pos;
       const flagName = this.getInvaderFlagName();
       // Should attack everything as sometimes a core appears.
       targetPos.createFlag(flagName, COLOR_RED, COLOR_RED);

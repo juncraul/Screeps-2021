@@ -35,65 +35,67 @@ export function findPositionsInsideRect(rect: Rect): Coord[] {
   return positions;
 }
 
-Room.prototype.floodFill = function (this: Room, seeds: Coord[]): CostMatrix {
-  // Construct cost matrices
-  const floodCM = new PathFinder.CostMatrix();
-  const terrain = this.getTerrain();
-  const visitedCM = new PathFinder.CostMatrix();
+if (typeof Room !== "undefined") {
+  Room.prototype.floodFill = function (this: Room, seeds: Coord[]): CostMatrix {
+    // Construct cost matrices
+    const floodCM = new PathFinder.CostMatrix();
+    const terrain = this.getTerrain();
+    const visitedCM = new PathFinder.CostMatrix();
 
-  let depth = 0;
-  let thisGeneration: Coord[] = seeds;
-  let nextGeneration: Coord[] = [];
+    let depth = 0;
+    let thisGeneration: Coord[] = seeds;
+    let nextGeneration: Coord[] = [];
 
-  // Mark seeds as visited
-  for (const pos of seeds) {
-    visitedCM.set(pos.x, pos.y, 1);
-  }
-
-  while (thisGeneration.length > 0) {
-    nextGeneration = [];
-
-    for (const pos of thisGeneration) {
-      if (depth !== 0) {
-        // Skip walls
-        if (terrain.get(pos.x, pos.y) === TERRAIN_MASK_WALL) {
-          continue;
-        }
-
-        floodCM.set(pos.x, pos.y, depth);
-
-        if (Memory.roomVisuals) {
-          this.visual.rect(pos.x - 0.5, pos.y - 0.5, 1, 1, {
-            fill: `hsl(${200 + depth * 2}, 100%, 60%)`,
-            opacity: 0.4
-          });
-        }
-      }
-
-      const rect: Rect = {
-        x1: pos.x - 1,
-        y1: pos.y - 1,
-        x2: pos.x + 1,
-        y2: pos.y + 1
-      };
-
-      const adjacentPositions = findPositionsInsideRect(rect);
-
-      for (const adjacentPos of adjacentPositions) {
-        if (visitedCM.get(adjacentPos.x, adjacentPos.y) === 1) {
-          continue;
-        }
-
-        visitedCM.set(adjacentPos.x, adjacentPos.y, 1);
-        nextGeneration.push(adjacentPos);
-      }
+    // Mark seeds as visited
+    for (const pos of seeds) {
+      visitedCM.set(pos.x, pos.y, 1);
     }
 
-    thisGeneration = nextGeneration;
-    depth += 1;
-  }
+    while (thisGeneration.length > 0) {
+      nextGeneration = [];
 
-  return floodCM;
-};
+      for (const pos of thisGeneration) {
+        if (depth !== 0) {
+          // Skip walls
+          if (terrain.get(pos.x, pos.y) === TERRAIN_MASK_WALL) {
+            continue;
+          }
+
+          floodCM.set(pos.x, pos.y, depth);
+
+          if (Memory.roomVisuals) {
+            this.visual.rect(pos.x - 0.5, pos.y - 0.5, 1, 1, {
+              fill: `hsl(${200 + depth * 2}, 100%, 60%)`,
+              opacity: 0.4
+            });
+          }
+        }
+
+        const rect: Rect = {
+          x1: pos.x - 1,
+          y1: pos.y - 1,
+          x2: pos.x + 1,
+          y2: pos.y + 1
+        };
+
+        const adjacentPositions = findPositionsInsideRect(rect);
+
+        for (const adjacentPos of adjacentPositions) {
+          if (visitedCM.get(adjacentPos.x, adjacentPos.y) === 1) {
+            continue;
+          }
+
+          visitedCM.set(adjacentPos.x, adjacentPos.y, 1);
+          nextGeneration.push(adjacentPos);
+        }
+      }
+
+      thisGeneration = nextGeneration;
+      depth += 1;
+    }
+
+    return floodCM;
+  };
+}
 
 export {};

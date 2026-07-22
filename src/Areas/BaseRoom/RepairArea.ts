@@ -2,6 +2,7 @@ import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
+import { CreepBase } from "CreepBase";
 
 export default class RepairArea extends BaseArea {
   controller: StructureController;
@@ -34,6 +35,7 @@ export default class RepairArea extends BaseArea {
 
   private handleCreeps() {
     for (const creep of this.creeps) {
+      this.interupCurrentTaskIfNeeded(creep);
       if (!creep.isFree()) continue;
       if (creep.pos.roomName !== this.room.name) {
         creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, this.room.name)));
@@ -58,6 +60,18 @@ export default class RepairArea extends BaseArea {
           creep.addTask(new CreepTask(Activity.Repair, structureToRepair.pos));
         }
       }
+    }
+  }
+
+  private interupCurrentTaskIfNeeded(creep: CreepBase) {
+    if (creep.isFree()) return;
+    if (creep.task?.activity === Activity.Repair && this.isExitTile(creep.pos)) {
+      const newPosition = new RoomPosition(
+        creep.pos.x === 0 ? 1 : creep.pos.x === 49 ? 48 : creep.pos.x,
+        creep.pos.y === 0 ? 1 : creep.pos.y === 49 ? 48 : creep.pos.y,
+        creep.pos.roomName
+      );
+      creep.addTask(new CreepTask(Activity.Move, newPosition));
     }
   }
 
@@ -166,5 +180,9 @@ export default class RepairArea extends BaseArea {
     }
 
     return new SpawnTask(CreepType.Repairer, this.areaId, bodyPartConstants, this);
+  }
+
+  private isExitTile(pos: RoomPosition): boolean {
+    return pos.x === 0 || pos.x === 49 || pos.y === 0 || pos.y === 49;
   }
 }

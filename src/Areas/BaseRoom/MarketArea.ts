@@ -350,7 +350,9 @@ export default class MarketArea extends BaseArea {
     const haveUtilityCreeps = this.creeps.length > 0;
     const segments = haveUtilityCreeps ? Math.max(5, Math.floor(this.room.energyCapacityAvailable / 100)) : 1; // Carry-50; Move-50
     if (segments < 1) {
-      console.log(`Error: Trying to spawn a carrier with segments ${segments} less than 1`);
+      console.log(
+        `Error MarketArea: Room ${this.room.name} Trying to spawn a clerk with segments ${segments} less than 1`
+      );
       return null;
     } else {
       const moveParts = segments / 2;

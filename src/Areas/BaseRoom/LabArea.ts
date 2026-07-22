@@ -54,6 +54,11 @@ export default class LabArea extends BaseArea {
       return [];
     }
 
+    const plan = this.getReactionPlan();
+    if (!this.hasLaboratoryWork(plan)) {
+      return [];
+    }
+
     const tasks: SpawnTask[] = [];
     if (this.creeps.length < this.maxWorkerCount) {
       const spawnTask = this.createCreepForThisArea();
@@ -469,6 +474,57 @@ export default class LabArea extends BaseArea {
       return null;
     }
     return { resource: selected, amount: largestExcess };
+  }
+
+  private hasLaboratoryWork(plan: LabReactionPlan | null): boolean {
+    const terminal = this.terminal;
+    if (!terminal) {
+      return false;
+    }
+
+    if (this.findLabCleanupTarget(plan)) {
+      return true;
+    }
+
+    if (this.getTerminalExcessResource()) {
+      return true;
+    }
+
+    const terminalDeficit = this.getTerminalDeficitResource();
+    if (terminalDeficit && this.storage.store.getUsedCapacity(terminalDeficit) > 0) {
+      return true;
+    }
+
+    if (plan) {
+      const inputLabA = Game.getObjectById(plan.inputLabAId);
+      if (inputLabA !== null && (inputLabA.store.getUsedCapacity(plan.reagentA) ?? 0) < LAB_REAGENT_TARGET) {
+        if (
+          this.storage.store.getUsedCapacity(plan.reagentA) > 0 ||
+          terminal.store.getUsedCapacity(plan.reagentA) > 0
+        ) {
+          return true;
+        }
+      }
+
+      const inputLabB = Game.getObjectById(plan.inputLabBId);
+      if (inputLabB !== null && (inputLabB.store.getUsedCapacity(plan.reagentB) ?? 0) < LAB_REAGENT_TARGET) {
+        if (
+          this.storage.store.getUsedCapacity(plan.reagentB) > 0 ||
+          terminal.store.getUsedCapacity(plan.reagentB) > 0
+        ) {
+          return true;
+        }
+      }
+    }
+
+    const energyHungryLab = this.labs.find(lab => lab.store.getUsedCapacity(RESOURCE_ENERGY) < LAB_ENERGY_TARGET);
+    if (!energyHungryLab) {
+      return false;
+    }
+
+    return (
+      this.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0 || terminal.store.getUsedCapacity(RESOURCE_ENERGY) > 0
+    );
   }
 
   private getLabLayout(): { inputLabA: StructureLab; inputLabB: StructureLab; outputLabs: StructureLab[] } | null {

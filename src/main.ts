@@ -56,7 +56,11 @@ export function executeTestFlag() {
   if (!Game.flags) return;
   const testFlag = Game.flags.Test;
   if (!testFlag) return;
-  Game.flags["Attack-W7N3-4-1"].setPosition(new RoomPosition(5, 26, "W7N3"));
+  if (testFlag.color === COLOR_WHITE) {
+    Game.flags["Attack-W7N3-4-1"].setPosition(new RoomPosition(48, 26, "W7N3"));
+  } else {
+    Game.flags["Attack-W7N3-4-1"].setPosition(new RoomPosition(1, 26, "W6N3"));
+  }
   testFlag.remove();
   //   const exitDir = Game.map.findExit(testFlag.pos.roomName, "E23N15");
   //   if (exitDir === ERR_NO_PATH || exitDir === ERR_INVALID_ARGS) return;

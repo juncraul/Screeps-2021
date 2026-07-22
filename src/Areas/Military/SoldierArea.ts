@@ -7,6 +7,16 @@ import { GetRoomObjects, RemoteRoomMode } from "Helpers/GetRoomObjects";
 import LineNaviagation from "./Navigation/LineNaviagation";
 import QuadNavigation from "./Navigation/QuadNavigation";
 import EdgeNavigation from "./Navigation/EdgeNavigation";
+import {
+  addSoldierCreepName,
+  clearSoldierAreaMemory,
+  getAllSoldierFlagStates,
+  getSoldierCreepNames,
+  setSoldierCreepNames,
+  setSoldierFlagState,
+  setSoldierNavigationStyle,
+  updateSoldierComposition
+} from "./SoldierAreaMemory";
 
 const ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
 const EXCEPTION_PLAYER_NAMES = ["nekey975"];
@@ -50,9 +60,15 @@ export default class SoldierArea extends BaseArea {
   protected static cachedFlagLists: Record<string, { tick: number; flags: unknown[] }> = {};
 
   constructor(flag: AttackFlagConfig) {
-    super("SoldierArea", flag.name, flag.position, Game.rooms[flag.targetRoom]);
+    super(
+      "SoldierArea",
+      flag.name,
+      flag.position,
+      Game.rooms[flag.targetRoom],
+      `Memory.Areas.Soldiers["${flag.name}"].composition.creepNames`
+    );
     this.flag = flag;
-    this.migrateLegacySoldierFlag(flag.name);
+    // this.migrateLegacySoldierFlag(flag.name);
   }
 
   // Static: detect all Attack flags (cached per tick)
@@ -83,7 +99,7 @@ export default class SoldierArea extends BaseArea {
       };
     }
 
-    const previousStates = Memory.soldierFlagStates ?? {};
+    const previousStates = getAllSoldierFlagStates();
 
     for (const flagName of Object.keys(currentStates)) {
       const prev = previousStates[flagName];
@@ -103,9 +119,14 @@ export default class SoldierArea extends BaseArea {
     for (const flagName of Object.keys(previousStates)) {
       if (!currentStates[flagName]) {
         SoldierArea.clearTasksForFlag(flagName);
+        clearSoldierAreaMemory(flagName);
       }
     }
 
+    for (const flagName of Object.keys(currentStates)) {
+      setSoldierFlagState(flagName, currentStates[flagName]);
+    }
+    // Keep this synchronized for compatibility with any existing consumers.
     Memory.soldierFlagStates = currentStates;
 
     const validFlags = configs.filter(c => c.squadSize > 0);
@@ -197,13 +218,14 @@ export default class SoldierArea extends BaseArea {
   // Instance: per-flag creep handling
 
   public handleThisArea(): void {
+    updateSoldierComposition(this.flag, this.creeps);
     this.runHealerPassiveEffect();
     this.runAttackerPassiveEffect();
 
     // const combatAssigned = this.assignCombatTask(Game.flags[this.flag.name]);
     // const targetPosition = combatAssigned ? combatAssigned.pos : this.flag.position;
     const formationMovementApplied = SoldierArea.managedToApplyAFormationMovement(this.creeps, this.flag);
-
+    console.log("formationMovementApplied", formationMovementApplied);
     for (const creep of this.creeps) {
       if (formationMovementApplied) {
         if (creep.task) creep.task.taskDone = true;
@@ -244,16 +266,30 @@ export default class SoldierArea extends BaseArea {
   // Private static helpers
 
   private static managedToApplyAFormationMovement(creeps: CreepBase[], flag: AttackFlagConfig): boolean {
+    const roomsToForceEdgeNavigation = ["W6N3"];
     const firstFourCreeps = SoldierArea.getOrderedFormationCreeps(creeps.slice(0, 4));
-    const shouldApplyEdgeNavigation = EdgeNavigation.shouldApplyEdgeNavigation(firstFourCreeps, flag.position);
+    if (firstFourCreeps.length === 0) return false;
+    const shouldApplyEdgeNavigation = EdgeNavigation.shouldApplyEdgeNavigation(firstFourCreeps[0], flag.position);
     const creepsAreInRoomWithDestination =
       firstFourCreeps.filter(c => c.pos.roomName === flag.targetRoom).length === firstFourCreeps.length;
     if (
-      firstFourCreeps.some(creep => creep.pos.roomName === "X") || // Add any room to force it.
+      firstFourCreeps.some(
+        creep =>
+          roomsToForceEdgeNavigation.includes(creep.pos.roomName) &&
+          roomsToForceEdgeNavigation.includes(flag.targetRoom)
+      ) || // Add any room to force it.
       shouldApplyEdgeNavigation
     ) {
+      console.log(
+        `[SoldierArea] Applying edge navigation for ${firstFourCreeps.length} creeps to flag ${flag.name} in room ${flag.targetRoom}`
+      );
+      setSoldierNavigationStyle(flag.name, "edge");
       return EdgeNavigation.tryToAttackFromEdge(firstFourCreeps, flag.position, flag.name);
     } else if (creepsAreInRoomWithDestination) {
+      console.log(
+        `[SoldierArea] Applying quad navigation for ${firstFourCreeps.length} creeps to flag ${flag.name} in room ${flag.targetRoom}`
+      );
+      setSoldierNavigationStyle(flag.name, "quad");
       return QuadNavigation.tryToKiteTheEnemyAsFormation(
         firstFourCreeps,
         flag.position,
@@ -261,6 +297,10 @@ export default class SoldierArea extends BaseArea {
         flag.secondaryColor
       );
     } else {
+      console.log(
+        `[SoldierArea] Applying line navigation for ${firstFourCreeps.length} creeps to flag ${flag.name} in room ${flag.targetRoom}`
+      );
+      setSoldierNavigationStyle(flag.name, "line");
       return LineNaviagation.tryMoveAsFormation(firstFourCreeps, flag.position);
     }
   }
@@ -304,8 +344,7 @@ export default class SoldierArea extends BaseArea {
   }
 
   private static clearTasksForFlag(flagName: string): void {
-    const key = `SoldierArea-${flagName}`;
-    const creepNames: string[] = Helper.getCashedMemory(key, []);
+    const creepNames = getSoldierCreepNames(flagName);
     for (const name of creepNames) {
       const creep = Game.creeps[name];
       if (creep) {
@@ -343,7 +382,9 @@ export default class SoldierArea extends BaseArea {
     if (primaryColor === PrimaryColor.GREEN) return CreepType.Ranged;
     if (primaryColor === PrimaryColor.BLUE) {
       const creepsWithMeleeBodyPart = this.creeps.filter(
-        creep => creep.getNumberOfBodyPart(ATTACK) > 0 && (creep.creep.ticksToLive ?? 0) > TICKS_TO_LIVE_THRESHOLD
+        creep =>
+          creep.getNumberOfBodyPart(ATTACK) > 0 &&
+          ((creep.creep.ticksToLive ?? 0) > TICKS_TO_LIVE_THRESHOLD || creep.spawning)
       );
       return creepsWithMeleeBodyPart.length === 0 ? CreepType.Melee : CreepType.Healer;
     }
@@ -352,7 +393,9 @@ export default class SoldierArea extends BaseArea {
     }
     if (primaryColor === PrimaryColor.YELLOW) {
       const creepsWithWorkBodyPart = this.creeps.filter(
-        creep => creep.getNumberOfBodyPart(WORK) > 0 && (creep.creep.ticksToLive ?? 0) > TICKS_TO_LIVE_THRESHOLD
+        creep =>
+          creep.getNumberOfBodyPart(WORK) > 0 &&
+          ((creep.creep.ticksToLive ?? 0) > TICKS_TO_LIVE_THRESHOLD || creep.spawning)
       );
       return creepsWithWorkBodyPart.length === 0 ? CreepType.Dismantler : CreepType.Healer;
     }
@@ -367,9 +410,22 @@ export default class SoldierArea extends BaseArea {
    * the check is idempotent.
    */
   private migrateLegacySoldierFlag(flagName: string): void {
-    const key = `SoldierArea-${flagName}`;
-    const registeredNames: string[] = Helper.getCashedMemory(key, []);
+    if (this.memoryType !== "SoldierArea") {
+      return;
+    }
+
+    const legacyKey = `SoldierArea-${flagName}`;
+    const legacyNames: string[] = Helper.getCashedMemory(legacyKey, []);
+    const registeredNames = getSoldierCreepNames(flagName);
     let changed = false;
+
+    for (const legacyName of legacyNames) {
+      if (!registeredNames.includes(legacyName)) {
+        registeredNames.push(legacyName);
+        changed = true;
+      }
+    }
+
     for (const name in Game.creeps) {
       const creep = Game.creeps[name];
       if (creep.memory.soldierFlag === flagName && !registeredNames.includes(name)) {
@@ -377,10 +433,52 @@ export default class SoldierArea extends BaseArea {
         changed = true;
       }
     }
+
     if (changed) {
-      Helper.setCashedMemory(key, registeredNames);
+      setSoldierCreepNames(flagName, registeredNames);
       this.creeps = this.getCreepsAssignedToThisArea();
     }
+
+    // Legacy key is no longer the source of truth.
+    if (legacyNames.length > 0) {
+      Helper.setCashedMemory(legacyKey, []);
+    }
+  }
+
+  public handleNewCreepMemory(creepName: string): string {
+    if (this.memoryType !== "SoldierArea") {
+      return super.handleNewCreepMemory(creepName);
+    }
+
+    addSoldierCreepName(this.flag.name, creepName);
+    return creepName;
+  }
+
+  public getCreepsAssignedToThisArea(): CreepBase[] {
+    if (this.memoryType !== "SoldierArea") {
+      return super.getCreepsAssignedToThisArea();
+    }
+
+    const flagName = this.areaId;
+    const creepNames = getSoldierCreepNames(flagName);
+    const aliveNames: string[] = [];
+    const creeps: CreepBase[] = [];
+
+    for (const name of creepNames) {
+      const creep = Game.creeps[name];
+      if (!creep || creep.hits <= 0) {
+        continue;
+      }
+
+      aliveNames.push(name);
+      creeps.push(new CreepBase(creep));
+    }
+
+    if (aliveNames.length !== creepNames.length) {
+      setSoldierCreepNames(flagName, aliveNames);
+    }
+
+    return creeps;
   }
 
   private createCreepForFlag(): SpawnTask | null {
@@ -474,11 +572,21 @@ export default class SoldierArea extends BaseArea {
   }
 
   private createDismantlerBody(segments: number): BodyPartConstant[] {
+    let toughParts = 0;
+    if (segments === 18) toughParts = 7;
+    if (segments === 16) toughParts = 6;
+    if (segments === 14) toughParts = 5;
+    if (segments === 12) toughParts = 4;
+    if (segments === 10) toughParts = 3;
+    if (segments === 8) toughParts = 2;
+    if (segments === 6) toughParts = 1;
+    if (segments === 4) toughParts = 1;
+    if (segments === 2) toughParts = 1;
     if (segments === 0) segments = 6; // 0 is used for maximum segments.
     const body: BodyPartConstant[] = [];
-    for (let i = 0; i < segments; i++) body.push(TOUGH); // TOUGH-10; WORK-100; MOVE-50  plain=1  road=1  swamp=5
+    for (let i = 0; i < toughParts; i++) body.push(TOUGH); // TOUGH-10; WORK-100; MOVE-50  plain=1  road=1  swamp=5
     for (let i = 0; i < segments; i++) body.push(WORK); // TOUGH-10; WORK-100; MOVE-50  plain=1  road=1  swamp=5
-    for (let i = 0; i < segments * 2; i++) body.push(MOVE); // TOUGH-10; WORK-100; MOVE-50  plain=1  road=1  swamp=5
+    for (let i = 0; i < segments + toughParts; i++) body.push(MOVE); // TOUGH-10; WORK-100; MOVE-50  plain=1  road=1  swamp=5
     return body;
   }
 
@@ -496,8 +604,9 @@ export default class SoldierArea extends BaseArea {
       creep => creep.creepType === CreepType.Dismantler && creep.pos.roomName === this.flag.targetRoom
     );
     for (const dismantler of dismantlers) {
+      console.log("Game.rooms[dismantler.creep.pos.roomName].controller?.my", Game.rooms[dismantler.creep.pos.roomName].controller?.my);
       if (!Game.rooms[dismantler.creep.pos.roomName].controller?.my) {
-        const target = GetRoomObjects.getWithinRangeStructures(dismantler.pos, 1, STRUCTURE_ROAD);
+        const target = GetRoomObjects.getWithinRangeStructures(dismantler.pos, 1, null);
         if (target.length > 0) {
           dismantler.creep.dismantle(target[0]);
         }
@@ -514,7 +623,7 @@ export default class SoldierArea extends BaseArea {
       }
       // TODO: should also exclude remote rooms.
       if (!Game.rooms[melee.creep.pos.roomName].controller?.my) {
-        const target = GetRoomObjects.getWithinRangeStructures(melee.pos, 1, STRUCTURE_ROAD);
+        const target = GetRoomObjects.getWithinRangeStructures(melee.pos, 1, null);
         if (target.length > 0) {
           melee.creep.attack(target[0]);
         }

@@ -1,5 +1,11 @@
 import { CreepBase } from "../../../CreepBase";
 import { Helper } from "Helpers/Helper";
+import {
+  getSoldierEdgeKiteState,
+  getSoldierEdgeMode,
+  setSoldierEdgeKiteState,
+  setSoldierEdgeMode
+} from "../SoldierAreaMemory";
 
 interface EdgeKiteState {
   tick: number;
@@ -22,6 +28,7 @@ interface EntryEdge {
  * memory key so callers know to suppress normal forward movement during recovery).
  */
 export default class EdgeNavigation {
+  private static EnableDebugLogging = true;
   /**
    * Main entry point. Returns `true` when this class is handling all creep movement this
    * tick (including retreat / hold-and-heal). Returns `false` to hand control back to the
@@ -32,19 +39,18 @@ export default class EdgeNavigation {
     if (creeps.length === 0) return false;
 
     const kiteStateKey = `EdgeNavigation-KiteState-${memoryName}`;
-    const isEdgeNavKey = `EdgeNavigation-Mode-${memoryName}`;
 
     const totalHits = _.sum(creeps, (c: CreepBase) => c.hits);
     const totalMaxHits = _.sum(creeps, (c: CreepBase) => c.hitsMax);
     const allFullyHealed = totalHits === totalMaxHits;
 
-    const previousState = Helper.getCashedMemory<EdgeKiteState | null>(kiteStateKey, null);
+    const previousState = getSoldierEdgeKiteState(memoryName) ?? null;
     const damageTaken =
       previousState !== null && previousState.tick === Game.time - 1
         ? Math.max(0, previousState.totalHits - totalHits)
         : 0;
 
-    const isEdgeNavigating = Helper.getCashedMemory<boolean>(isEdgeNavKey, false);
+    const isEdgeNavigating = getSoldierEdgeMode(memoryName);
 
     // ── Kite logic ──────────────────────────────────────────────────────────
 
@@ -57,10 +63,14 @@ export default class EdgeNavigation {
     const focusedDamageMissing = mostDamaged ? mostDamaged.hitsMax - mostDamaged.hits : 0;
     const healerCannotKeepUp = focusedDamageMissing > focusedHealPotential || totalMissingHits > totalHealPotential;
 
-    console.log(
-      `[${kiteStateKey}] damageTaken=${damageTaken} missingHits=${totalMissingHits} ` +
-        `healPotential=${totalHealPotential} focusedHeal=${focusedHealPotential} isEdgeNav=${String(isEdgeNavigating)}`
-    );
+    if (EdgeNavigation.EnableDebugLogging) {
+      console.log(
+        `[${kiteStateKey}] damageTaken=${damageTaken} missingHits=${totalMissingHits} ` +
+          `healPotential=${totalHealPotential} focusedHeal=${focusedHealPotential} isEdgeNav=${String(
+            isEdgeNavigating
+          )}`
+      );
+    }
 
     const wasRetreating = previousState !== null && previousState.tick === Game.time - 1 && previousState.isRetreating;
 
@@ -69,38 +79,67 @@ export default class EdgeNavigation {
       ? !allFullyHealed
       : mostDamagedPercentage < 0.4 && damageTaken > 0 && healerCannotKeepUp;
 
-    Helper.setCashedMemory(kiteStateKey, { tick: Game.time, totalHits, isRetreating: shouldRetreat });
+    setSoldierEdgeKiteState(memoryName, { tick: Game.time, totalHits, isRetreating: shouldRetreat });
 
-    if (shouldRetreat) {
+    if (EdgeNavigation.EnableDebugLogging) {
+      console.log("shouldRetreat", shouldRetreat);
+    }
+    const allCreepsInDestinationRoom = creeps.every(c => c.pos.roomName === destination.roomName);
+    if (shouldRetreat && allCreepsInDestinationRoom) {
       // Mark edge-nav mode so the caller suppresses forward movement during recovery.
-      Helper.setCashedMemory(isEdgeNavKey, true);
+      setSoldierEdgeMode(memoryName, true);
       this.retreatToAdjacentRoom(creeps, destination.roomName);
       return true;
     }
 
+    if (EdgeNavigation.EnableDebugLogging) {
+      console.log("isEdgeNavigating", isEdgeNavigating);
+      console.log("allFullyHealed", allFullyHealed);
+    }
     // Holding in retreat room — let passive healer actions restore HP.
-    if (isEdgeNavigating && !allFullyHealed) {
+    if (!allFullyHealed) {
+      for (const creep of creeps) {
+        if (creep.pos.roomName !== destination.roomName && creep.pos.x !== 48) {
+          creep.moveTo(new RoomPosition(creep.pos.x - 1, creep.pos.y, creep.pos.roomName));
+          if (EdgeNavigation.EnableDebugLogging) {
+            console.log(creep.name, "will move a bit to the left");
+          }
+        }
+      }
       return true;
     }
 
     // Fully healed after an edge-nav retreat — clear flag and let standard movement
     // (LineNavigation) walk the squad back to the target room entrance.
     if (isEdgeNavigating && allFullyHealed) {
-      Helper.setCashedMemory(isEdgeNavKey, false);
+      setSoldierEdgeMode(memoryName, false);
       return false;
     }
 
     // ── Edge attack ─────────────────────────────────────────────────────────
 
     const anyInTargetRoom = creeps.some(c => c.pos.roomName === destination.roomName);
+    if (EdgeNavigation.EnableDebugLogging) {
+      console.log("anyInTargetRoom", anyInTargetRoom);
+    }
     if (!anyInTargetRoom) return false;
 
     const edge = this.detectEntryEdge(creeps, destination.roomName);
+    if (EdgeNavigation.EnableDebugLogging) {
+      console.log("edge", edge);
+    }
     if (!edge) return false;
 
     if (creeps.some(c => c.creep.fatigue > 0)) return true;
 
     const slots = this.getEdgeSlots(edge, creeps.length, destination);
+    if (EdgeNavigation.EnableDebugLogging) {
+      console.log(
+        `Assigning ${creeps.length} creeps to ${slots.length} slots in room ${
+          destination.roomName
+        }, mapping: ${slots.map(s => `(${s.x},${s.y})`).join(", ")}`
+      );
+    }
     this.assignCreepsToSlots(creeps, slots, destination.roomName);
     this.attackFromEdge(creeps, destination.roomName);
     this.bringAllCreepsToTheLeaderRoom(creeps, destination.roomName);
@@ -232,6 +271,8 @@ export default class EdgeNavigation {
       }
     });
 
+    const allCreepsAreInTheirSlots = creeps.every((creep, i) => Helper.isSamePosition(creep.pos, slots[i]));
+
     // let creepCantReach: CreepBase | null = null;
     for (let i = 0; i < slots.length; i++) {
       const creep = creeps[i];
@@ -257,29 +298,44 @@ export default class EdgeNavigation {
       }
 
       if (!Helper.isSamePosition(creep.pos, slot)) {
-        // creep.creep.moveTo(slot, {
-        //   range: 0,
-        //   reusePath: 0,
-        //   visualizePathStyle: { stroke: "#ff9900", opacity: 0.5 }
-        // });
-        const path = PathFinder.search(
-          creep.creep.pos,
-          { pos: slot, range: 0 },
-          {
-            roomCallback: roomName => {
-              const room = Game.rooms[roomName];
-              if (!room) return false;
+        const creepOnFirstEdge = creep.pos.x === 0 || creep.pos.x === 49 || creep.pos.y === 0 || creep.pos.y === 49;
+        const creepOnSecondEdge = creep.pos.x === 1 || creep.pos.x === 48 || creep.pos.y === 1 || creep.pos.y === 48;
+        if (creepOnFirstEdge || creepOnSecondEdge) {
+          const path = PathFinder.search(
+            creep.creep.pos,
+            { pos: slot, range: 0 },
+            {
+              roomCallback: roomName => {
+                const room = Game.rooms[roomName];
+                if (!room) return false;
 
-              const costs = new PathFinder.CostMatrix();
+                const costs = new PathFinder.CostMatrix();
 
-              for (let y = 0; y < 50; y++) {
-                costs.set(47, y, 255);
+                for (let i = 0; i < 50; i++) {
+                  costs.set(0, i, 5);
+                  costs.set(49, i, 5);
+                  costs.set(i, 0, 5);
+                  costs.set(i, 49, 5);
+                  costs.set(2, i, 5);
+                  costs.set(47, i, 5);
+                  costs.set(i, 2, 5);
+                  costs.set(i, 47, 5);
+                }
+                return costs;
               }
-              return costs;
             }
-          }
-        );
-        creep.creep.moveByPath(path.path);
+          );
+          // for (const pos of path.path) {
+          //   room.visual.text("·", pos.x, pos.y, { font: 0.5, color: "#ff9900" });
+          // }
+          creep.creep.moveByPath(path.path);
+        } else {
+          creep.creep.moveTo(slot, {
+            range: 0,
+            reusePath: 0,
+            visualizePathStyle: { stroke: "#ff9900", opacity: 0.5 }
+          });
+        }
       }
     }
   }
@@ -371,10 +427,23 @@ export default class EdgeNavigation {
     }
   }
 
-  public static shouldApplyEdgeNavigation(creeps: CreepBase[], destination: RoomPosition): boolean {
-    if (Game.rooms[destination.roomName] && Game.rooms[destination.roomName].controller?.my) return false;
-    const creepsThatAreInRoomWithDestination = creeps.filter(c => c.pos.roomName === destination.roomName);
-    for (const creep of creepsThatAreInRoomWithDestination) {
+  public static shouldApplyEdgeNavigation(creepLeader: CreepBase, destination: RoomPosition): boolean {
+    console.log("shouldApplyEdgeNavigation", creepLeader.pos.roomName, destination.roomName);
+    console.log("destination", destination.x, destination.y);
+    if (destination.x === 1 || destination.x === 48 || destination.y === 1 || destination.y === 48) {
+      console.log("destination is on edge, applying edge navigation");
+      return true;
+    }
+    if (!Game.rooms[destination.roomName]) {
+      console.log("destination room is not visible, not applying edge navigation");
+      return false;
+    }
+    if (Game.rooms[destination.roomName] && Game.rooms[destination.roomName].controller?.my) {
+      console.log("destination room is owned by me, not applying edge navigation");
+      return false;
+    }
+    const creeps = [creepLeader];
+    for (const creep of creeps) {
       if (!(creep.pos.x <= 1 || creep.pos.x >= 48 || creep.pos.y <= 1 || creep.pos.y >= 48)) continue;
       for (let i = -1; i <= 1; i++) {
         for (let j = -1; j <= 1; j++) {
@@ -386,7 +455,10 @@ export default class EdgeNavigation {
             pos
               .lookFor(LOOK_STRUCTURES)
               .filter(s => s.structureType === STRUCTURE_RAMPART || s.structureType === STRUCTURE_WALL).length > 0;
-          if (isRampartOrWallStructure) return true;
+          if (isRampartOrWallStructure) {
+            console.log("found rampart or wall structure at", pos.x, pos.y, "in room", pos.roomName);
+            return true;
+          }
         }
       }
     }

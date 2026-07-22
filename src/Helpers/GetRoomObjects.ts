@@ -324,11 +324,12 @@ export class GetRoomObjects {
     for (const flag of flags) {
       const match = this.REROUTE_FLAG_PATTERN.exec(flag.name);
       if (!match) continue;
+      if (flag.pos.roomName !== fromRoomName) continue;
 
-      const targetFromName = match[1];
-      const routeFromName = match[2];
+      const targetRoomNameFlag = match[1];
+      const throughRoomNameFlag = match[2];
 
-      if (targetFromName === targetRoomName && routeFromName === fromRoomName) {
+      if (targetRoomName === targetRoomNameFlag && fromRoomName === throughRoomNameFlag) {
         return flag.pos.roomName;
       }
     }
@@ -511,12 +512,12 @@ export class GetRoomObjects {
   public static getWithinRangeStructures(
     roomPosition: RoomPosition,
     range: number,
-    structureToLookFor: StructureConstant
+    structureToLookFor: StructureConstant | null
   ): Structure[] {
     const structures = roomPosition.findInRange(FIND_STRUCTURES, range);
     const structuresFiltered: Structure[] = [];
     structures.forEach(function (structure) {
-      if (structure.structureType === structureToLookFor) {
+      if (structure.structureType === structureToLookFor || structureToLookFor === null) {
         structuresFiltered.push(structure);
       }
     });
