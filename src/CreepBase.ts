@@ -296,12 +296,18 @@ export class CreepBase {
       targetCollect instanceof StructureContainer ||
       targetCollect instanceof StructureStorage ||
       targetCollect instanceof StructureTerminal ||
-      targetCollect instanceof StructureLab ||
       targetCollect instanceof Ruin ||
       targetCollect instanceof Tombstone
     ) {
-      if (targetCollect.store.energy === 0) {
-        this.completeTask("📦✔️");
+      if (this.task?.value2) {
+        const resourceType = this.task.value2 as ResourceConstant;
+        if (targetCollect.store.getUsedCapacity(resourceType) === 0) {
+          this.completeTask("📦✔️");
+        }
+      } else {
+        if (targetCollect.store.getUsedCapacity() === 0) {
+          this.completeTask("📦✔️");
+        }
       }
     } else if (
       targetCollect instanceof StructureLink ||
@@ -314,6 +320,10 @@ export class CreepBase {
       }
     } else if (targetCollect instanceof Resource) {
       if (targetCollect.amount === 0) {
+        this.completeTask("📦✔️");
+      }
+    } else if (targetCollect instanceof StructureLab) {
+      if (targetCollect.store.getUsedCapacity() === 0) {
         this.completeTask("📦✔️");
       }
     }

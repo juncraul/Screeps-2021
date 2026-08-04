@@ -6,6 +6,7 @@ export default class CreepTask implements ICreepTask {
   targetId: string | null;
   silent: boolean;
   value: number | null;
+  value2: string | null;
 
   constructor(
     activity: number,
@@ -13,7 +14,8 @@ export default class CreepTask implements ICreepTask {
     targetPlaceSecond: RoomPosition | null = null,
     targetId: string | null = null,
     silent = false,
-    value: number | null = null
+    value: number | null = null,
+    value2: string | null = null
   ) {
     this.activity = activity;
     this.targetPlace = targetPlace;
@@ -22,6 +24,7 @@ export default class CreepTask implements ICreepTask {
     this.targetPlaceSecond = targetPlaceSecond;
     this.silent = silent;
     this.value = value;
+    this.value2 = value2;
   }
 
   public static getSourceFromTarget(target: RoomPosition): Source | null {

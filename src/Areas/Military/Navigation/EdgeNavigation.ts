@@ -28,7 +28,7 @@ interface EntryEdge {
  * memory key so callers know to suppress normal forward movement during recovery).
  */
 export default class EdgeNavigation {
-  private static EnableDebugLogging = true;
+  private static EnableDebugLogging = false;
   /**
    * Main entry point. Returns `true` when this class is handling all creep movement this
    * tick (including retreat / hold-and-heal). Returns `false` to hand control back to the
@@ -141,7 +141,8 @@ export default class EdgeNavigation {
       );
     }
     this.assignCreepsToSlots(creeps, slots, destination.roomName);
-    this.attackFromEdge(creeps, destination.roomName);
+    // Already handled by the passive attack from soldier.
+    // this.attackFromEdge(creeps, destination.roomName);
     this.bringAllCreepsToTheLeaderRoom(creeps, destination.roomName);
 
     return true;
@@ -347,52 +348,52 @@ export default class EdgeNavigation {
    *  - ATTACK / WORK parts target adjacent hostile structures, walls, and creeps (range 1).
    *  - RANGED_ATTACK targets hostile creeps first, then hostile structures and walls (range 3).
    */
-  private static attackFromEdge(creeps: CreepBase[], roomName: string): void {
-    const room = Game.rooms[roomName];
-    if (!room) return;
+  // private static attackFromEdge(creeps: CreepBase[], roomName: string): void {
+  //   const room = Game.rooms[roomName];
+  //   if (!room) return;
 
-    for (const creep of creeps) {
-      // Neutral walls have no owner → FIND_STRUCTURES; enemy-owned structures → FIND_HOSTILE_STRUCTURES.
-      const hostileStructures = creep.pos.findInRange(FIND_HOSTILE_STRUCTURES, 3, {
-        filter: s => s.structureType !== STRUCTURE_CONTROLLER
-      });
-      const walls = creep.pos.findInRange(FIND_STRUCTURES, 3, {
-        filter: s => s.structureType === STRUCTURE_WALL
-      });
-      const hostileCreeps = creep.pos.findInRange(FIND_HOSTILE_CREEPS, 3);
+  //   for (const creep of creeps) {
+  //     // Neutral walls have no owner → FIND_STRUCTURES; enemy-owned structures → FIND_HOSTILE_STRUCTURES.
+  //     const hostileStructures = creep.pos.findInRange(FIND_HOSTILE_STRUCTURES, 3, {
+  //       filter: s => s.structureType !== STRUCTURE_CONTROLLER
+  //     });
+  //     const walls = creep.pos.findInRange(FIND_STRUCTURES, 3, {
+  //       filter: s => s.structureType === STRUCTURE_WALL
+  //     });
+  //     const hostileCreeps = creep.pos.findInRange(FIND_HOSTILE_CREEPS, 3);
 
-      // Melee / dismantle: range 1 targets
-      if (creep.getNumberOfBodyPart(ATTACK) > 0) {
-        const adjacent =
-          hostileCreeps.find(c => creep.pos.getRangeTo(c.pos) <= 1) ??
-          (hostileStructures.find(s => creep.pos.getRangeTo(s.pos) <= 1) as Structure | undefined) ??
-          (walls.find(w => creep.pos.getRangeTo(w.pos) <= 1) as Structure | undefined);
-        if (adjacent) {
-          creep.creep.attack(adjacent);
-        }
-      }
+  //     // Melee / dismantle: range 1 targets
+  //     if (creep.getNumberOfBodyPart(ATTACK) > 0) {
+  //       const adjacent =
+  //         hostileCreeps.find(c => creep.pos.getRangeTo(c.pos) <= 1) ??
+  //         (hostileStructures.find(s => creep.pos.getRangeTo(s.pos) <= 1) as Structure | undefined) ??
+  //         (walls.find(w => creep.pos.getRangeTo(w.pos) <= 1) as Structure | undefined);
+  //       if (adjacent) {
+  //         creep.creep.attack(adjacent);
+  //       }
+  //     }
 
-      if (creep.getNumberOfBodyPart(WORK) > 0) {
-        const adjacentStructure =
-          (hostileStructures.find(s => creep.pos.getRangeTo(s.pos) <= 1) as Structure | undefined) ??
-          (walls.find(w => creep.pos.getRangeTo(w.pos) <= 1) as Structure | undefined);
-        if (adjacentStructure) {
-          creep.creep.dismantle(adjacentStructure);
-        }
-      }
+  //     if (creep.getNumberOfBodyPart(WORK) > 0) {
+  //       const adjacentStructure =
+  //         (hostileStructures.find(s => creep.pos.getRangeTo(s.pos) <= 1) as Structure | undefined) ??
+  //         (walls.find(w => creep.pos.getRangeTo(w.pos) <= 1) as Structure | undefined);
+  //       if (adjacentStructure) {
+  //         creep.creep.dismantle(adjacentStructure);
+  //       }
+  //     }
 
-      // Ranged attack: prefer creeps, then structures, then walls
-      if (creep.getNumberOfBodyPart(RANGED_ATTACK) > 0) {
-        const rangedTarget =
-          (hostileCreeps[0] as Creep | undefined) ??
-          (hostileStructures[0] as Structure | undefined) ??
-          (walls[0] as Structure | undefined);
-        if (rangedTarget) {
-          creep.creep.rangedAttack(rangedTarget);
-        }
-      }
-    }
-  }
+  //     // Ranged attack: prefer creeps, then structures, then walls
+  //     if (creep.getNumberOfBodyPart(RANGED_ATTACK) > 0) {
+  //       const rangedTarget =
+  //         (hostileCreeps[0] as Creep | undefined) ??
+  //         (hostileStructures[0] as Structure | undefined) ??
+  //         (walls[0] as Structure | undefined);
+  //       if (rangedTarget) {
+  //         creep.creep.rangedAttack(rangedTarget);
+  //       }
+  //     }
+  //   }
+  // }
 
   // ── Heal potential ────────────────────────────────────────────────────────
 
@@ -428,18 +429,26 @@ export default class EdgeNavigation {
   }
 
   public static shouldApplyEdgeNavigation(creepLeader: CreepBase, destination: RoomPosition): boolean {
-    console.log("shouldApplyEdgeNavigation", creepLeader.pos.roomName, destination.roomName);
-    console.log("destination", destination.x, destination.y);
+    if (EdgeNavigation.EnableDebugLogging) {
+      console.log("shouldApplyEdgeNavigation", creepLeader.pos.roomName, destination.roomName);
+      console.log("destination", destination.x, destination.y);
+    }
     if (destination.x === 1 || destination.x === 48 || destination.y === 1 || destination.y === 48) {
-      console.log("destination is on edge, applying edge navigation");
+      if (EdgeNavigation.EnableDebugLogging) {
+        console.log("destination is on edge, applying edge navigation");
+      }
       return true;
     }
     if (!Game.rooms[destination.roomName]) {
-      console.log("destination room is not visible, not applying edge navigation");
+      if (EdgeNavigation.EnableDebugLogging) {
+        console.log("destination room is not visible, not applying edge navigation");
+      }
       return false;
     }
     if (Game.rooms[destination.roomName] && Game.rooms[destination.roomName].controller?.my) {
-      console.log("destination room is owned by me, not applying edge navigation");
+      if (EdgeNavigation.EnableDebugLogging) {
+        console.log("destination room is owned by me, not applying edge navigation");
+      }
       return false;
     }
     const creeps = [creepLeader];

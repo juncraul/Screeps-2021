@@ -92,7 +92,7 @@ export default class CarryArea extends BaseArea {
         targetCollect instanceof Tombstone
       ) {
         // Someone else has already emptied the container, ruin, or tombstone. Cancel the task.
-        if (targetCollect.store.getUsedCapacity(RESOURCE_ENERGY) <= 20) {
+        if (targetCollect.store.getUsedCapacity() <= 20) {
           creep.task = null;
         }
       }
@@ -163,6 +163,16 @@ export default class CarryArea extends BaseArea {
       creep.addTask(new CreepTask(Activity.Pickup, firstDroppedResourceHalfAmount.pos));
       return true;
     }
+    const tombstones = creep.room.find(FIND_TOMBSTONES, {
+      filter: tombstone => tombstone.store.getUsedCapacity() > 0
+    });
+    if (tombstones.length > 0) {
+      const closestTombstone = creep.pos.findClosestByPath(tombstones);
+      if (closestTombstone) {
+        creep.addTask(new CreepTask(Activity.Collect, closestTombstone.pos));
+        return true;
+      }
+    }
 
     const firstContainer = creep.pos.findClosestByPath(
       this.collectFromGeneralStore.filter(
@@ -172,17 +182,6 @@ export default class CarryArea extends BaseArea {
     if (firstContainer) {
       creep.addTask(new CreepTask(Activity.Collect, firstContainer.pos));
       return true;
-    }
-
-    const tombstones = creep.room.find(FIND_TOMBSTONES, {
-      filter: tombstone => tombstone.store.getUsedCapacity(RESOURCE_ENERGY) > 0
-    });
-    if (tombstones.length > 0) {
-      const closestTombstone = creep.pos.findClosestByPath(tombstones);
-      if (closestTombstone) {
-        creep.addTask(new CreepTask(Activity.Collect, closestTombstone.pos));
-        return true;
-      }
     }
 
     // Check if this room has stationary fillers, this is because we don't have utilities in these rooms.
@@ -336,10 +335,10 @@ export default class CarryArea extends BaseArea {
   private carryBodyNeededTotal(): number {
     const roomEnergyToCollect = this.getTotalCollectableEnergy();
     let carryBodyPartsNeeded: number;
-    if (roomEnergyToCollect >= 2500) carryBodyPartsNeeded = 25;
-    else if (roomEnergyToCollect >= 2000) carryBodyPartsNeeded = 20;
-    else if (roomEnergyToCollect >= 1000) carryBodyPartsNeeded = 15;
-    else if (roomEnergyToCollect >= 500) carryBodyPartsNeeded = 10;
+    if (roomEnergyToCollect >= 5000) carryBodyPartsNeeded = 25;
+    else if (roomEnergyToCollect >= 3000) carryBodyPartsNeeded = 20;
+    else if (roomEnergyToCollect >= 1500) carryBodyPartsNeeded = 15;
+    else if (roomEnergyToCollect >= 1000) carryBodyPartsNeeded = 10;
     else carryBodyPartsNeeded = 5;
     return carryBodyPartsNeeded;
   }
@@ -352,6 +351,9 @@ export default class CarryArea extends BaseArea {
   }
 
   private calculateMaxWorkerCount(): number {
+    const isThereAYongCreep = this.creeps.some(creep => (creep.ticksToLive ?? 0) > 1400);
+    if (isThereAYongCreep && this.controllerLevel > 2) return this.creeps.length;
+
     const carryBodyPartsNeededLeft = this.carryBodyNeededLeft();
     if (carryBodyPartsNeededLeft === 0) return this.creeps.length;
     return this.creeps.length + 1;

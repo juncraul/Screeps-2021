@@ -5,6 +5,8 @@ import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
 import { CreepBase } from "CreepBase";
 
+const STORAGE_ENERGY_THRESHOLD = 10000;
+
 export default class UpgradeArea extends BaseArea {
   controller: StructureController;
   maxWorkerCount: number;
@@ -117,18 +119,23 @@ export default class UpgradeArea extends BaseArea {
       (total, creep) => total + creep.creep.getActiveBodyparts(WORK),
       0
     );
-    let carryBodyPartsNeeded = 1;
 
-    if (availableUpgradeEnergy > 100000) carryBodyPartsNeeded = 60;
-    else if (availableUpgradeEnergy >= 40000) carryBodyPartsNeeded = 50;
-    else if (availableUpgradeEnergy >= 30000) carryBodyPartsNeeded = 40;
-    else if (availableUpgradeEnergy >= 10000) carryBodyPartsNeeded = 30;
-    else if (availableUpgradeEnergy >= 5000) carryBodyPartsNeeded = 20;
-    else if (availableUpgradeEnergy >= 2000) carryBodyPartsNeeded = 15;
-    else if (availableUpgradeEnergy >= 1000) carryBodyPartsNeeded = 10;
-    else if (availableUpgradeEnergy >= 500) carryBodyPartsNeeded = 7;
-    else if (availableUpgradeEnergy < 500) carryBodyPartsNeeded = 4;
-    if (workBodyPartsFromCreeps >= carryBodyPartsNeeded) return this.creeps.length;
+    const isThereAYongCreep = this.creeps.some(creep => (creep.ticksToLive ?? 0) > 1400);
+    if (isThereAYongCreep) return this.creeps.length;
+    let workBodyPartsNeeded = 1;
+    if (availableUpgradeEnergy > 100000) workBodyPartsNeeded = 60;
+    else if (availableUpgradeEnergy >= 40000) workBodyPartsNeeded = 50;
+    else if (availableUpgradeEnergy >= 30000) workBodyPartsNeeded = 40;
+    else if (availableUpgradeEnergy >= 10000) workBodyPartsNeeded = 30;
+    else if (availableUpgradeEnergy >= 5000) workBodyPartsNeeded = 20;
+    else if (availableUpgradeEnergy >= 2000) workBodyPartsNeeded = 15;
+    else if (availableUpgradeEnergy >= 1000) workBodyPartsNeeded = 10;
+    else if (availableUpgradeEnergy >= 500) workBodyPartsNeeded = 7;
+    else if (availableUpgradeEnergy < 500) workBodyPartsNeeded = 4;
+    if (workBodyPartsFromCreeps >= workBodyPartsNeeded) return this.creeps.length;
+    if (this.controllerLevel >= 6) {
+      workBodyPartsNeeded = Math.max(0, workBodyPartsNeeded - 10);
+    }
     return Math.min(8, this.creeps.length + 1);
   }
 
@@ -150,7 +157,7 @@ export default class UpgradeArea extends BaseArea {
 
     const storage = GetRoomObjects.getRoomStorage(this.room);
     if (storage) {
-      availableEnergy += Math.max(0, storage.store.getUsedCapacity(RESOURCE_ENERGY) - 10000);
+      availableEnergy += Math.max(0, storage.store.getUsedCapacity(RESOURCE_ENERGY) - STORAGE_ENERGY_THRESHOLD);
     }
 
     return availableEnergy;
@@ -169,10 +176,10 @@ export default class UpgradeArea extends BaseArea {
     // Cap segments at reasonable limits based on controller level
     if (this.controllerLevel <= 4 && segments > 5) {
       segments = 5;
-    } else if (this.controllerLevel <= 6 && segments > 10) {
-      segments = 10;
-    } else if (segments >= 10) {
-      segments = 10;
+    } else if (this.controllerLevel <= 6 && segments > 5) {
+      segments = 5;
+    } else if (segments >= 5) {
+      segments = 5;
     }
 
     const carryParts = this.containerNextToController ? 1 : segments;

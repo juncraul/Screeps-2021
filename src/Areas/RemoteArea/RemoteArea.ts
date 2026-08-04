@@ -166,7 +166,11 @@ export default class RemoteArea extends BaseArea {
 
     // Handle Carrier spawning
     const carryBodyCount = this.getBodyCountByType(CreepType.Carrier, CARRY);
+    const isThereAYongCarryCreep = this.creeps
+      .filter(c => c.creepType === CreepType.Carrier)
+      .some(creep => (creep.ticksToLive ?? 0) > 1400);
     if (
+      !isThereAYongCarryCreep &&
       carryBodyCount < this.carryBodyPartsPerRoom &&
       (this.containers.length > 0 || (this.controller && this.controller.level <= 3))
     ) {

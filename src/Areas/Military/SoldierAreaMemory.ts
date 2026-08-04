@@ -78,13 +78,17 @@ export function clearSoldierAreaMemory(flagName: string): void {
   delete soldiers[flagName];
 }
 
-export function setSoldierNavigationStyle(flagName: string, style: "edge" | "quad" | "line"): void {
+export function setSoldierNavigationStyle(flagName: string, style: "edge" | "quad" | "line" | undefined): void {
   const record = getSoldierAreaMemory(flagName);
   if (!record.navigation) {
     record.navigation = {};
   }
   record.navigation.lastStyle = style;
   record.lastUpdatedTick = Game.time;
+}
+
+export function getSoldierNavigationStyle(flagName: string): "edge" | "quad" | "line" | undefined {
+  return getSoldierAreaMemory(flagName).navigation?.lastStyle;
 }
 
 export function getSoldierEdgeKiteState(flagName: string): SoldierKiteState | undefined {

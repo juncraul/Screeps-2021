@@ -779,6 +779,14 @@ export class GetRoomObjects {
     return result.path.length <= step ? result.path[result.path.length - 1] : result.path[step - 1];
   }
 
+  public static isOnOrNearSourceContainer(position: RoomPosition): boolean {
+    const nearbySourceContainer = position.findInRange(FIND_STRUCTURES, 1, {
+      filter: structure =>
+        structure.structureType === STRUCTURE_CONTAINER && structure.pos.findInRange(FIND_SOURCES, 1).length > 0
+    })[0];
+    return nearbySourceContainer !== undefined;
+  }
+
   // public static getSources(room: Room, onlyActive: boolean = false): Source[] {
   //  let roomMemory = MemoryManager.getRoomMemory(room.name);
   //  let sources: Source[] = [];

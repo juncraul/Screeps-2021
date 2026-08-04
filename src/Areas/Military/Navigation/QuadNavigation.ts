@@ -53,7 +53,7 @@ export default class QuadNavigation {
       console.log(`[${kiteStateKey}] Retreating from threat at ${String(threat?.pos)} due to previous state.`);
     const shouldRetreat = isRetreating
       ? totalMissingHits !== 0
-      : mostDamagedPercentage < 0.6 && damageTaken > 0 && healerCannotKeepUp && !!threat;
+      : mostDamagedPercentage < 0.7 && damageTaken > 0 && healerCannotKeepUp && !!threat;
 
     setSoldierQuadKiteState(memoryName, { tick: Game.time, totalHits, isRetreating: shouldRetreat });
 
@@ -117,6 +117,15 @@ export default class QuadNavigation {
     const anchor = this.getQuadAnchor(quad);
     if (!anchor) {
       return false;
+    }
+
+    const destinationRoom = Game.rooms[destination.roomName];
+    if (destinationRoom && destination.roomName === leader.pos.roomName) {
+      destinationRoom.visual.line(leader.pos.x, leader.pos.y, destination.x, destination.y, {
+        color: "#ec0e0e",
+        width: 0.15,
+        opacity: 0.5
+      });
     }
 
     // Check if creeps have fatique
@@ -488,19 +497,7 @@ export default class QuadNavigation {
 
     const hostileCreeps = room
       .find(FIND_HOSTILE_CREEPS)
-      .filter(
-        hostile =>
-          hostile.getActiveBodyparts(ATTACK) > 0 ||
-          hostile.getActiveBodyparts(RANGED_ATTACK) > 0 ||
-          hostile.getActiveBodyparts(WORK) > 0
-      );
-
-    if (hostileCreeps.length > 0) {
-      const closestHostile = nearPos.findClosestByRange(hostileCreeps);
-      if (closestHostile) {
-        return { pos: closestHostile.pos, type: "creep" };
-      }
-    }
+      .filter(hostile => hostile.getActiveBodyparts(ATTACK) > 0 || hostile.getActiveBodyparts(RANGED_ATTACK) > 0);
 
     const hostileTowers = room
       .find(FIND_HOSTILE_STRUCTURES)
@@ -509,9 +506,16 @@ export default class QuadNavigation {
       ) as StructureTower[];
 
     if (hostileTowers.length > 0) {
-      const closestTower = nearPos.findClosestByRange(hostileTowers);
+      const closestTower = nearPos.findClosestByPath(hostileTowers);
       if (closestTower) {
         return { pos: closestTower.pos, type: "tower" };
+      }
+    }
+
+    if (hostileCreeps.length > 0) {
+      const closestHostile = nearPos.findClosestByPath(hostileCreeps);
+      if (closestHostile) {
+        return { pos: closestHostile.pos, type: "creep" };
       }
     }
 
@@ -519,7 +523,7 @@ export default class QuadNavigation {
       .find(FIND_HOSTILE_STRUCTURES)
       .filter(structure => structure.structureType !== STRUCTURE_CONTROLLER);
     if (anyHostileStructures.length > 0) {
-      const closestStructure = nearPos.findClosestByRange(anyHostileStructures);
+      const closestStructure = nearPos.findClosestByPath(anyHostileStructures);
       if (closestStructure) {
         return { pos: closestStructure.pos, type: "structure" };
       }

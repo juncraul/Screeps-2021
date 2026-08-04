@@ -15,6 +15,7 @@ import {
   setSoldierCreepNames,
   setSoldierFlagState,
   setSoldierNavigationStyle,
+  getSoldierNavigationStyle,
   updateSoldierComposition
 } from "./SoldierAreaMemory";
 
@@ -54,6 +55,7 @@ export interface AttackFlagConfig {
  * Overseer calls SoldierArea.detectAllFlags() once, then creates one instance per flag.
  */
 export default class SoldierArea extends BaseArea {
+  private static EnableDebugLogging = false;
   flag: AttackFlagConfig;
 
   // Shared tick cache for military flag detection helpers.
@@ -225,24 +227,12 @@ export default class SoldierArea extends BaseArea {
     // const combatAssigned = this.assignCombatTask(Game.flags[this.flag.name]);
     // const targetPosition = combatAssigned ? combatAssigned.pos : this.flag.position;
     const formationMovementApplied = SoldierArea.managedToApplyAFormationMovement(this.creeps, this.flag);
-    console.log("formationMovementApplied", formationMovementApplied);
+    if (SoldierArea.EnableDebugLogging) {
+      console.log("formationMovementApplied", formationMovementApplied);
+    }
     for (const creep of this.creeps) {
       if (formationMovementApplied) {
         if (creep.task) creep.task.taskDone = true;
-
-        if (creep.getNumberOfBodyPart(ATTACK) > 0) {
-          const getNearbyHostileCreeps = creep.pos.findInRange(FIND_HOSTILE_CREEPS, 1);
-          if (getNearbyHostileCreeps.length > 0) {
-            creep.say("⚔️");
-            creep.creep.attack(getNearbyHostileCreeps[0]);
-          }
-
-          const getNearbyHostileStructures = creep.pos.findInRange(FIND_HOSTILE_STRUCTURES, 1);
-          if (getNearbyHostileStructures.length > 0) {
-            creep.say("⚔️");
-            creep.creep.attack(getNearbyHostileStructures[0]);
-          }
-        }
         continue;
       }
       if (!creep.isFree()) continue;
@@ -272,6 +262,7 @@ export default class SoldierArea extends BaseArea {
     const shouldApplyEdgeNavigation = EdgeNavigation.shouldApplyEdgeNavigation(firstFourCreeps[0], flag.position);
     const creepsAreInRoomWithDestination =
       firstFourCreeps.filter(c => c.pos.roomName === flag.targetRoom).length === firstFourCreeps.length;
+    const stillUsingLineNavigation = getSoldierNavigationStyle(flag.name) === "line";
     if (
       firstFourCreeps.some(
         creep =>
@@ -280,15 +271,19 @@ export default class SoldierArea extends BaseArea {
       ) || // Add any room to force it.
       shouldApplyEdgeNavigation
     ) {
-      console.log(
-        `[SoldierArea] Applying edge navigation for ${firstFourCreeps.length} creeps to flag ${flag.name} in room ${flag.targetRoom}`
-      );
+      if (SoldierArea.EnableDebugLogging) {
+        console.log(
+          `[SoldierArea] Applying edge navigation for ${firstFourCreeps.length} creeps to flag ${flag.name} in room ${flag.targetRoom}`
+        );
+      }
       setSoldierNavigationStyle(flag.name, "edge");
       return EdgeNavigation.tryToAttackFromEdge(firstFourCreeps, flag.position, flag.name);
-    } else if (creepsAreInRoomWithDestination) {
-      console.log(
-        `[SoldierArea] Applying quad navigation for ${firstFourCreeps.length} creeps to flag ${flag.name} in room ${flag.targetRoom}`
-      );
+    } else if (creepsAreInRoomWithDestination && !stillUsingLineNavigation) {
+      if (SoldierArea.EnableDebugLogging) {
+        console.log(
+          `[SoldierArea] Applying quad navigation for ${firstFourCreeps.length} creeps to flag ${flag.name} in room ${flag.targetRoom}`
+        );
+      }
       setSoldierNavigationStyle(flag.name, "quad");
       return QuadNavigation.tryToKiteTheEnemyAsFormation(
         firstFourCreeps,
@@ -297,11 +292,13 @@ export default class SoldierArea extends BaseArea {
         flag.secondaryColor
       );
     } else {
-      console.log(
-        `[SoldierArea] Applying line navigation for ${firstFourCreeps.length} creeps to flag ${flag.name} in room ${flag.targetRoom}`
-      );
+      if (SoldierArea.EnableDebugLogging) {
+        console.log(
+          `[SoldierArea] Applying line navigation for ${firstFourCreeps.length} creeps to flag ${flag.name} in room ${flag.targetRoom}`
+        );
+      }
       setSoldierNavigationStyle(flag.name, "line");
-      return LineNaviagation.tryMoveAsFormation(firstFourCreeps, flag.position);
+      return LineNaviagation.tryMoveAsFormation(firstFourCreeps, flag.position, flag);
     }
   }
 
@@ -604,10 +601,13 @@ export default class SoldierArea extends BaseArea {
       creep => creep.creepType === CreepType.Dismantler && creep.pos.roomName === this.flag.targetRoom
     );
     for (const dismantler of dismantlers) {
-      console.log("Game.rooms[dismantler.creep.pos.roomName].controller?.my", Game.rooms[dismantler.creep.pos.roomName].controller?.my);
-      if (!Game.rooms[dismantler.creep.pos.roomName].controller?.my) {
+      const controller = Game.rooms[dismantler.creep.pos.roomName].controller;
+      if (!controller?.my || (!controller?.my && controller?.owner)) {
         const target = GetRoomObjects.getWithinRangeStructures(dismantler.pos, 1, null);
-        if (target.length > 0) {
+        const nonRoadTarget = target.filter(structure => structure.structureType !== STRUCTURE_ROAD);
+        if (nonRoadTarget.length > 0) {
+          dismantler.creep.dismantle(nonRoadTarget[0]);
+        } else {
           dismantler.creep.dismantle(target[0]);
         }
       }
@@ -622,10 +622,16 @@ export default class SoldierArea extends BaseArea {
         continue;
       }
       // TODO: should also exclude remote rooms.
-      if (!Game.rooms[melee.creep.pos.roomName].controller?.my) {
+      const controller = Game.rooms[melee.creep.pos.roomName].controller;
+      if (!controller?.my || (!controller?.my && controller?.owner)) {
         const target = GetRoomObjects.getWithinRangeStructures(melee.pos, 1, null);
         if (target.length > 0) {
-          melee.creep.attack(target[0]);
+          const nonRoadTarget = target.filter(structure => structure.structureType !== STRUCTURE_ROAD);
+          if (nonRoadTarget.length > 0) {
+            melee.creep.attack(nonRoadTarget[0]);
+          } else {
+            melee.creep.attack(target[0]);
+          }
         }
       }
     }
@@ -704,6 +710,7 @@ export default class SoldierArea extends BaseArea {
       .filter(creep => !this.onEdge(creep.pos) && !EXCEPTION_PLAYER_NAMES.includes(creep.owner.username));
     const enemyStructures = room
       .find(FIND_HOSTILE_STRUCTURES)
+      .filter(structure => structure.structureType !== STRUCTURE_CONTROLLER)
       .filter(structure => structure.owner && !EXCEPTION_PLAYER_NAMES.includes(structure.owner.username));
     for (const creep of enemyCreeps) {
       room.visual.circle(creep.pos.x, creep.pos.y, { fill: "transparent", radius: 0.55, stroke: "#ff0000" });
@@ -730,6 +737,7 @@ export default class SoldierArea extends BaseArea {
     if (!room) return null;
     const enemyStructures = room
       .find(FIND_HOSTILE_STRUCTURES)
+      .filter(structure => structure.structureType !== STRUCTURE_CONTROLLER)
       .filter(structure => structure.owner && !EXCEPTION_PLAYER_NAMES.includes(structure.owner.username));
     for (const structure of enemyStructures) {
       room.visual.circle(structure.pos.x, structure.pos.y, { fill: "transparent", radius: 0.55, stroke: "#ff0000" });

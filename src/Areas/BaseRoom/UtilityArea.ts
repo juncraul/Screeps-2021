@@ -55,7 +55,9 @@ export default class UtilityArea extends BaseArea {
           creep.addTask(new CreepTask(Activity.Collect, this.link.pos));
         } else {
           if (this.storage) {
-            creep.addTask(new CreepTask(Activity.Collect, this.storage.pos));
+            creep.addTask(
+              new CreepTask(Activity.Collect, this.storage.pos, null, null, undefined, null, RESOURCE_ENERGY)
+            );
           }
         }
       } else {

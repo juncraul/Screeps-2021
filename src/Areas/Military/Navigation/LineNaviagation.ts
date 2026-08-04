@@ -1,9 +1,10 @@
 import { CreepBase } from "../../../CreepBase";
 import { Helper } from "Helpers/Helper";
-import { CreepType } from "../../../CreepType";
+import { AttackFlagConfig } from "../SoldierArea";
+import { setSoldierNavigationStyle } from "../SoldierAreaMemory";
 
 export default class LineNaviagation {
-  public static tryMoveAsFormation(creeps: CreepBase[], destination: RoomPosition): boolean {
+  public static tryMoveAsFormation(creeps: CreepBase[], destination: RoomPosition, flag: AttackFlagConfig): boolean {
     if (creeps.length < 4) {
       return false;
     }
@@ -17,6 +18,7 @@ export default class LineNaviagation {
 
     const search = Helper.simplePathFinderWithObstacles(leader.pos, destination);
     if (search.path.length === 0) {
+      setSoldierNavigationStyle(flag.name, undefined);
       return false;
     }
 
@@ -45,8 +47,10 @@ export default class LineNaviagation {
 
     for (let i = 0; i < path.length; i++) {
       const pos = path[i];
-      leader.room.visual.circle(pos.x, pos.y, { fill: "transparent", radius: 0.5, stroke: "#ff0000" });
-      leader.room.visual.text(i.toString(), pos.x, pos.y, { color: "#ff0000", font: 0.5 });
+      const room = Game.rooms[pos.roomName];
+      if (!room) continue;
+      room.visual.circle(pos.x, pos.y, { fill: "transparent", radius: 0.5, stroke: "#ff0000" });
+      room.visual.text(i.toString(), pos.x, pos.y, { color: "#ff0000", font: 0.5 });
     }
 
     // Check if creeps have fatique
@@ -61,17 +65,46 @@ export default class LineNaviagation {
     return true;
   }
 
+  // private static creepsAreInRangeOfEachOther(creeps: CreepBase[], range: number): boolean {
+  //   for (let i = 0; i < creeps.length; i++) {
+  //     for (let j = i + 1; j < creeps.length; j++) {
+  //       if (creeps[i].pos.roomName !== creeps[j].pos.roomName) {
+  //         return false;
+  //       }
+  //       if (creeps[i].pos.getRangeTo(creeps[j].pos) > range) {
+  //         return false;
+  //       }
+  //     }
+  //   }
+  //   return true;
+  // }
+
   private static creepsAreInRangeOfEachOther(creeps: CreepBase[], range: number): boolean {
-    for (let i = 0; i < creeps.length; i++) {
-      for (let j = i + 1; j < creeps.length; j++) {
-        if (creeps[i].pos.roomName !== creeps[j].pos.roomName) {
-          return false;
-        }
-        if (creeps[i].pos.getRangeTo(creeps[j].pos) > range) {
+    const positions = creeps.map(c => this.getWorldPosition(c.pos));
+
+    for (let i = 0; i < positions.length; i++) {
+      for (let j = i + 1; j < positions.length; j++) {
+        if (Math.max(Math.abs(positions[i].x - positions[j].x), Math.abs(positions[i].y - positions[j].y)) > range) {
           return false;
         }
       }
     }
+
     return true;
+  }
+
+  private static getWorldPosition(pos: RoomPosition) {
+    const match = /^([WE])(\d+)([NS])(\d+)$/.exec(pos.roomName)!;
+
+    let rx = Number(match[2]);
+    let ry = Number(match[4]);
+
+    if (match[1] === "W") rx = -rx - 1;
+    if (match[3] === "N") ry = -ry - 1;
+
+    return {
+      x: rx * 50 + pos.x,
+      y: ry * 50 + pos.y
+    };
   }
 }

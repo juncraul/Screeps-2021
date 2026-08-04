@@ -350,8 +350,7 @@ export class Helper {
           for (let x = 0; x < 50; x++) {
             for (let y = 0; y < 50; y++) {
               if (x < 1 || x > 48 || y < 1 || y > 48) {
-                costs.set(x, y, 255);
-                continue;
+                costs.set(x, y, 10); // Treat edges as more costly to avoid getting stuck on them.
               }
 
               const positionBlocked = terrain.get(x, y) === TERRAIN_MASK_WALL || blocked.has(`${x}:${y}`);

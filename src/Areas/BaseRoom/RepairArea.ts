@@ -4,6 +4,8 @@ import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
 import { CreepBase } from "CreepBase";
 
+const STORAGE_ENERGY_THRESHOLD = 5000;
+
 export default class RepairArea extends BaseArea {
   controller: StructureController;
   maxWorkerCount: number;
@@ -55,6 +57,13 @@ export default class RepairArea extends BaseArea {
           }
         }
       } else {
+        if (GetRoomObjects.isOnOrNearSourceContainer(creep.pos)) {
+          const positionAwayFromSourceContainer = GetRoomObjects.getXStepTowardsSpawn(creep.pos, 2);
+          if (!creep.pos.isEqualTo(positionAwayFromSourceContainer)) {
+            creep.addTask(new CreepTask(Activity.Move, positionAwayFromSourceContainer));
+            continue;
+          }
+        }
         const structureToRepair = this.getClosestStructureToRepair(creep.pos);
         if (structureToRepair) {
           creep.addTask(new CreepTask(Activity.Repair, structureToRepair.pos));
@@ -73,6 +82,12 @@ export default class RepairArea extends BaseArea {
       );
       creep.addTask(new CreepTask(Activity.Move, newPosition));
     }
+    if (creep.task?.activity === Activity.Repair && GetRoomObjects.isOnOrNearSourceContainer(creep.pos)) {
+      const positionAwayFromSourceContainer = GetRoomObjects.getXStepTowardsSpawn(creep.pos, 2);
+      if (!creep.pos.isEqualTo(positionAwayFromSourceContainer)) {
+        creep.addTask(new CreepTask(Activity.Move, positionAwayFromSourceContainer));
+      }
+    }
   }
 
   private calculateMaxWorkerCount(): number {
@@ -90,7 +105,11 @@ export default class RepairArea extends BaseArea {
     }
 
     const roomStorage = GetRoomObjects.getRoomStorage(this.room);
-    if (damagedNonWallCount >= 25 && roomStorage && roomStorage.store.getUsedCapacity(RESOURCE_ENERGY) > 30000) {
+    if (
+      damagedNonWallCount >= 25 &&
+      roomStorage &&
+      roomStorage.store.getUsedCapacity(RESOURCE_ENERGY) > STORAGE_ENERGY_THRESHOLD
+    ) {
       return 2;
     }
 

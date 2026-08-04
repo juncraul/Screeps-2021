@@ -4,6 +4,8 @@ import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
 import { CreepBase } from "CreepBase";
 
+const STORAGE_ENERGY_THRESHOLD = 5000;
+
 export default class ConstructionArea extends BaseArea {
   controller: StructureController;
   maxWorkerCount: number;
@@ -57,7 +59,7 @@ export default class ConstructionArea extends BaseArea {
           creep.addTask(new CreepTask(Activity.Pickup, closestDroppedResource.pos));
           continue;
         }
-        if (this.storage && this.storage.store.energy > threasholdToCollectFrom) {
+        if (this.storage && this.storage.store.energy > STORAGE_ENERGY_THRESHOLD) {
           creep.addTask(new CreepTask(Activity.Collect, this.storage.pos)); // TODO:Add Energy type in here.
           continue;
         }
@@ -77,6 +79,13 @@ export default class ConstructionArea extends BaseArea {
         }
       }
       if (!creep.isEmpty()) {
+        if (GetRoomObjects.isOnOrNearSourceContainer(creep.pos)) {
+          const positionAwayFromSourceContainer = GetRoomObjects.getXStepTowardsSpawn(creep.pos, 2);
+          if (!creep.pos.isEqualTo(positionAwayFromSourceContainer)) {
+            creep.addTask(new CreepTask(Activity.Move, positionAwayFromSourceContainer));
+            continue;
+          }
+        }
         const constructionArea = this.getConstructionClosestByPoint(creep.pos);
         if (constructionArea) {
           creep.addTask(new CreepTask(Activity.Construct, constructionArea.pos));
@@ -90,6 +99,13 @@ export default class ConstructionArea extends BaseArea {
 
   private interupCurrentTaskIfNeeded(creep: CreepBase) {
     if (!creep.task) return;
+    if (creep.task.activity === Activity.Construct && GetRoomObjects.isOnOrNearSourceContainer(creep.pos)) {
+      const positionAwayFromSourceContainer = GetRoomObjects.getXStepTowardsSpawn(creep.pos, 2);
+      if (!creep.pos.isEqualTo(positionAwayFromSourceContainer)) {
+        creep.addTask(new CreepTask(Activity.Move, positionAwayFromSourceContainer));
+      }
+      return;
+    }
     if (creep.task.activity === Activity.Harvest && Game.time % 10 === 0) {
       // We should cancel the harvest as there might be energy somewhere else.
       creep.task = null;
