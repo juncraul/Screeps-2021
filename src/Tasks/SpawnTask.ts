@@ -11,6 +11,7 @@ export default class SpawnTask {
   namePrefix: string;
   spawnRoomName: string | null;
   spawnDirection: DirectionConstant[];
+  spawnId: Id<StructureSpawn> | null;
 
   constructor(
     creepType: CreepType,
@@ -19,7 +20,8 @@ export default class SpawnTask {
     area: BaseArea,
     namePrefix: string | null = null,
     spawnRoomName: string | null = null,
-    spawnDirection: DirectionConstant[] = []
+    spawnDirection: DirectionConstant[] = [],
+    spawnId: Id<StructureSpawn> | null = null
   ) {
     this.creepType = creepType;
     this.areaId = areaId;
@@ -28,6 +30,7 @@ export default class SpawnTask {
     this.namePrefix = namePrefix ?? this.getCreepTypeText();
     this.spawnRoomName = spawnRoomName;
     this.spawnDirection = spawnDirection.length === 0 ? [BOTTOM_RIGHT, BOTTOM, BOTTOM_LEFT] : spawnDirection;
+    this.spawnId = spawnId;
   }
 
   public getCreepTypeText(): string {

@@ -534,7 +534,10 @@ export default class Overseer implements IOverseer {
   }
 
   private createNewCreep(room: Room, task: SpawnTask): Creep | null {
-    const spawns: StructureSpawn[] = GetRoomObjects.getRoomSpawns(room, true);
+    let spawns: StructureSpawn[] = GetRoomObjects.getRoomSpawns(room, true);
+    if (task.spawnId) {
+      spawns = spawns.filter(spawn => spawn.id === task.spawnId);
+    }
     let theNewCreep: Creep | null = null;
     spawns.forEach(spawn => {
       if (spawn.spawning == null) {

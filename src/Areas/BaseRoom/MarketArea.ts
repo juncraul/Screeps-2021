@@ -5,6 +5,8 @@ import BaseArea from "./BaseArea";
 const MARKET_FLAG_PREFIX = "Market";
 const GREEN_FLAG_TTL = 10000;
 const MIN_TERMINAL_ENERGY = 10000;
+const MIN_TERMINAL_RESOURCE = 5000;
+const INTER_ROOM_SEND_AMOUNT = 3000;
 const MIN_SELL_PRICE = 0.001;
 const UNDERCUT_STEP = 0.001;
 
@@ -27,6 +29,7 @@ interface MarketFlagState {
 interface MarketContext {
   flagsNeedingTransfer: MarketFlagConfig[];
   needsTerminalBuffer: boolean;
+  resourceToTransferToTerminal: ResourceConstant | null;
 }
 
 export default class MarketArea extends BaseArea {
@@ -44,20 +47,27 @@ export default class MarketArea extends BaseArea {
   }
 
   public handleThisArea() {
+    this.trySendResourcesToOwnRooms();
     const context = this.getMarketContext();
 
-    const needsWork = context.flagsNeedingTransfer.length > 0 || context.needsTerminalBuffer;
+    const needsWork =
+      context.flagsNeedingTransfer.length > 0 ||
+      context.needsTerminalBuffer ||
+      context.resourceToTransferToTerminal !== null;
     if (!needsWork) {
       return;
     }
 
-    this.handleCreeps();
+    this.handleCreeps(context);
   }
 
   public handleSpawnTasks(): SpawnTask[] {
     const context = this.getMarketContext();
     const tasksForThisArea: SpawnTask[] = [];
-    const needsWork = context.flagsNeedingTransfer.length > 0 || context.needsTerminalBuffer;
+    const needsWork =
+      context.flagsNeedingTransfer.length > 0 ||
+      context.needsTerminalBuffer ||
+      context.resourceToTransferToTerminal !== null;
     if (needsWork && this.creeps.length < this.maxWorkerCount) {
       const task: SpawnTask | null = this.createCreepForThisArea();
       if (task) {
@@ -67,18 +77,22 @@ export default class MarketArea extends BaseArea {
     return tasksForThisArea;
   }
 
-  private handleCreeps() {
+  private handleCreeps(context: MarketContext) {
     if (!this.terminal) return;
+    const resourceToTransfer = context.resourceToTransferToTerminal;
 
     for (const creep of this.creeps) {
       if (!creep.isFree()) continue;
 
       if (creep.isEmpty()) {
-        if (this.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-          creep.withdraw(this.storage, RESOURCE_ENERGY);
+        if (resourceToTransfer && this.storage.store.getUsedCapacity(resourceToTransfer) > 0) {
+          creep.withdraw(this.storage, resourceToTransfer);
         }
       } else {
-        creep.transfer(this.terminal, RESOURCE_ENERGY);
+        const carriedResource = this.getCarriedResourceType(creep);
+        if (carriedResource) {
+          creep.transfer(this.terminal, carriedResource);
+        }
       }
     }
   }
@@ -171,8 +185,153 @@ export default class MarketArea extends BaseArea {
     this.setMarketStates(states);
     return {
       flagsNeedingTransfer,
-      needsTerminalBuffer: this.needsTerminalBuffer()
+      needsTerminalBuffer: this.needsTerminalBuffer(),
+      resourceToTransferToTerminal: this.getResourceToTransferToTerminal(flagsNeedingTransfer)
     };
+  }
+
+  private getResourceToTransferToTerminal(flagsNeedingTransfer: MarketFlagConfig[]): ResourceConstant | null {
+    if (!this.terminal) {
+      return null;
+    }
+
+    if (this.needsTerminalBuffer() && this.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+      return RESOURCE_ENERGY;
+    }
+
+    for (const config of flagsNeedingTransfer) {
+      if (
+        this.terminal.store.getUsedCapacity(config.resourceType) < config.amount &&
+        this.storage.store.getUsedCapacity(config.resourceType) > 0
+      ) {
+        return config.resourceType;
+      }
+    }
+
+    const resourceTypes = this.getSendableResourceTypes();
+    for (const resourceType of resourceTypes) {
+      const totalInRoom = this.getResourceTotalInRoom(this.room, resourceType);
+      if (totalInRoom <= MIN_TERMINAL_RESOURCE) {
+        continue;
+      }
+      if (this.terminal.store.getUsedCapacity(resourceType) >= MIN_TERMINAL_RESOURCE) {
+        continue;
+      }
+      const recipientRoom = this.getRecipientRoomForResource(resourceType);
+      if (recipientRoom && this.storage.store.getUsedCapacity(resourceType) > 0) {
+        return resourceType;
+      }
+    }
+
+    return null;
+  }
+
+  private trySendResourcesToOwnRooms(): void {
+    if (!this.terminal) {
+      return;
+    }
+    if (this.terminal.cooldown > 0) {
+      return;
+    }
+    if (this.terminal.store.getUsedCapacity(RESOURCE_ENERGY) < MIN_TERMINAL_ENERGY) {
+      return;
+    }
+
+    const resourceTypes = this.getSendableResourceTypes();
+    for (const resourceType of resourceTypes) {
+      const totalInRoom = this.getResourceTotalInRoom(this.room, resourceType);
+      if (totalInRoom <= MIN_TERMINAL_RESOURCE) {
+        continue;
+      }
+
+      const terminalAmount = this.terminal.store.getUsedCapacity(resourceType);
+      if (terminalAmount < MIN_TERMINAL_RESOURCE || terminalAmount < INTER_ROOM_SEND_AMOUNT) {
+        continue;
+      }
+
+      const recipientRoom = this.getRecipientRoomForResource(resourceType);
+      if (!recipientRoom) {
+        continue;
+      }
+
+      const recipientCurrentAmount = this.getResourceTotalInRoom(recipientRoom, resourceType);
+      const recipientDeficit = Math.max(0, MIN_TERMINAL_RESOURCE - recipientCurrentAmount);
+      if (recipientDeficit === 0) {
+        continue;
+      }
+
+      const amountToSend = Math.min(INTER_ROOM_SEND_AMOUNT, recipientDeficit, terminalAmount);
+      if (amountToSend <= 0) {
+        continue;
+      }
+
+      const result = this.terminal.send(resourceType, amountToSend, recipientRoom.name, `Balance-${resourceType}`);
+      if (result === OK) {
+        console.log(
+          `MarketArea: Sent ${amountToSend} ${resourceType} from ${this.room.name} to ${recipientRoom.name} for balancing.`
+        );
+      } else {
+        console.log(
+          `MarketArea: terminal.send failed in ${this.room.name} for ${resourceType} to ${recipientRoom.name}, code ${result}.`
+        );
+      }
+      return;
+    }
+  }
+
+  private getSendableResourceTypes(): ResourceConstant[] {
+    if (!this.terminal) {
+      return [];
+    }
+
+    const keys = [...Object.keys(this.storage.store), ...Object.keys(this.terminal.store)] as ResourceConstant[];
+    const uniqueKeys: ResourceConstant[] = [];
+    for (const key of keys) {
+      if (!uniqueKeys.includes(key)) {
+        uniqueKeys.push(key);
+      }
+    }
+    return uniqueKeys.sort();
+  }
+
+  private getRecipientRoomForResource(resourceType: ResourceConstant): Room | null {
+    const candidateRooms = GetRoomObjects.getAllClaimedRooms()
+      .filter(room => room.name !== this.room.name)
+      .filter(room => GetRoomObjects.getRoomTerminal(room));
+
+    let bestRoom: Room | null = null;
+    let lowestAmount = Infinity;
+
+    for (const room of candidateRooms) {
+      const amountInRoom = this.getResourceTotalInRoom(room, resourceType);
+      if (amountInRoom >= MIN_TERMINAL_RESOURCE) {
+        continue;
+      }
+      if (amountInRoom < lowestAmount) {
+        lowestAmount = amountInRoom;
+        bestRoom = room;
+      }
+    }
+
+    return bestRoom;
+  }
+
+  private getResourceTotalInRoom(room: Room, resourceType: ResourceConstant): number {
+    const storage = GetRoomObjects.getRoomStorage(room);
+    const terminal = GetRoomObjects.getRoomTerminal(room);
+    const storageAmount = storage ? storage.store.getUsedCapacity(resourceType) : 0;
+    const terminalAmount = terminal ? terminal.store.getUsedCapacity(resourceType) : 0;
+    return storageAmount + terminalAmount;
+  }
+
+  private getCarriedResourceType(creep: { store: StoreDefinition }): ResourceConstant | null {
+    for (const resourceType in creep.store) {
+      const typedResource = resourceType as ResourceConstant;
+      if ((creep.store[typedResource] ?? 0) > 0) {
+        return typedResource;
+      }
+    }
+    return null;
   }
 
   private needsTerminalBuffer(): boolean {

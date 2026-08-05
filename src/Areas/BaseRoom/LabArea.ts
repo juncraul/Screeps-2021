@@ -5,7 +5,7 @@ import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
 
 const MIN_TERMINAL_RESOURCE = 5000;
-const LAB_REAGENT_TARGET = 1000;
+const LAB_REAGENT_TARGET = 300;
 const LAB_ENERGY_TARGET = 2000;
 
 interface LabReactionPlan {
@@ -23,6 +23,11 @@ interface ImmediateReaction {
   reagentB: ResourceConstant;
 }
 
+interface BoostRequirement {
+  bodyPart: BodyPartConstant;
+  effect: string;
+}
+
 export default class LabArea extends BaseArea {
   private readonly maxWorkerCount: number;
   private readonly storage: StructureStorage;
@@ -38,6 +43,15 @@ export default class LabArea extends BaseArea {
   }
 
   public handleThisArea(): void {
+    if (this.labs.length === 0) {
+      return;
+    }
+
+    const boostWorkHandled = this.handleBoosting();
+    if (boostWorkHandled) {
+      return;
+    }
+
     if (!this.terminal || this.labs.length < 3) {
       return;
     }
@@ -183,7 +197,7 @@ export default class LabArea extends BaseArea {
       if (
         inputLabA !== null &&
         carriedResource === plan.reagentA &&
-        (inputLabA.mineralType === null || inputLabA.mineralType === plan.reagentA) &&
+        (!inputLabA.mineralType || inputLabA.mineralType === plan.reagentA) &&
         (inputLabA.store.getFreeCapacity(plan.reagentA) ?? 0) > 0
       ) {
         creep.addTask(new CreepTask(Activity.DepositMineral, inputLabA.pos));
@@ -194,7 +208,7 @@ export default class LabArea extends BaseArea {
       if (
         inputLabB !== null &&
         carriedResource === plan.reagentB &&
-        (inputLabB.mineralType === null || inputLabB.mineralType === plan.reagentB) &&
+        (!inputLabB.mineralType || inputLabB.mineralType === plan.reagentB) &&
         (inputLabB.store.getFreeCapacity(plan.reagentB) ?? 0) > 0
       ) {
         creep.addTask(new CreepTask(Activity.DepositMineral, inputLabB.pos));
@@ -209,6 +223,141 @@ export default class LabArea extends BaseArea {
     }
 
     creep.addTask(new CreepTask(Activity.DepositMineral, this.storage.pos));
+  }
+
+  private handleBoosting(): boolean {
+    let boostWorkHandled = false;
+
+    const creepsInRoom = this.room.find(FIND_MY_CREEPS);
+    for (const roomCreep of creepsInRoom) {
+      const creep = new CreepBase(roomCreep);
+      if (!this.shouldTryBoost(creep)) {
+        continue;
+      }
+
+      const boostLab = this.getBestBoostLabForCreep(creep);
+      if (!boostLab) {
+        continue;
+      }
+
+      boostWorkHandled = true;
+      if (creep.pos.isNearTo(boostLab.pos)) {
+        boostLab.boostCreep(creep.creep);
+        continue;
+      }
+
+      if (!this.isMoveTaskToBoostLab(creep, boostLab)) {
+        creep.addTask(new CreepTask(Activity.Move, boostLab.pos, null, null, true));
+      }
+    }
+
+    return boostWorkHandled;
+  }
+
+  private shouldTryBoost(creep: CreepBase): boolean {
+    if (creep.spawning) {
+      return false;
+    }
+    if ((creep.ticksToLive ?? 0) >= 1450) {
+      return false;
+    }
+    if (creep.creep.body.some(part => !!part.boost)) {
+      return false;
+    }
+
+    const boostRequirement = this.getBoostRequirementForCreep(creep);
+    if (!boostRequirement) {
+      return false;
+    }
+
+    return creep.getNumberOfBodyPart(boostRequirement.bodyPart) > 0;
+  }
+
+  private getBoostRequirementForCreep(creep: CreepBase): BoostRequirement | null {
+    switch (creep.creepType) {
+      case CreepType.Harvester:
+      case CreepType.MineralHarvester:
+        return { bodyPart: WORK, effect: "harvest" };
+      case CreepType.Upgrader:
+        return { bodyPart: WORK, effect: "upgradeController" };
+      case CreepType.Constructor:
+        return { bodyPart: WORK, effect: "build" };
+      case CreepType.Repairer:
+        return { bodyPart: WORK, effect: "repair" };
+      case CreepType.Dismantler:
+        return { bodyPart: WORK, effect: "dismantle" };
+      case CreepType.Carrier:
+      case CreepType.Collector:
+      case CreepType.Utility:
+      case CreepType.MineralCarrier:
+      case CreepType.StationaryFiller:
+      case CreepType.Clerk:
+      case CreepType.Laboratorian:
+      case CreepType.Looter:
+        return { bodyPart: CARRY, effect: "capacity" };
+      case CreepType.Melee:
+      case CreepType.Defender:
+        return { bodyPart: ATTACK, effect: "attack" };
+      case CreepType.Ranged:
+      case CreepType.DefenseRanger:
+        return { bodyPart: RANGED_ATTACK, effect: "rangedAttack" };
+      case CreepType.Healer:
+      case CreepType.DefenseHealer:
+        return { bodyPart: HEAL, effect: "heal" };
+      case CreepType.Claimer:
+        return { bodyPart: CLAIM, effect: "claim" };
+      default:
+        return null;
+    }
+  }
+
+  private getBestBoostLabForCreep(creep: CreepBase): StructureLab | null {
+    const boostRequirement = this.getBoostRequirementForCreep(creep);
+    if (!boostRequirement) {
+      return null;
+    }
+
+    const boostOptions = BOOSTS[boostRequirement.bodyPart] as Record<string, Record<string, number>> | undefined;
+    if (!boostOptions) {
+      return null;
+    }
+
+    const candidateLabs = this.labs
+      .filter(lab => {
+        const mineralType = lab.mineralType;
+        if (!mineralType) {
+          return false;
+        }
+        const boostMineralType = mineralType as ResourceConstant;
+        const boostForMineral = boostOptions[boostMineralType];
+        if (!boostForMineral || boostForMineral[boostRequirement.effect] === undefined) {
+          return false;
+        }
+        const storedEnergy = lab.store[RESOURCE_ENERGY] ?? 0;
+        const storedMineral = lab.store[boostMineralType] ?? 0;
+        return storedEnergy >= LAB_BOOST_ENERGY && storedMineral >= LAB_BOOST_MINERAL;
+      })
+      .sort((a, b) => {
+        const mineralA = a.mineralType as ResourceConstant;
+        const mineralB = b.mineralType as ResourceConstant;
+        const boostValueA = boostOptions[mineralA]?.[boostRequirement.effect] ?? 0;
+        const boostValueB = boostOptions[mineralB]?.[boostRequirement.effect] ?? 0;
+        if (boostValueB !== boostValueA) {
+          return boostValueB - boostValueA;
+        }
+        return creep.pos.getRangeTo(a.pos) - creep.pos.getRangeTo(b.pos);
+      });
+
+    return candidateLabs[0] ?? null;
+  }
+
+  private isMoveTaskToBoostLab(creep: CreepBase, lab: StructureLab): boolean {
+    return (
+      creep.task?.activity === Activity.Move &&
+      creep.task.targetPlace.roomName === lab.pos.roomName &&
+      creep.task.targetPlace.x === lab.pos.x &&
+      creep.task.targetPlace.y === lab.pos.y
+    );
   }
 
   private runLabReactions(plan: LabReactionPlan): void {
