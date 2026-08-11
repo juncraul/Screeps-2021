@@ -17,7 +17,7 @@ export default class SourceArea extends HarvestArea {
     this.source = source;
     this.controller = controller;
     this.linkConstructionSiteNextToSource = GetRoomObjects.getWithinRangeConstructionSite(
-      source.pos,
+      this.containerNextToHarvestArea?.pos ?? source.pos,
       1,
       STRUCTURE_LINK
     );
@@ -61,8 +61,11 @@ export default class SourceArea extends HarvestArea {
           this.isFurthestSourceInRoom());
 
       if (canCreateLink) {
-        const positionForLink = Helper.getFreeAdjacentPositions(this.containerNextToHarvestArea.pos)[0];
+        const positionForLink =
+          GetRoomObjects.getSourceLinkPosition(this.room, this.source.id) ??
+          Helper.getFreeAdjacentPositions(this.containerNextToHarvestArea.pos)[0];
         if (positionForLink) {
+          GetRoomObjects.setSourceLinkPosition(this.room, this.source.id, positionForLink);
           console.log("SourceArea: will create link", positionForLink.toString());
           this.room.createConstructionSite(positionForLink, STRUCTURE_LINK);
         } else {
@@ -211,6 +214,14 @@ export default class SourceArea extends HarvestArea {
 
   protected doWeNeedToReplaceWeakCreep(): boolean {
     return super.doWeNeedToReplaceWeakCreep();
+  }
+
+  protected getStoredContainerPosition(): RoomPosition | null {
+    return GetRoomObjects.getSourceContainerPosition(this.room, this.source.id);
+  }
+
+  protected rememberContainerPosition(pos: RoomPosition): void {
+    GetRoomObjects.setSourceContainerPosition(this.room, this.source.id, pos);
   }
 
   protected createCreepForThisArea(): SpawnTask | null {

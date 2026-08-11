@@ -116,7 +116,61 @@ export class GetRoomObjects {
     return closestId;
   }
 
-  private static buildRoomObjectCache(room: Room): RoomObjectsMemory {
+  private static getClosestStructurePosInRange(
+    structures: Structure[],
+    structureType: StructureConstant,
+    targetPos: RoomPosition,
+    range: number
+  ): RoomObjectPositionMemory | null {
+    let closestStructure: Structure | null = null;
+    let closestRange = Infinity;
+
+    for (const structure of structures) {
+      if (structure.structureType !== structureType) {
+        continue;
+      }
+
+      const dist = targetPos.getRangeTo(structure.pos);
+      if (dist > range || dist >= closestRange) {
+        continue;
+      }
+
+      closestRange = dist;
+      closestStructure = structure;
+    }
+
+    if (!closestStructure) {
+      return null;
+    }
+
+    return { x: closestStructure.pos.x, y: closestStructure.pos.y };
+  }
+
+  private static getStoredPosition(
+    roomName: string,
+    current: RoomObjectPositionMemory | null,
+    previous?: RoomObjectPositionMemory | null
+  ): RoomObjectPositionMemory | null {
+    const pos = current ?? previous;
+    if (!pos) {
+      return null;
+    }
+
+    return { x: pos.x, y: pos.y };
+  }
+
+  private static toRoomPosition(
+    roomName: string,
+    pos: RoomObjectPositionMemory | null | undefined
+  ): RoomPosition | null {
+    if (!pos) {
+      return null;
+    }
+
+    return new RoomPosition(pos.x, pos.y, roomName);
+  }
+
+  private static buildRoomObjectCache(room: Room, previousCache?: RoomObjectsMemory): RoomObjectsMemory {
     const structures = room.find(FIND_STRUCTURES);
     const controller = room.controller;
     const sources = room.find(FIND_SOURCES);
@@ -128,7 +182,17 @@ export class GetRoomObjects {
       x: source.pos.x,
       y: source.pos.y,
       containerId: this.getClosestStructureIdInRange(structures, STRUCTURE_CONTAINER, source.pos, 2),
-      linkId: this.getClosestStructureIdInRange(structures, STRUCTURE_LINK, source.pos, 2)
+      linkId: this.getClosestStructureIdInRange(structures, STRUCTURE_LINK, source.pos, 2),
+      containerPos: this.getStoredPosition(
+        room.name,
+        this.getClosestStructurePosInRange(structures, STRUCTURE_CONTAINER, source.pos, 2),
+        previousCache?.sources.find(info => info.id === source.id)?.containerPos
+      ),
+      linkPos: this.getStoredPosition(
+        room.name,
+        this.getClosestStructurePosInRange(structures, STRUCTURE_LINK, source.pos, 2),
+        previousCache?.sources.find(info => info.id === source.id)?.linkPos
+      )
     }));
 
     const controllerInfo: RoomObjectControllerInfoMemory | null = controller
@@ -137,7 +201,17 @@ export class GetRoomObjects {
           x: controller.pos.x,
           y: controller.pos.y,
           containerId: this.getClosestStructureIdInRange(structures, STRUCTURE_CONTAINER, controller.pos, 3),
-          linkId: this.getClosestStructureIdInRange(structures, STRUCTURE_LINK, controller.pos, 3)
+          linkId: this.getClosestStructureIdInRange(structures, STRUCTURE_LINK, controller.pos, 3),
+          containerPos: this.getStoredPosition(
+            room.name,
+            this.getClosestStructurePosInRange(structures, STRUCTURE_CONTAINER, controller.pos, 3),
+            previousCache?.controller?.containerPos
+          ),
+          linkPos: this.getStoredPosition(
+            room.name,
+            this.getClosestStructurePosInRange(structures, STRUCTURE_LINK, controller.pos, 3),
+            previousCache?.controller?.linkPos
+          )
         }
       : null;
 
@@ -145,7 +219,12 @@ export class GetRoomObjects {
       id: mineral.id,
       x: mineral.pos.x,
       y: mineral.pos.y,
-      containerId: this.getClosestStructureIdInRange(structures, STRUCTURE_CONTAINER, mineral.pos, 1)
+      containerId: this.getClosestStructureIdInRange(structures, STRUCTURE_CONTAINER, mineral.pos, 1),
+      containerPos: this.getStoredPosition(
+        room.name,
+        this.getClosestStructurePosInRange(structures, STRUCTURE_CONTAINER, mineral.pos, 1),
+        previousCache?.minerals.find(info => info.id === mineral.id)?.containerPos
+      )
     }));
 
     const exitInfos: RoomObjectExitInfoMemory[] = exits.map(exit => ({
@@ -169,7 +248,7 @@ export class GetRoomObjects {
     const cached = roomsMemory[room.name];
 
     if (!cached || this.shouldRefreshRoomObjectCache(room, cached)) {
-      const rebuilt = this.buildRoomObjectCache(room);
+      const rebuilt = this.buildRoomObjectCache(room, cached);
       roomsMemory[room.name] = rebuilt;
       return rebuilt;
     }
@@ -575,6 +654,64 @@ export class GetRoomObjects {
     }
 
     return this.getTypedObjectById<StructureLink>(cache.controller.linkId);
+  }
+
+  public static getSourceInfo(room: Room, sourceId: string): RoomObjectSourceInfoMemory | null {
+    const cache = this.getRoomObjectCache(room);
+    return cache.sources.find(source => source.id === sourceId) ?? null;
+  }
+
+  public static getMineralInfo(room: Room, mineralId: string): RoomObjectMineralInfoMemory | null {
+    const cache = this.getRoomObjectCache(room);
+    return cache.minerals.find(mineral => mineral.id === mineralId) ?? null;
+  }
+
+  public static setSourceContainerPosition(room: Room, sourceId: string, pos: RoomPosition): void {
+    const cache = this.getRoomObjectCache(room);
+    const source = cache.sources.find(info => info.id === sourceId);
+    if (!source) {
+      return;
+    }
+
+    source.containerPos = { x: pos.x, y: pos.y };
+    Memory.Rooms![room.name] = cache;
+  }
+
+  public static setSourceLinkPosition(room: Room, sourceId: string, pos: RoomPosition): void {
+    const cache = this.getRoomObjectCache(room);
+    const source = cache.sources.find(info => info.id === sourceId);
+    if (!source) {
+      return;
+    }
+
+    source.linkPos = { x: pos.x, y: pos.y };
+    Memory.Rooms![room.name] = cache;
+  }
+
+  public static setMineralContainerPosition(room: Room, mineralId: string, pos: RoomPosition): void {
+    const cache = this.getRoomObjectCache(room);
+    const mineral = cache.minerals.find(info => info.id === mineralId);
+    if (!mineral) {
+      return;
+    }
+
+    mineral.containerPos = { x: pos.x, y: pos.y };
+    Memory.Rooms![room.name] = cache;
+  }
+
+  public static getSourceContainerPosition(room: Room, sourceId: string): RoomPosition | null {
+    const source = this.getSourceInfo(room, sourceId);
+    return this.toRoomPosition(room.name, source?.containerPos);
+  }
+
+  public static getSourceLinkPosition(room: Room, sourceId: string): RoomPosition | null {
+    const source = this.getSourceInfo(room, sourceId);
+    return this.toRoomPosition(room.name, source?.linkPos);
+  }
+
+  public static getMineralContainerPosition(room: Room, mineralId: string): RoomPosition | null {
+    const mineral = this.getMineralInfo(room, mineralId);
+    return this.toRoomPosition(room.name, mineral?.containerPos);
   }
 
   // --------------------------

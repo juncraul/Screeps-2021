@@ -45,6 +45,7 @@ export class Helper {
         if (adjacentPos.x < 0 || adjacentPos.x > 49 || adjacentPos.y < 0 || adjacentPos.y > 49) continue;
         if (adjacentPos.lookFor(LOOK_TERRAIN)[0] === "wall") continue;
         if (adjacentPos.lookFor(LOOK_STRUCTURES).length > 0) continue;
+        if (adjacentPos.lookFor(LOOK_CONSTRUCTION_SITES).length > 0) continue;
         adjacentPositions.push(adjacentPos);
       }
     }

@@ -73,6 +73,8 @@ interface RoomObjectControllerInfoMemory {
   y: number;
   containerId: string | null;
   linkId: string | null;
+  containerPos?: RoomObjectPositionMemory | null;
+  linkPos?: RoomObjectPositionMemory | null;
 }
 
 interface RoomObjectSourceInfoMemory {
@@ -81,6 +83,8 @@ interface RoomObjectSourceInfoMemory {
   y: number;
   containerId: string | null;
   linkId: string | null;
+  containerPos?: RoomObjectPositionMemory | null;
+  linkPos?: RoomObjectPositionMemory | null;
 }
 
 interface RoomObjectMineralInfoMemory {
@@ -88,6 +92,12 @@ interface RoomObjectMineralInfoMemory {
   x: number;
   y: number;
   containerId: string | null;
+  containerPos?: RoomObjectPositionMemory | null;
+}
+
+interface RoomObjectPositionMemory {
+  x: number;
+  y: number;
 }
 
 interface RoomObjectExitInfoMemory {

@@ -68,15 +68,15 @@ export class Cannon {
     }
 
     // Priority 4: Repair structures (only when energy allows and CPU is healthy).
-    if (this.energy <= this.energyCapacity * 0.5 || Game.cpu.bucket < 1000) return;
+    if (this.energy <= this.energyCapacity * 0.75 || Game.cpu.bucket < 1000) return;
 
-    let structure = GetRoomObjects.getClosestStructureToRepairByRange(this.pos, 0.5);
+    let structure = GetRoomObjects.getClosestStructureToRepairByRange(this.pos, 0.3);
     if (structure) {
       this.repair(structure);
       return;
     }
 
-    structure = GetRoomObjects.getClosestStructureToRepairByRange(this.pos, 0.8);
+    structure = GetRoomObjects.getClosestStructureToRepairByRange(this.pos, 0.5);
     if (structure) {
       this.repair(structure);
       return;

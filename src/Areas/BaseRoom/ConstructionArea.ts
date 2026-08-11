@@ -49,7 +49,7 @@ export default class ConstructionArea extends BaseArea {
           this.containersToCollectFrom.filter(c => c.store.energy > threasholdToCollectFrom)
         );
         if (closestContainer) {
-          creep.addTask(new CreepTask(Activity.Collect, closestContainer.pos));
+          creep.addTask(new CreepTask(Activity.CollectEnergy, closestContainer.pos));
           continue;
         }
         const closestDroppedResource = creep.pos.findClosestByPath(
@@ -60,7 +60,7 @@ export default class ConstructionArea extends BaseArea {
           continue;
         }
         if (this.storage && this.storage.store.energy > STORAGE_ENERGY_THRESHOLD) {
-          creep.addTask(new CreepTask(Activity.Collect, this.storage.pos)); // TODO:Add Energy type in here.
+          creep.addTask(new CreepTask(Activity.CollectEnergy, this.storage.pos)); // TODO:Add Energy type in here.
           continue;
         }
         // If there is no energy to collect from anywhere, then we should send the creep to harvest from a source. Only if there is no spawn, otherwise spawn should create a harvester

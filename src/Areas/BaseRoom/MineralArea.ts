@@ -2,6 +2,7 @@ import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import HarvestArea from "./HarvestArea";
 import { Helper } from "Helpers/Helper";
+import { GetRoomObjects } from "Helpers/GetRoomObjects";
 
 export default class MineralArea extends HarvestArea {
   mineral: Mineral;
@@ -54,6 +55,14 @@ export default class MineralArea extends HarvestArea {
         creep.addTask(new CreepTask(Activity.Move, this.containerNextToHarvestArea.pos));
       }
     }
+  }
+
+  protected getStoredContainerPosition(): RoomPosition | null {
+    return GetRoomObjects.getMineralContainerPosition(this.room, this.mineral.id);
+  }
+
+  protected rememberContainerPosition(pos: RoomPosition): void {
+    GetRoomObjects.setMineralContainerPosition(this.room, this.mineral.id, pos);
   }
 
   protected createCreepForThisArea(): SpawnTask | null {

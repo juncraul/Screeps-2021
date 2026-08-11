@@ -77,13 +77,13 @@ export default class StationaryFillerArea extends BaseArea {
         }
         const container = creep.pos.findInRange(this.containers, 1)[0];
         if (container && container.store.energy > 0) {
-          creep.addTask(new CreepTask(Activity.Collect, container.pos, null, null, true));
+          creep.addTask(new CreepTask(Activity.CollectEnergy, container.pos, null, null, true));
         } else {
           const collectableExtensions = this.getExtensionsThatWeCanCollectFrom(creep);
           if (collectableExtensions.length > 0) {
             const closestExtension = creep.pos.findInRange(collectableExtensions, 1)[0];
             if (closestExtension) {
-              creep.addTask(new CreepTask(Activity.Collect, closestExtension.pos, null, null, true));
+              creep.addTask(new CreepTask(Activity.CollectEnergy, closestExtension.pos, null, null, true));
             }
           }
         }
@@ -199,6 +199,8 @@ export default class StationaryFillerArea extends BaseArea {
   }
 
   public static getExtensionsAndSpawnsFromStationaryFillerArea(room: Room): (StructureExtension | StructureSpawn)[] {
+    const plans = StationaryFillerArea.getFixedExtensionBuildPlans(room);
+    if (plans.length === 0) return [];
     const extensions = room.find(FIND_MY_STRUCTURES, {
       filter: structure => structure.structureType === STRUCTURE_EXTENSION
     });
@@ -207,8 +209,6 @@ export default class StationaryFillerArea extends BaseArea {
     });
 
     const structures = [...extensions, ...spawns] as (StructureExtension | StructureSpawn)[];
-    const plans = StationaryFillerArea.getFixedExtensionBuildPlans(room);
-    if (plans.length === 0) return structures;
 
     const extensionsAndSpawnsPositions: RoomPosition[] = [];
     for (const plan of plans) {

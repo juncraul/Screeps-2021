@@ -87,8 +87,8 @@ export class CreepBase {
       case Activity.Move: // 3
         this.activityMove();
         break;
-      case Activity.Collect: // 4
-        this.activityCollect();
+      case Activity.CollectEnergy: // 4
+        this.activityCollectEnergy();
         break;
       // TODO: There is a tick pause between collection and upgrade.
       case Activity.Upgrade: // 5
@@ -135,6 +135,9 @@ export class CreepBase {
         break;
       case Activity.AttackController: // 20
         this.activityAttackController();
+        break;
+      case Activity.CollectAll: // 21
+        this.activityCollectAll();
         break;
     }
 
@@ -270,28 +273,18 @@ export class CreepBase {
     }
   }
 
-  private activityCollect(): void {
-    let targetCollect: Structure | Tombstone | Ruin | null = CreepTask.getStructureFromTargetNoRoadNoRampart(
-      this.task!.targetPlace
-    );
+  private activityCollectEnergy(): void {
+    const targetCollect = this.getCollectTarget(this.task!.targetPlace);
     if (!targetCollect) {
-      targetCollect = CreepTask.getTombstoneFromTarget(this.task!.targetPlace);
-      if (!targetCollect) {
-        targetCollect = CreepTask.getRuinFromTarget(this.task!.targetPlace);
-      }
+      this.completeTask("📦✔️");
+      return;
     }
-    if (!targetCollect) {
-      targetCollect = CreepTask.getRuinFromTarget(this.task!.targetPlace);
-      if (!targetCollect) {
-        this.completeTask("📦✔️"); // Target must have dissappeared.
-      }
+
+    const result = this.withdraw(targetCollect, RESOURCE_ENERGY);
+    if (result === OK) {
+      this.completeTask("📦✔️");
     }
-    if (targetCollect) {
-      const result = this.withdraw(targetCollect, RESOURCE_ENERGY);
-      if (result === OK) {
-        this.completeTask("📦✔️");
-      }
-    }
+
     if (
       targetCollect instanceof StructureContainer ||
       targetCollect instanceof StructureStorage ||
@@ -330,6 +323,50 @@ export class CreepBase {
     if (this.carryCurrent === this.carryCapacity) {
       this.completeTask("📦✔️");
     }
+  }
+
+  private activityCollectAll(): void {
+    const targetCollect = this.getCollectTarget(this.task!.targetPlace);
+    if (!targetCollect) {
+      this.completeTask("📦✔️");
+      return;
+    }
+
+    const availableResources = this.getCollectTargetResources(targetCollect);
+    if (availableResources.length === 0) {
+      this.completeTask("📦✔️");
+      return;
+    }
+
+    this.withdraw(targetCollect, availableResources[0]);
+
+    if (this.store.getFreeCapacity() === 0 || this.getCollectTargetResources(targetCollect).length === 0) {
+      this.completeTask("📦✔️");
+    }
+  }
+
+  private getCollectTarget(targetPlace: RoomPosition): Structure | Tombstone | Ruin | null {
+    let targetCollect: Structure | Tombstone | Ruin | null = CreepTask.getStructureFromTargetNoRoadNoRampart(
+      targetPlace
+    );
+    if (!targetCollect) {
+      targetCollect = CreepTask.getTombstoneFromTarget(targetPlace);
+      if (!targetCollect) {
+        targetCollect = CreepTask.getRuinFromTarget(targetPlace);
+      }
+    }
+    return targetCollect;
+  }
+
+  private getCollectTargetResources(target: Structure | Tombstone | Ruin): ResourceConstant[] {
+    if (!(target instanceof Tombstone || target instanceof Ruin || "store" in target)) {
+      return [];
+    }
+
+    const store = target.store as Store<ResourceConstant, boolean>;
+    return Object.keys(store).filter(
+      resource => store.getUsedCapacity(resource as ResourceConstant) > 0
+    ) as ResourceConstant[];
   }
 
   private activityUpgrade(): void {

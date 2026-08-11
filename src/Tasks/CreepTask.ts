@@ -102,7 +102,7 @@ export enum Activity {
   Construct = 1,
   Deposit = 2,
   Move = 3,
-  Collect = 4,
+  CollectEnergy = 4,
   Upgrade = 5,
   Pickup = 6,
   Claim = 7,
@@ -118,5 +118,6 @@ export enum Activity {
   CollectMineral = 17,
   Drop = 18,
   Dismantle = 19,
-  AttackController = 20
+  AttackController = 20,
+  CollectAll = 21
 }

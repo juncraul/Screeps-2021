@@ -19,6 +19,7 @@ export default class CarryArea extends BaseArea {
   droppedResourcesToCollectFrom: Resource[];
   mineralContainer: StructureContainer | null;
   storage: StructureStorage | null;
+  storageLink: StructureLink | null;
 
   constructor(controller: StructureController) {
     super("CarryArea", controller.room.name, controller.pos, controller.room);
@@ -34,6 +35,7 @@ export default class CarryArea extends BaseArea {
     this.droppedResourcesToCollectFrom = this.getDroppedResourcesToCollectFrom(RESOURCE_ENERGY);
     this.mineralContainer = GetRoomObjects.getContainerNextToMineral(controller.room);
     this.storage = GetRoomObjects.getRoomStorage(controller.room);
+    this.storageLink = this.storage ? GetRoomObjects.getWithinRangeLink(this.storage.pos, 3) : null;
     this.maxWorkerCount = this.calculateMaxWorkerCount();
   }
 
@@ -82,7 +84,11 @@ export default class CarryArea extends BaseArea {
 
   private interupCurrentTaskIfNeeded(creep: CreepBase): void {
     if (!creep.task) return;
-    if (creep.task.activity === Activity.Collect) {
+    if (
+      creep.task.activity === Activity.CollectAll ||
+      creep.task.activity === Activity.CollectEnergy ||
+      creep.task.activity === Activity.CollectMineral
+    ) {
       const targetCollect: Structure | Tombstone | Ruin | null = CreepTask.getStructureFromTargetNoRoadNoRampart(
         creep.task.targetPlace
       );
@@ -92,7 +98,7 @@ export default class CarryArea extends BaseArea {
         targetCollect instanceof Tombstone
       ) {
         // Someone else has already emptied the container, ruin, or tombstone. Cancel the task.
-        if (targetCollect.store.getUsedCapacity() <= 20) {
+        if (targetCollect.store.getUsedCapacity() <= 10) {
           creep.task = null;
         }
       }
@@ -135,15 +141,19 @@ export default class CarryArea extends BaseArea {
   }
 
   private findSomewhereToCollectFrom(creep: CreepBase): boolean {
-    // Disabled, we should never collect from links. This is for Utility creeps to use.
-    // for (let j = 0; j < this.collectFromLimitedStore.length; j++) {
-    //   if (this.collectFromLimitedStore[j].store.energy < 100) continue;
-    //   creep.addTask(new CreepTask(Activity.Collect, this.collectFromLimitedStore[j].pos));
-    //   return;
-    // }
+    // Check If there are any utility allive
+    const utilityCreepsNames = Helper.getCreepNamesFromArea("UtilityArea", this.room.name);
+    if (
+      utilityCreepsNames.length === 0 &&
+      this.storageLink &&
+      this.storageLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0
+    ) {
+      creep.addTask(new CreepTask(Activity.CollectEnergy, this.storageLink.pos));
+      return true;
+    }
     // In case we put energy by mistake in the mineral container, we should collect it from there.
     if (this.mineralContainer && this.mineralContainer.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-      creep.addTask(new CreepTask(Activity.Collect, this.mineralContainer.pos));
+      creep.addTask(new CreepTask(Activity.CollectEnergy, this.mineralContainer.pos));
       return true;
     }
 
@@ -169,7 +179,7 @@ export default class CarryArea extends BaseArea {
     if (tombstones.length > 0) {
       const closestTombstone = creep.pos.findClosestByPath(tombstones);
       if (closestTombstone) {
-        creep.addTask(new CreepTask(Activity.Collect, closestTombstone.pos));
+        creep.addTask(new CreepTask(Activity.CollectAll, closestTombstone.pos));
         return true;
       }
     }
@@ -180,19 +190,10 @@ export default class CarryArea extends BaseArea {
       )
     );
     if (firstContainer) {
-      creep.addTask(new CreepTask(Activity.Collect, firstContainer.pos));
+      creep.addTask(new CreepTask(Activity.CollectEnergy, firstContainer.pos));
       return true;
     }
 
-    // Check if this room has stationary fillers, this is because we don't have utilities in these rooms.
-    const stationaryFillers = GetRoomObjects.usesLayoutFixedExtension(this.room);
-    if (stationaryFillers) {
-      const storage = GetRoomObjects.getRoomStorage(this.room);
-      if (storage && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-        creep.addTask(new CreepTask(Activity.Collect, storage.pos));
-        return true;
-      }
-    }
     return false;
   }
 
@@ -288,7 +289,7 @@ export default class CarryArea extends BaseArea {
 
   private depositToTowers(creep: CreepBase): boolean {
     const towers = GetRoomObjects.getRoomTowers(this.room).filter(
-      tower => tower.store.getFreeCapacity(RESOURCE_ENERGY) > 100
+      tower => tower.store.getFreeCapacity(RESOURCE_ENERGY) > 200
     );
     if (towers.length > 0) {
       const closestTower = creep.pos.findClosestByPath(towers);
@@ -339,7 +340,8 @@ export default class CarryArea extends BaseArea {
     else if (roomEnergyToCollect >= 3000) carryBodyPartsNeeded = 20;
     else if (roomEnergyToCollect >= 1500) carryBodyPartsNeeded = 15;
     else if (roomEnergyToCollect >= 1000) carryBodyPartsNeeded = 10;
-    else carryBodyPartsNeeded = 5;
+    else if (roomEnergyToCollect >= 500) carryBodyPartsNeeded = 5;
+    else carryBodyPartsNeeded = 2;
     return carryBodyPartsNeeded;
   }
 

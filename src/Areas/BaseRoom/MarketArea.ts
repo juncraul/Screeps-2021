@@ -256,11 +256,11 @@ export default class MarketArea extends BaseArea {
 
       const recipientCurrentAmount = this.getResourceTotalInRoom(recipientRoom, resourceType);
       const recipientDeficit = Math.max(0, MIN_TERMINAL_RESOURCE - recipientCurrentAmount);
-      if (recipientDeficit === 0) {
+      if (recipientDeficit <= 500) {
         continue;
       }
 
-      const amountToSend = Math.min(INTER_ROOM_SEND_AMOUNT, recipientDeficit, terminalAmount);
+      const amountToSend = Math.min(INTER_ROOM_SEND_AMOUNT, recipientDeficit);
       if (amountToSend <= 0) {
         continue;
       }

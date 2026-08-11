@@ -159,11 +159,11 @@ export default class LabArea extends BaseArea {
     const energyHungryLab = this.labs.find(lab => lab.store.getUsedCapacity(RESOURCE_ENERGY) < LAB_ENERGY_TARGET);
     if (energyHungryLab) {
       if (this.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-        creep.addTask(new CreepTask(Activity.Collect, this.storage.pos));
+        creep.addTask(new CreepTask(Activity.CollectEnergy, this.storage.pos));
         return;
       }
       if (terminal.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-        creep.addTask(new CreepTask(Activity.Collect, terminal.pos));
+        creep.addTask(new CreepTask(Activity.CollectEnergy, terminal.pos));
       }
     }
   }

@@ -137,10 +137,10 @@ export default class RepairArea extends BaseArea {
 
   private getClosestEnergyTarget(
     pos: RoomPosition
-  ): { activity: Activity.Collect | Activity.Pickup; pos: RoomPosition } | null {
+  ): { activity: Activity.CollectEnergy | Activity.Pickup; pos: RoomPosition } | null {
     let closestPos: RoomPosition | null = null;
     let closestRange = Infinity;
-    let activity: Activity.Collect | Activity.Pickup = Activity.Collect;
+    let activity: Activity.CollectEnergy | Activity.Pickup = Activity.CollectEnergy;
 
     for (let i = 0; i < this.containersToCollectFrom.length; i++) {
       if (this.containersToCollectFrom[i].store.getUsedCapacity(RESOURCE_ENERGY) < 100) {
@@ -150,7 +150,7 @@ export default class RepairArea extends BaseArea {
       if (range < closestRange) {
         closestRange = range;
         closestPos = this.containersToCollectFrom[i].pos;
-        activity = Activity.Collect;
+        activity = Activity.CollectEnergy;
       }
     }
 
@@ -170,7 +170,7 @@ export default class RepairArea extends BaseArea {
       const range = pos.getRangeTo(this.storage.pos);
       if (range < closestRange) {
         closestPos = this.storage.pos;
-        activity = Activity.Collect;
+        activity = Activity.CollectEnergy;
       }
     }
 

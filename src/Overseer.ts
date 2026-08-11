@@ -111,13 +111,13 @@ export default class Overseer implements IOverseer {
       CreepType.Carrier
     ];
     const existing: Record<number, number> = {
-      [CreepType.Harvester]: harvest.existing,
+      [CreepType.Harvester]: harvest.sourceExisting,
       [CreepType.Carrier]: carry.existing,
       [CreepType.Upgrader]: upgrade.existing,
       [CreepType.StationaryFiller]: stationaryfiller.existing
     };
     const taskBuckets: Record<number, SpawnTask[]> = {
-      [CreepType.Harvester]: [...harvest.tasks],
+      [CreepType.Harvester]: [...harvest.sourceTasks],
       [CreepType.Carrier]: [...carry.tasks],
       [CreepType.Upgrader]: [...upgrade.tasks],
       [CreepType.Constructor]: [...construction.tasks],
@@ -143,14 +143,15 @@ export default class Overseer implements IOverseer {
       ...(taskBuckets[CreepType.Constructor] ?? []),
       ...(taskBuckets[CreepType.Repairer] ?? []),
       ...stationaryfiller.tasks,
+      ...utility.tasks,
       ...market.tasks,
       ...lab.tasks,
-      ...utility.tasks,
       ...soldierTasks,
       ...sourceKeeperTasks,
       ...looterTasks,
       ...remoteRebuildTasks,
       ...remoteTasks,
+      ...harvest.mineralTasks,
       ...scout.tasks,
       ...seasonTasks
     ];
@@ -214,8 +215,18 @@ export default class Overseer implements IOverseer {
     if (spawn) {
       sources = sources.sort((a, b) => spawn.pos.getRangeTo(a) - spawn.pos.getRangeTo(b));
     }
-    sources.forEach(source => {
-      const sourceArea: SourceArea = new SourceArea(source, room.controller!);
+    let sourceAreas: SourceArea[] = sources.map(source => new SourceArea(source, room.controller!));
+    const sourceAreaCounts = sourceAreas.map(area => area.creeps.length);
+    const harvestersAreUnEven = sourceAreaCounts.every(count => count === sourceAreaCounts[0]) === false;
+    if (harvestersAreUnEven) {
+      // If harvesters are unevenly distributed, we want to spawn for the source with the least harvesters first.
+      sourceAreas = sourceAreas.sort((a, b) => {
+        const aCount = sourceAreaCounts[sources.indexOf(a.source)];
+        const bCount = sourceAreaCounts[sources.indexOf(b.source)];
+        return aCount - bCount;
+      });
+    }
+    sourceAreas.forEach(sourceArea => {
       if (doSpawnTasks) {
         sourceTasks.push(...sourceArea.handleSpawnTasks());
       }

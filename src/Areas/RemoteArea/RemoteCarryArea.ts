@@ -29,13 +29,13 @@ export function handleCarrier(area: RemoteArea, creep: CreepBase): void {
 
       const tombstone = findTombstoneWithSomethingInStore(area, creep);
       if (tombstone) {
-        creep.addTask(new CreepTask(Activity.Collect, tombstone.pos));
+        creep.addTask(new CreepTask(Activity.CollectAll, tombstone.pos));
         return;
       }
 
       const sourceContainer = findContainerWithEnergy(area, creep, 150);
       if (sourceContainer) {
-        creep.addTask(new CreepTask(Activity.Collect, sourceContainer.pos));
+        creep.addTask(new CreepTask(Activity.CollectEnergy, sourceContainer.pos));
         return;
       }
 

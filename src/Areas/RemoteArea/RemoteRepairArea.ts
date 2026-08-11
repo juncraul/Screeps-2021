@@ -13,7 +13,7 @@ export function handleRepairer(area: RemoteArea, creep: CreepBase): void {
       if (energySource instanceof Resource) {
         creep.addTask(new CreepTask(Activity.Pickup, energySource.pos));
       } else {
-        creep.addTask(new CreepTask(Activity.Collect, energySource.pos));
+        creep.addTask(new CreepTask(Activity.CollectEnergy, energySource.pos));
       }
       return;
     }

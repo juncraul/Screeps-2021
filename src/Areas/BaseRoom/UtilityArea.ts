@@ -52,12 +52,10 @@ export default class UtilityArea extends BaseArea {
 
       if (creep.isEmpty()) {
         if (this.link && this.link.store.energy > 100) {
-          creep.addTask(new CreepTask(Activity.Collect, this.link.pos));
+          creep.addTask(new CreepTask(Activity.CollectEnergy, this.link.pos));
         } else {
           if (this.storage) {
-            creep.addTask(
-              new CreepTask(Activity.Collect, this.storage.pos, null, null, undefined, null, RESOURCE_ENERGY)
-            );
+            creep.addTask(new CreepTask(Activity.CollectEnergy, this.storage.pos));
           }
         }
       } else {
@@ -120,10 +118,7 @@ export default class UtilityArea extends BaseArea {
       ? Math.min(10, Math.floor(this.room.energyCapacityAvailable / 100))
       : Math.min(10, Math.floor(this.room.energyAvailable / 100)); // Carry-50; Move-50
     if (segments < 1) {
-      console.log(
-        `Error UtilityArea: Room ${this.room.name} Trying to spawn an utility with segments ${segments} less than 1`
-      );
-      return null;
+      return null; // No energy to spawn smallest creep.
     } else {
       const moveParts = segments / 2;
       for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);

@@ -110,9 +110,12 @@ export default class UpgradeArea extends BaseArea {
     if (this.controllerLevel === 8) {
       return 1;
     }
-    // if (this.controllerLevel < 3) {
-    //   return 6;
-    // }
+    if (this.controllerLevel > 3) {
+      const nearbyEnergy = this.getAvailableUpgradeEnergyNearby();
+      if (nearbyEnergy < 500) {
+        return 0;
+      }
+    }
 
     const availableUpgradeEnergy = this.getAvailableUpgradeEnergy();
     const workBodyPartsFromCreeps = this.creeps.reduce(
@@ -120,6 +123,7 @@ export default class UpgradeArea extends BaseArea {
       0
     );
 
+    // Let young creep do some work as energy availablity might go down.
     const isThereAYongCreep = this.creeps.some(creep => (creep.ticksToLive ?? 0) > 1400);
     if (isThereAYongCreep) return this.creeps.length;
     let workBodyPartsNeeded = 1;
@@ -137,6 +141,20 @@ export default class UpgradeArea extends BaseArea {
       workBodyPartsNeeded = Math.max(0, workBodyPartsNeeded - 10);
     }
     return Math.min(8, this.creeps.length + 1);
+  }
+
+  private getAvailableUpgradeEnergyNearby(): number {
+    let availableEnergy = 0;
+
+    if (this.containerNextToController) {
+      availableEnergy += this.containerNextToController.store[RESOURCE_ENERGY];
+    }
+
+    if (this.linkNextToController) {
+      availableEnergy += this.linkNextToController.store[RESOURCE_ENERGY];
+    }
+
+    return availableEnergy;
   }
 
   private getAvailableUpgradeEnergy(): number {
@@ -196,10 +214,10 @@ export default class UpgradeArea extends BaseArea {
 
   private findSomwhereToCollectEnergyFrom(creep: CreepBase): boolean {
     if (this.linkNextToController && this.linkNextToController.store[RESOURCE_ENERGY] > 0) {
-      creep.addTask(new CreepTask(Activity.Collect, this.linkNextToController.pos));
+      creep.addTask(new CreepTask(Activity.CollectEnergy, this.linkNextToController.pos));
       return true;
     } else if (this.containerNextToController && this.containerNextToController.store[RESOURCE_ENERGY] > 0) {
-      creep.addTask(new CreepTask(Activity.Collect, this.containerNextToController.pos));
+      creep.addTask(new CreepTask(Activity.CollectEnergy, this.containerNextToController.pos));
       return true;
     }
     return false;
@@ -219,7 +237,7 @@ export default class UpgradeArea extends BaseArea {
     //     (a, b) => a.pos.getRangeTo(creep.pos.x, creep.pos.y) - b.pos.getRangeTo(creep.pos.x, creep.pos.y)
     //   );
     //   for (let j = 0; j < collectFromGeneralStoreSorted.length; j++) {
-    //     creep.addTask(new CreepTask(Activity.Collect, collectFromGeneralStoreSorted[j].pos));
+    //     creep.addTask(new CreepTask(Activity.CollectEnergy, collectFromGeneralStoreSorted[j].pos));
     //     break;
     //   }
     // }

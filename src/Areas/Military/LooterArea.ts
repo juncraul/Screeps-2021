@@ -13,7 +13,7 @@ export interface LooterFlagConfig extends AttackFlagConfig {
 
 type LootTask =
   | { activity: Activity.Pickup; pos: RoomPosition }
-  | { activity: Activity.Collect; pos: RoomPosition }
+  | { activity: Activity.CollectEnergy; pos: RoomPosition }
   | { activity: Activity.CollectMineral; pos: RoomPosition; resourceType: ResourceConstant };
 
 export default class LooterArea extends SoldierArea {
@@ -232,7 +232,7 @@ export default class LooterArea extends SoldierArea {
     }
 
     if (resourceType === RESOURCE_ENERGY && includeEnergy) {
-      return { activity: Activity.Collect, pos: closestTarget.pos };
+      return { activity: Activity.CollectEnergy, pos: closestTarget.pos };
     }
 
     return { activity: Activity.CollectMineral, pos: closestTarget.pos, resourceType };
@@ -244,8 +244,8 @@ export default class LooterArea extends SoldierArea {
       return;
     }
 
-    if (lootTask.activity === Activity.Collect) {
-      creep.addTask(new CreepTask(Activity.Collect, lootTask.pos));
+    if (lootTask.activity === Activity.CollectEnergy) {
+      creep.addTask(new CreepTask(Activity.CollectEnergy, lootTask.pos));
       return;
     }
 
