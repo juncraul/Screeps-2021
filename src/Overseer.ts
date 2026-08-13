@@ -28,19 +28,18 @@ const SCOUT_FLAG = "Scout";
 
 export default class Overseer implements IOverseer {
   public refresh(): void {
-    const roomsWithSpawns = GetRoomObjects.getAllClaimedRooms();
-    roomsWithSpawns.forEach(roomWithSpawn => {
-      let tasks: SpawnTask[] = [];
-      const towers: StructureTower[] = GetRoomObjects.getRoomTowers(roomWithSpawn);
-      tasks = tasks.concat(this.overseeRoom(roomWithSpawn));
-      this.handleRoomTasks(roomWithSpawn, tasks);
+    const claimedRooms = GetRoomObjects.getAllClaimedRooms();
+    claimedRooms.forEach(room => {
+      const tasks: SpawnTask[] = this.overseeRoom(room);
+      this.handleRoomTasks(room, tasks);
+      const towers: StructureTower[] = GetRoomObjects.getRoomTowers(room);
       towers.forEach(tower => {
         const cannon = new Cannon(tower);
         cannon.cannonLogic();
       });
-      SafeMode.run(roomWithSpawn, towers);
-      BaseRoomStats.drawRoomVisual(roomWithSpawn);
-      BaseBuilder.automaticFlagPlacement(roomWithSpawn);
+      SafeMode.run(room, towers);
+      BaseRoomStats.drawRoomVisual(room);
+      BaseBuilder.automaticFlagPlacement(room);
       BaseBuilder.logicCreateConstructionSites();
     });
   }

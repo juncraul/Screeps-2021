@@ -123,6 +123,8 @@ export class BaseBuilder {
 
     BaseBuilder.writeLegend(autoPlaceFlags);
 
+    if (Game.time % 20 !== 0) return; // Only run this logic every 20 ticks to reduce CPU usage
+
     for (const autoPlaceFlag of autoPlaceFlags) {
       if (!autoPlaceFlag.room) {
         continue;

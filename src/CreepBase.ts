@@ -493,18 +493,26 @@ export class CreepBase {
 
   private activityHarvestAndDeposit(): void {
     const source: Source | null = CreepTask.getSourceFromTarget(this.task!.targetPlace);
-    if (source) {
-      this.harvest(source);
-    }
-    const structureEmptyExtensions = GetRoomObjects.getWithinRangeExtensions(this.creep.pos, 1).find(
-      a => a.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+    if (!source) return;
+
+    this.harvest(source);
+
+    if (this.creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) return;
+
+    const sourceAreaExtensions = GetRoomObjects.getSourceAreaExtensions(this.room, source.id);
+
+    const structureEmptyExtensions = sourceAreaExtensions.find(
+      extension => extension.pos.isNearTo(this.creep.pos) && extension.store.getFreeCapacity(RESOURCE_ENERGY) > 0
     );
+
     if (structureEmptyExtensions) {
       if (this.transfer(structureEmptyExtensions, RESOURCE_ENERGY) !== OK) {
         this.drop(RESOURCE_ENERGY);
       }
     } else {
-      const structureLink = GetRoomObjects.getWithinRangeLink(this.creep.pos, 1);
+      const sourceAreaLink = source ? GetRoomObjects.getSourceAreaLink(this.room, source.id) : null;
+      const nearbyLink = GetRoomObjects.getWithinRangeLink(this.creep.pos, 1);
+      const structureLink = sourceAreaLink?.pos.isNearTo(this.creep.pos) ? sourceAreaLink : nearbyLink;
       if (structureLink) {
         if (this.transfer(structureLink, RESOURCE_ENERGY) !== OK) {
           this.drop(RESOURCE_ENERGY);
@@ -768,8 +776,12 @@ export class CreepBase {
   }
 
   public harvest(source: Source | Mineral): ScreepsReturnCode {
-    // Don't think will ever have the creep's internal cooldown longer than EXTRACTOR_COOLDOWN
-    const result = this.creep.harvest(source);
+    let result: ScreepsReturnCode = OK;
+    if (source instanceof Mineral && Game.time % (EXTRACTOR_COOLDOWN + 1) === 0) {
+      result = this.creep.harvest(source);
+    } else if (source instanceof Source) {
+      result = this.creep.harvest(source);
+    }
     if (result === OK && source instanceof Source) {
       const estimatedHarvested = this.creep.getActiveBodyparts(WORK) * HARVEST_POWER;
       if (estimatedHarvested > 0) {

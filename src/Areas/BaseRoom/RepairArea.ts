@@ -92,28 +92,30 @@ export default class RepairArea extends BaseArea {
 
   private calculateMaxWorkerCount(): number {
     if (this.controller.level < 3) return 0;
-    const damagedNonWallCount = this.room.find(FIND_STRUCTURES, {
-      filter: structure =>
-        structure.structureType !== STRUCTURE_WALL &&
-        structure.structureType !== STRUCTURE_RAMPART &&
-        structure.hits < structure.hitsMax * 0.9
-    }).length;
-    const wallOrRampToRepair = GetRoomObjects.getClosestWallRampartToRepairByRange(this.controller.pos);
+    return 1;
+    // Well really we should always have a repairer because there is always something to repair, even if we had one wall or rampart.
+    // const damagedNonWallCount = this.room.find(FIND_STRUCTURES, {
+    //   filter: structure =>
+    //     structure.structureType !== STRUCTURE_WALL &&
+    //     structure.structureType !== STRUCTURE_RAMPART &&
+    //     structure.hits < structure.hitsMax * 0.9
+    // }).length;
+    // const wallOrRampToRepair = GetRoomObjects.getClosestWallRampartToRepairByRange(this.controller.pos);
 
-    if (damagedNonWallCount === 0 && !wallOrRampToRepair) {
-      return 0;
-    }
+    // if (damagedNonWallCount === 0 && !wallOrRampToRepair) {
+    //   return 0;
+    // }
 
-    const roomStorage = GetRoomObjects.getRoomStorage(this.room);
-    if (
-      damagedNonWallCount >= 25 &&
-      roomStorage &&
-      roomStorage.store.getUsedCapacity(RESOURCE_ENERGY) > STORAGE_ENERGY_THRESHOLD
-    ) {
-      return 2;
-    }
+    // const roomStorage = GetRoomObjects.getRoomStorage(this.room);
+    // if (
+    //   damagedNonWallCount >= 25 &&
+    //   roomStorage &&
+    //   roomStorage.store.getUsedCapacity(RESOURCE_ENERGY) > STORAGE_ENERGY_THRESHOLD
+    // ) {
+    //   return 2;
+    // }
 
-    return 2;
+    // return 2;
   }
 
   private getClosestStructureToRepair(pos: RoomPosition): Structure | null {

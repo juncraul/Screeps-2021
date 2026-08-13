@@ -116,6 +116,17 @@ export class GetRoomObjects {
     return closestId;
   }
 
+  private static getStructureIdsInRange(
+    structures: Structure[],
+    structureType: StructureConstant,
+    targetPos: RoomPosition,
+    range: number
+  ): string[] {
+    return structures
+      .filter(structure => structure.structureType === structureType && targetPos.getRangeTo(structure.pos) <= range)
+      .map(structure => structure.id);
+  }
+
   private static getClosestStructurePosInRange(
     structures: Structure[],
     structureType: StructureConstant,
@@ -183,6 +194,7 @@ export class GetRoomObjects {
       y: source.pos.y,
       containerId: this.getClosestStructureIdInRange(structures, STRUCTURE_CONTAINER, source.pos, 2),
       linkId: this.getClosestStructureIdInRange(structures, STRUCTURE_LINK, source.pos, 2),
+      extensionIds: this.getStructureIdsInRange(structures, STRUCTURE_EXTENSION, source.pos, 2),
       containerPos: this.getStoredPosition(
         room.name,
         this.getClosestStructurePosInRange(structures, STRUCTURE_CONTAINER, source.pos, 2),
@@ -239,7 +251,8 @@ export class GetRoomObjects {
       controller: controllerInfo,
       sources: sourceInfos,
       minerals: mineralInfos,
-      exits: exitInfos
+      exits: exitInfos,
+      labArea: previousCache?.labArea
     };
   }
 
@@ -659,6 +672,31 @@ export class GetRoomObjects {
   public static getSourceInfo(room: Room, sourceId: string): RoomObjectSourceInfoMemory | null {
     const cache = this.getRoomObjectCache(room);
     return cache.sources.find(source => source.id === sourceId) ?? null;
+  }
+
+  public static getSourceAreaExtensions(room: Room, sourceId: string): StructureExtension[] {
+    const sourceInfo = this.getSourceInfo(room, sourceId);
+    if (!sourceInfo) {
+      return [];
+    }
+
+    const extensions: StructureExtension[] = [];
+    for (const extensionId of sourceInfo.extensionIds ?? []) {
+      const extension = this.getTypedObjectById<StructureExtension>(extensionId);
+      if (extension) {
+        extensions.push(extension);
+      }
+    }
+    return extensions;
+  }
+
+  public static getSourceAreaLink(room: Room, sourceId: string): StructureLink | null {
+    const sourceInfo = this.getSourceInfo(room, sourceId);
+    if (!sourceInfo) {
+      return null;
+    }
+
+    return this.getTypedObjectById<StructureLink>(sourceInfo.linkId);
   }
 
   public static getMineralInfo(room: Room, mineralId: string): RoomObjectMineralInfoMemory | null {

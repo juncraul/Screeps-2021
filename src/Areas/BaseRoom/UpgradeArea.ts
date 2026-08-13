@@ -127,12 +127,8 @@ export default class UpgradeArea extends BaseArea {
     const isThereAYongCreep = this.creeps.some(creep => (creep.ticksToLive ?? 0) > 1400);
     if (isThereAYongCreep) return this.creeps.length;
     let workBodyPartsNeeded = 1;
-    if (availableUpgradeEnergy > 100000) workBodyPartsNeeded = 60;
-    else if (availableUpgradeEnergy >= 40000) workBodyPartsNeeded = 50;
-    else if (availableUpgradeEnergy >= 30000) workBodyPartsNeeded = 40;
-    else if (availableUpgradeEnergy >= 10000) workBodyPartsNeeded = 30;
-    else if (availableUpgradeEnergy >= 5000) workBodyPartsNeeded = 20;
-    else if (availableUpgradeEnergy >= 2000) workBodyPartsNeeded = 15;
+    if (availableUpgradeEnergy >= 50000) workBodyPartsNeeded = 20;
+    else if (availableUpgradeEnergy >= 10000) workBodyPartsNeeded = 15;
     else if (availableUpgradeEnergy >= 1000) workBodyPartsNeeded = 10;
     else if (availableUpgradeEnergy >= 500) workBodyPartsNeeded = 7;
     else if (availableUpgradeEnergy < 500) workBodyPartsNeeded = 4;

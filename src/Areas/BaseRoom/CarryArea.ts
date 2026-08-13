@@ -68,6 +68,7 @@ export default class CarryArea extends BaseArea {
         if (this.tryCollectMineral(creep)) continue;
         if (this.findSomewhereToCollectFrom(creep)) continue;
         if (this.moveToDroppedResourceNearSource(creep)) continue;
+        if (this.collectFromControllerLink(creep)) continue;
       } else {
         // Creep has something — decide which deposit logic to use based on what it's carrying.
         const mineralResource = this.getCarriedMineralType(creep);
@@ -194,6 +195,15 @@ export default class CarryArea extends BaseArea {
       return true;
     }
 
+    return false;
+  }
+
+  private collectFromControllerLink(creep: CreepBase): boolean {
+    const controllerLink = GetRoomObjects.getLinkNextToController(this.controller.room);
+    if (controllerLink && controllerLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+      creep.addTask(new CreepTask(Activity.CollectEnergy, controllerLink.pos));
+      return true;
+    }
     return false;
   }
 

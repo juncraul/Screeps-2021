@@ -7,6 +7,7 @@ import BaseArea from "./BaseArea";
 const MIN_TERMINAL_RESOURCE = 5000;
 const LAB_REAGENT_TARGET = 300;
 const LAB_ENERGY_TARGET = 2000;
+const REACTION_PLAN_SEARCH_COOLDOWN = 100;
 
 interface LabReactionPlan {
   product: ResourceConstant;
@@ -21,6 +22,15 @@ interface ImmediateReaction {
   product: ResourceConstant;
   reagentA: ResourceConstant;
   reagentB: ResourceConstant;
+}
+
+interface LabReactionPlanMemory {
+  product: ResourceConstant;
+  reagentA: ResourceConstant;
+  reagentB: ResourceConstant;
+  inputLabAId: Id<StructureLab>;
+  inputLabBId: Id<StructureLab>;
+  outputLabIds: Id<StructureLab>[];
 }
 
 interface BoostRequirement {
@@ -402,6 +412,21 @@ export default class LabArea extends BaseArea {
       return null;
     }
 
+    const cachedPlan = this.getCachedReactionPlan();
+    if (cachedPlan) {
+      if ((this.terminal.store.getUsedCapacity(cachedPlan.product) ?? 0) < MIN_TERMINAL_RESOURCE) {
+        return cachedPlan;
+      }
+
+      this.clearCachedReactionPlan(Game.time + REACTION_PLAN_SEARCH_COOLDOWN);
+      return null;
+    }
+
+    const nextSearchTick = this.getRoomObjectsMemory().labArea?.nextReactionPlanSearchTick ?? 0;
+    if (Game.time < nextSearchTick) {
+      return null;
+    }
+
     const totals = this.getTotalMinerals();
     const terminalMinerals = this.getTerminalMinerals();
     const producible = this.getAllProducibleResources();
@@ -417,15 +442,105 @@ export default class LabArea extends BaseArea {
         continue;
       }
 
-      return {
+      const plan = {
         ...immediate,
         inputLabAId: layout.inputLabA.id,
         inputLabBId: layout.inputLabB.id,
         outputLabIds: layout.outputLabs.map(lab => lab.id)
       };
+
+      this.setCachedReactionPlan(plan);
+      return plan;
     }
 
+    this.clearCachedReactionPlan(Game.time + REACTION_PLAN_SEARCH_COOLDOWN);
     return null;
+  }
+
+  private getCachedReactionPlan(): LabReactionPlan | null {
+    const memoryPlan = this.getRoomObjectsMemory().labArea?.reactionPlan as LabReactionPlanMemory | undefined;
+    if (!memoryPlan) {
+      return null;
+    }
+
+    const inputLabA = Game.getObjectById(memoryPlan.inputLabAId);
+    const inputLabB = Game.getObjectById(memoryPlan.inputLabBId);
+    if (!inputLabA || !inputLabB) {
+      this.clearCachedReactionPlan();
+      return null;
+    }
+
+    if (!memoryPlan.outputLabIds.length) {
+      this.clearCachedReactionPlan();
+      return null;
+    }
+
+    const outputLabCount = memoryPlan.outputLabIds.filter(labId => Game.getObjectById(labId) !== null).length;
+    if (outputLabCount === 0) {
+      this.clearCachedReactionPlan();
+      return null;
+    }
+
+    return {
+      product: memoryPlan.product,
+      reagentA: memoryPlan.reagentA,
+      reagentB: memoryPlan.reagentB,
+      inputLabAId: memoryPlan.inputLabAId,
+      inputLabBId: memoryPlan.inputLabBId,
+      outputLabIds: memoryPlan.outputLabIds
+    };
+  }
+
+  private setCachedReactionPlan(plan: LabReactionPlan): void {
+    const roomObjectsMemory = this.getRoomObjectsMemory();
+    if (!roomObjectsMemory.labArea) {
+      roomObjectsMemory.labArea = {};
+    }
+
+    roomObjectsMemory.labArea.reactionPlan = {
+      product: plan.product,
+      reagentA: plan.reagentA,
+      reagentB: plan.reagentB,
+      inputLabAId: plan.inputLabAId,
+      inputLabBId: plan.inputLabBId,
+      outputLabIds: plan.outputLabIds
+    };
+    roomObjectsMemory.labArea.nextReactionPlanSearchTick = undefined;
+  }
+
+  private clearCachedReactionPlan(nextSearchTick?: number): void {
+    const roomObjectsMemory = this.getRoomObjectsMemory();
+    if (!roomObjectsMemory.labArea) {
+      roomObjectsMemory.labArea = {};
+    }
+
+    roomObjectsMemory.labArea.reactionPlan = undefined;
+    if (nextSearchTick === undefined) {
+      roomObjectsMemory.labArea.nextReactionPlanSearchTick = undefined;
+      return;
+    }
+
+    roomObjectsMemory.labArea.nextReactionPlanSearchTick = nextSearchTick;
+  }
+
+  private getRoomObjectsMemory(): RoomObjectsMemory {
+    if (!Memory.Rooms) {
+      Memory.Rooms = {};
+    }
+
+    if (!Memory.Rooms[this.room.name]) {
+      Memory.Rooms[this.room.name] = {
+        lastTimeTopologyWasChecked: 0,
+        lastUpdatedTick: 0,
+        roomName: this.room.name,
+        controller: null,
+        sources: [],
+        minerals: [],
+        exits: []
+      };
+    }
+
+    return Memory.Rooms[this.room.name];
   }
 
   private findImmediateReaction(

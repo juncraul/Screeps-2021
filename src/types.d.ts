@@ -83,6 +83,7 @@ interface RoomObjectSourceInfoMemory {
   y: number;
   containerId: string | null;
   linkId: string | null;
+  extensionIds: string[];
   containerPos?: RoomObjectPositionMemory | null;
   linkPos?: RoomObjectPositionMemory | null;
 }
@@ -113,6 +114,10 @@ interface RoomObjectsMemory {
   sources: RoomObjectSourceInfoMemory[];
   minerals: RoomObjectMineralInfoMemory[];
   exits: RoomObjectExitInfoMemory[];
+  labArea?: {
+    reactionPlan?: LabAreaReactionPlanMemory;
+    nextReactionPlanSearchTick?: number;
+  };
 }
 
 interface RoomDefenseState {
@@ -167,10 +172,27 @@ interface AreasMemory {
   Soldiers?: Record<string, SoldierAreaMemory>;
 }
 
+interface LabAreaReactionPlanMemory {
+  product: ResourceConstant;
+  reagentA: ResourceConstant;
+  reagentB: ResourceConstant;
+  inputLabAId: Id<StructureLab>;
+  inputLabBId: Id<StructureLab>;
+  outputLabIds: Id<StructureLab>[];
+}
+
 interface Memory {
   uuid: number;
   log: any;
   Keys: any; // TODO: Find a proper type for this
+  profiler?: {
+    map?: Record<string, unknown>;
+    totalTime?: number;
+    enabledTick?: number;
+    disableTick?: number | false;
+    type?: string;
+    filter?: string;
+  } | null;
   Rooms?: Record<string, RoomObjectsMemory>;
   roomVisuals: boolean;
   scoreHistory: ScoreCollectionRecord[];
@@ -234,4 +256,17 @@ declare namespace NodeJS {
 // CPU extension for generatePixel method (Screeps World CPU)
 interface CPU {
   generatePixel(): string;
+}
+
+declare module "screeps-profiler" {
+  interface ScreepsProfiler {
+    enable(): void;
+    wrap<T>(callback: () => T): T;
+    registerClass<T extends { prototype: unknown }>(targetClass: T, label: string): void;
+    registerObject<T extends Record<string, unknown>>(targetObject: T, label: string): T;
+    registerFN<T extends (...args: any[]) => any>(targetFunction: T, label?: string): T;
+  }
+
+  const profiler: ScreepsProfiler;
+  export default profiler;
 }
