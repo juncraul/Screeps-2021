@@ -430,56 +430,11 @@ export class CreepBase {
 
     const exitDir = Game.map.findExit(this.creep.room.name, targetPos.roomName);
     if (exitDir === ERR_NO_PATH || exitDir === ERR_INVALID_ARGS) return;
-    let exits = this.creep.room.find(exitDir);
 
-    // TODO: CPU This is very inefficient it calculates path trhough all possible exits every tick, will need to improve.
-    let bestCost = Infinity;
-    let bestExit: RoomPosition | null = null;
-    if (Game.cpu.bucket < 1000 && exits.length > 0) {
-      console.log("CPU is low, only checking one exit for pathfinding.");
-      exits = [exits[0]]; // This is so that we only check through one exit if CPU is low, this will make the creep take a longer path but will save CPU.
+    const bestExitPos = GetRoomObjects.getBestExitPosition(this.creep.room, exitDir);
+    if (bestExitPos) {
+      moveTarget = bestExitPos;
     }
-    for (const exit of exits) {
-      const result = PathFinder.search(
-        this.creep.pos,
-        { pos: exit, range: 0 },
-        {
-          plainCost: 2,
-          swampCost: 10,
-          roomCallback: roomName => {
-            const room = Game.rooms[roomName];
-            if (!room) return false;
-
-            const costs = new PathFinder.CostMatrix();
-
-            // Avoid structures
-            room.find(FIND_STRUCTURES).forEach(structure => {
-              if (structure.structureType === STRUCTURE_ROAD) {
-                costs.set(structure.pos.x, structure.pos.y, 1);
-              } else if (
-                structure.structureType !== STRUCTURE_CONTAINER &&
-                structure.structureType !== STRUCTURE_RAMPART
-              ) {
-                costs.set(structure.pos.x, structure.pos.y, 255);
-              }
-            });
-
-            // Avoid creeps
-            room.find(FIND_CREEPS).forEach(creep => {
-              costs.set(creep.pos.x, creep.pos.y, 255);
-            });
-
-            return costs;
-          }
-        }
-      );
-      if (result.cost < bestCost) {
-        bestCost = result.cost;
-        bestExit = exit;
-      }
-    }
-
-    moveTarget = bestExit || exits[0];
 
     this.moveTo(moveTarget, { visualizePathStyle: { stroke: "#ffffff" }, reusePath: MOVE_TO_REUSE });
   }

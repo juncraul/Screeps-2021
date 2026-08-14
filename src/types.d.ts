@@ -106,6 +106,12 @@ interface RoomObjectExitInfoMemory {
   y: number;
 }
 
+interface RoomObjectBestExitInfoMemory {
+  x: number;
+  y: number;
+  calculatedTick: number;
+}
+
 interface RoomObjectsMemory {
   lastTimeTopologyWasChecked: number;
   lastUpdatedTick: number;
@@ -114,6 +120,7 @@ interface RoomObjectsMemory {
   sources: RoomObjectSourceInfoMemory[];
   minerals: RoomObjectMineralInfoMemory[];
   exits: RoomObjectExitInfoMemory[];
+  bestExitPositions?: Partial<Record<ExitConstant, RoomObjectBestExitInfoMemory>>;
   labArea?: {
     reactionPlan?: LabAreaReactionPlanMemory;
     nextReactionPlanSearchTick?: number;

@@ -31,6 +31,7 @@ import { SafeMode } from "Areas/Military/Defense/SafeMode";
 import profiler from "screeps-profiler";
 
 // Profiler githug: https://github.com/screepers/screeps-profiler
+// Profiler command: Game.profiler.profile(20)
 const profilerTargets: [{ prototype: unknown }, string][] = [
   [Overseer, "Overseer"],
   [CreepBase, "CreepBase"],

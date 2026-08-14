@@ -118,26 +118,26 @@ export default class LabArea extends BaseArea {
       return;
     }
 
-    const terminalExcess = this.getTerminalExcessResource();
-    if (terminalExcess) {
-      creep.addTask(
-        new CreepTask(
-          Activity.CollectMineral,
-          terminal.pos,
-          null,
-          terminalExcess.resource,
-          false,
-          terminalExcess.amount
-        )
-      );
-      return;
-    }
+    // const terminalExcess = this.getTerminalExcessResource();
+    // if (terminalExcess) {
+    //   creep.addTask(
+    //     new CreepTask(
+    //       Activity.CollectMineral,
+    //       terminal.pos,
+    //       null,
+    //       terminalExcess.resource,
+    //       false,
+    //       terminalExcess.amount
+    //     )
+    //   );
+    //   return;
+    // }
 
-    const terminalDeficit = this.getTerminalDeficitResource();
-    if (terminalDeficit && this.storage.store.getUsedCapacity(terminalDeficit) > 0) {
-      creep.addTask(new CreepTask(Activity.CollectMineral, this.storage.pos, null, terminalDeficit));
-      return;
-    }
+    // const terminalDeficit = this.getTerminalDeficitResource();
+    // if (terminalDeficit && this.storage.store.getUsedCapacity(terminalDeficit) > 0) {
+    //   creep.addTask(new CreepTask(Activity.CollectMineral, this.storage.pos, null, terminalDeficit));
+    //   return;
+    // }
 
     if (plan) {
       const inputLabA = Game.getObjectById(plan.inputLabAId);
@@ -683,62 +683,62 @@ export default class LabArea extends BaseArea {
     return null;
   }
 
-  private getTerminalDeficitResource(): ResourceConstant | null {
-    if (!this.terminal) {
-      return null;
-    }
+  // private getTerminalDeficitResource(): ResourceConstant | null {
+  //   if (!this.terminal) {
+  //     return null;
+  //   }
 
-    const knownResources = new Set<ResourceConstant>();
-    for (const resource of Object.keys(this.storage.store) as ResourceConstant[]) {
-      if (resource !== RESOURCE_ENERGY) {
-        knownResources.add(resource);
-      }
-    }
-    for (const resource of Object.keys(this.terminal.store) as ResourceConstant[]) {
-      if (resource !== RESOURCE_ENERGY) {
-        knownResources.add(resource);
-      }
-    }
+  //   const knownResources = new Set<ResourceConstant>();
+  //   for (const resource of Object.keys(this.storage.store) as ResourceConstant[]) {
+  //     if (resource !== RESOURCE_ENERGY) {
+  //       knownResources.add(resource);
+  //     }
+  //   }
+  //   for (const resource of Object.keys(this.terminal.store) as ResourceConstant[]) {
+  //     if (resource !== RESOURCE_ENERGY) {
+  //       knownResources.add(resource);
+  //     }
+  //   }
 
-    let selected: ResourceConstant | null = null;
-    let largestDeficit = 0;
-    for (const resource of knownResources) {
-      const terminalAmount = this.terminal.store.getUsedCapacity(resource);
-      const deficit = Math.max(0, MIN_TERMINAL_RESOURCE - terminalAmount);
-      if (deficit > largestDeficit && this.storage.store.getUsedCapacity(resource) > 0) {
-        largestDeficit = deficit;
-        selected = resource;
-      }
-    }
+  //   let selected: ResourceConstant | null = null;
+  //   let largestDeficit = 0;
+  //   for (const resource of knownResources) {
+  //     const terminalAmount = this.terminal.store.getUsedCapacity(resource);
+  //     const deficit = Math.max(0, MIN_TERMINAL_RESOURCE - terminalAmount);
+  //     if (deficit > largestDeficit && this.storage.store.getUsedCapacity(resource) > 0) {
+  //       largestDeficit = deficit;
+  //       selected = resource;
+  //     }
+  //   }
 
-    return selected;
-  }
+  //   return selected;
+  // }
 
-  private getTerminalExcessResource(): { resource: ResourceConstant; amount: number } | null {
-    if (!this.terminal) {
-      return null;
-    }
+  // private getTerminalExcessResource(): { resource: ResourceConstant; amount: number } | null {
+  //   if (!this.terminal) {
+  //     return null;
+  //   }
 
-    let selected: ResourceConstant | null = null;
-    let largestExcess = 0;
-    for (const resource of Object.keys(this.terminal.store) as ResourceConstant[]) {
-      if (resource === RESOURCE_ENERGY) {
-        continue;
-      }
+  //   let selected: ResourceConstant | null = null;
+  //   let largestExcess = 0;
+  //   for (const resource of Object.keys(this.terminal.store) as ResourceConstant[]) {
+  //     if (resource === RESOURCE_ENERGY) {
+  //       continue;
+  //     }
 
-      const amount = this.terminal.store.getUsedCapacity(resource);
-      const excess = Math.max(0, amount - MIN_TERMINAL_RESOURCE);
-      if (excess > largestExcess) {
-        largestExcess = excess;
-        selected = resource;
-      }
-    }
+  //     const amount = this.terminal.store.getUsedCapacity(resource);
+  //     const excess = Math.max(0, amount - MIN_TERMINAL_RESOURCE);
+  //     if (excess > largestExcess) {
+  //       largestExcess = excess;
+  //       selected = resource;
+  //     }
+  //   }
 
-    if (!selected) {
-      return null;
-    }
-    return { resource: selected, amount: largestExcess };
-  }
+  //   if (!selected) {
+  //     return null;
+  //   }
+  //   return { resource: selected, amount: largestExcess };
+  // }
 
   private hasLaboratoryWork(plan: LabReactionPlan | null): boolean {
     const terminal = this.terminal;
@@ -750,14 +750,14 @@ export default class LabArea extends BaseArea {
       return true;
     }
 
-    if (this.getTerminalExcessResource()) {
-      return true;
-    }
+    // if (this.getTerminalExcessResource()) {
+    //   return true;
+    // }
 
-    const terminalDeficit = this.getTerminalDeficitResource();
-    if (terminalDeficit && this.storage.store.getUsedCapacity(terminalDeficit) > 0) {
-      return true;
-    }
+    // const terminalDeficit = this.getTerminalDeficitResource();
+    // if (terminalDeficit && this.storage.store.getUsedCapacity(terminalDeficit) > 0) {
+    //   return true;
+    // }
 
     if (plan) {
       const inputLabA = Game.getObjectById(plan.inputLabAId);

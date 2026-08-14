@@ -25,6 +25,12 @@ export class GetRoomObjects {
   public static readonly ROOM_NAME_PATTERN = /^[WE]\d+[NS]\d+$/;
   public static readonly REROUTE_FLAG_PATTERN = /^ReRoute-([WE]\d+[NS]\d+)-From-([WE]\d+[NS]\d+)(?:-.+)?$/;
   private static readonly ROOM_OBJECT_CACHE_REFRESH_TICKS = 100;
+  private static readonly BEST_EXIT_RECALC_INTERVAL = 100;
+  // Heap-only (not Memory) per-tick cache: CostMatrix instances aren't serializable.
+  private static standardMovementCostMatrixCache: { tick: number; matrices: Map<string, CostMatrix> } = {
+    tick: -1,
+    matrices: new Map()
+  };
 
   private static ensureRoomsMemory(): Record<string, RoomObjectsMemory> {
     if (!Memory.Rooms) {
@@ -460,6 +466,91 @@ export class GetRoomObjects {
   public static getRoomExits(room: Room): RoomPosition[] {
     const cache = this.getRoomObjectCache(room);
     return cache.exits.map(exit => new RoomPosition(exit.x, exit.y, room.name));
+  }
+
+  /**
+   * Shared "avoid buildings/creeps" CostMatrix for a room, built at most once per tick.
+   * Do not mutate the returned matrix directly; `.clone()` it first if a variant is needed.
+   */
+  public static getStandardMovementCostMatrix(room: Room): CostMatrix {
+    if (this.standardMovementCostMatrixCache.tick !== Game.time) {
+      this.standardMovementCostMatrixCache = { tick: Game.time, matrices: new Map() };
+    }
+
+    const cached = this.standardMovementCostMatrixCache.matrices.get(room.name);
+    if (cached) {
+      return cached;
+    }
+
+    const costs = new PathFinder.CostMatrix();
+
+    // First we do all roads.
+    room.find(FIND_STRUCTURES).forEach(structure => {
+      if (structure.structureType === STRUCTURE_ROAD) {
+        costs.set(structure.pos.x, structure.pos.y, 1);
+      }
+    });
+
+    // Then the rest of structures as they might be on an existing road.
+    room.find(FIND_STRUCTURES).forEach(structure => {
+      if (
+        structure.structureType !== STRUCTURE_ROAD &&
+        structure.structureType !== STRUCTURE_CONTAINER &&
+        structure.structureType !== STRUCTURE_RAMPART
+      ) {
+        costs.set(structure.pos.x, structure.pos.y, 255);
+      }
+    });
+
+    room.find(FIND_CREEPS).forEach(creep => {
+      costs.set(creep.pos.x, creep.pos.y, 255);
+    });
+
+    this.standardMovementCostMatrixCache.matrices.set(room.name, costs);
+    return costs;
+  }
+
+  /**
+   * Best exit tile for a room+direction, cached in Memory and shared by every creep.
+   * Recalculated only when missing or every BEST_EXIT_RECALC_INTERVAL ticks.
+   */
+  public static getBestExitPosition(room: Room, exitDir: ExitConstant): RoomPosition | null {
+    const cache = this.getRoomObjectCache(room);
+    const cachedExit = cache.bestExitPositions?.[exitDir];
+
+    if (cachedExit && Game.time % this.BEST_EXIT_RECALC_INTERVAL !== 0) {
+      return new RoomPosition(cachedExit.x, cachedExit.y, room.name);
+    }
+
+    const exits = room.find(exitDir);
+    if (exits.length === 0) {
+      return null;
+    }
+
+    const costMatrix = this.getStandardMovementCostMatrix(room);
+    const origin = room.controller?.pos ?? new RoomPosition(25, 25, room.name);
+
+    let bestCost = Infinity;
+    let bestExit: RoomPosition = exits[0];
+    for (const exit of exits) {
+      const result = PathFinder.search(
+        origin,
+        { pos: exit, range: 0 },
+        { plainCost: 2, swampCost: 10, roomCallback: () => costMatrix }
+      );
+      if (result.cost < bestCost) {
+        bestCost = result.cost;
+        bestExit = exit;
+      }
+    }
+
+    if (!cache.bestExitPositions) {
+      cache.bestExitPositions = {};
+    }
+    cache.bestExitPositions[exitDir] = { x: bestExit.x, y: bestExit.y, calculatedTick: Game.time };
+    Memory.Rooms![room.name] = cache;
+
+    return bestExit;
   }
 
   public static getRoomConstructions(room: Room, mine?: boolean): ConstructionSite[] {

@@ -7,14 +7,17 @@ const GREEN_FLAG_TTL = 10000;
 const MIN_TERMINAL_ENERGY = 10000;
 const MIN_TERMINAL_RESOURCE = 5000;
 const INTER_ROOM_SEND_AMOUNT = 3000;
-const MIN_SELL_PRICE = 0.001;
+const MIN_ORDER_PRICE = 0.001;
 const UNDERCUT_STEP = 0.001;
+const SELL_PRICE_FLOOR_RATIO = 0.9;
+const BUY_PRICE_CEILING_RATIO = 1.1;
 
 type PriceMode = "MarketValue" | "Undercut" | "Fixed";
+type MarketOperation = "Sell" | "Buy";
 
 interface MarketFlagConfig {
   flag: Flag;
-  operation: "Sell";
+  operation: MarketOperation;
   resourceType: ResourceConstant;
   amount: number;
   priceMode: PriceMode;
@@ -156,29 +159,18 @@ export default class MarketArea extends BaseArea {
         continue;
       }
 
-      const terminalAmount = this.terminal.store.getUsedCapacity(config.resourceType);
-      if (terminalAmount >= config.amount) {
-        const price = this.getSellPrice(config);
-        const createOrderResult = Game.market.createOrder({
-          type: ORDER_SELL,
-          resourceType: config.resourceType,
-          price,
-          totalAmount: config.amount,
-          roomName: this.room.name
-        });
-        if (createOrderResult === OK) {
-          const createdOrder = this.findActiveOrderForFlag(config, state);
-          if (createdOrder) {
-            state.orderId = createdOrder.id;
-          }
-          config.flag.setColor(COLOR_YELLOW, config.flag.secondaryColor);
+      if (config.operation === "Sell") {
+        const terminalAmount = this.terminal.store.getUsedCapacity(config.resourceType);
+        if (terminalAmount >= config.amount) {
+          this.tryCreateOrder(config, state, ORDER_SELL);
         } else {
-          console.log(
-            `MarketArea: createOrder failed for flag ${config.flag.name} in ${this.room.name}, code ${createOrderResult}`
-          );
+          flagsNeedingTransfer.push(config);
         }
       } else {
-        flagsNeedingTransfer.push(config);
+        const totalOwned = this.getResourceTotalInRoom(this.room, config.resourceType);
+        if (totalOwned < config.amount) {
+          this.tryCreateOrder(config, state, ORDER_BUY);
+        }
       }
     }
 
@@ -364,42 +356,89 @@ export default class MarketArea extends BaseArea {
   }
 
   private isOrderMatchingFlag(order: Order, config: MarketFlagConfig): boolean {
-    if (order.type !== ORDER_SELL) return false;
+    const expectedType = config.operation === "Sell" ? ORDER_SELL : ORDER_BUY;
+    if (order.type !== expectedType) return false;
     if (order.roomName !== this.room.name) return false;
     if (order.resourceType !== config.resourceType) return false;
     if (order.totalAmount !== config.amount) return false;
     if (config.priceMode === "Fixed") {
-      const expected = config.fixedPrice ?? MIN_SELL_PRICE;
+      const expected = config.fixedPrice ?? MIN_ORDER_PRICE;
       return Math.abs(order.price - expected) < 0.0001;
     }
     return true;
   }
 
-  private getSellPrice(config: MarketFlagConfig): number {
+  private tryCreateOrder(config: MarketFlagConfig, state: MarketFlagState, orderType: ORDER_SELL | ORDER_BUY): void {
+    const price = this.getOrderPrice(config);
+    const createOrderResult = Game.market.createOrder({
+      type: orderType,
+      resourceType: config.resourceType,
+      price,
+      totalAmount: config.amount,
+      roomName: this.room.name
+    });
+    if (createOrderResult === OK) {
+      const createdOrder = this.findActiveOrderForFlag(config, state);
+      if (createdOrder) {
+        state.orderId = createdOrder.id;
+      }
+      config.flag.setColor(COLOR_YELLOW, config.flag.secondaryColor);
+    } else {
+      console.log(
+        `MarketArea: createOrder failed for flag ${config.flag.name} in ${this.room.name}, code ${createOrderResult}`
+      );
+    }
+  }
+
+  private getOrderPrice(config: MarketFlagConfig): number {
     if (config.priceMode === "Fixed") {
-      return Math.max(MIN_SELL_PRICE, config.fixedPrice ?? MIN_SELL_PRICE);
+      return Math.max(MIN_ORDER_PRICE, config.fixedPrice ?? MIN_ORDER_PRICE);
     }
 
-    if (config.priceMode === "Undercut") {
-      const allSellOrders = Game.market.getAllOrders({
-        type: ORDER_SELL,
-        resourceType: config.resourceType
-      });
-      const competitorOrders = allSellOrders.filter(order => order.id !== this.getTrackedOrderId(config.flag.name));
-      if (competitorOrders.length > 0) {
-        const cheapestOrder = _.min(competitorOrders, o => o.price);
-        if (cheapestOrder) {
-          return Math.max(MIN_SELL_PRICE, cheapestOrder.price - UNDERCUT_STEP);
-        }
+    const orderType = config.operation === "Sell" ? ORDER_SELL : ORDER_BUY;
+    const allOrders = Game.market.getAllOrders({ type: orderType, resourceType: config.resourceType });
+    const competitorOrders = allOrders.filter(order => order.id !== this.getTrackedOrderId(config.flag.name));
+
+    if (config.priceMode === "Undercut" && competitorOrders.length > 0) {
+      const bestCompetitor =
+        config.operation === "Sell" ? _.min(competitorOrders, o => o.price) : _.max(competitorOrders, o => o.price);
+      if (bestCompetitor) {
+        const step = config.operation === "Sell" ? -UNDERCUT_STEP : UNDERCUT_STEP;
+        return Math.max(MIN_ORDER_PRICE, bestCompetitor.price + step);
       }
     }
 
-    const history = Game.market.getHistory(config.resourceType);
-    if (history.length > 0) {
-      const latest = history[history.length - 1];
-      return Math.max(MIN_SELL_PRICE, latest.avgPrice);
+    // MarketValue: try to beat the best competitor order, staying within 10% of the last 3 days' average price.
+    const recentHistory = Game.market.getHistory(config.resourceType).slice(-3);
+    const averagePrice =
+      recentHistory.length > 0
+        ? recentHistory.reduce((sum, entry) => sum + entry.avgPrice, 0) / recentHistory.length
+        : null;
+
+    if (config.operation === "Sell") {
+      const floorPrice =
+        averagePrice !== null ? Math.max(MIN_ORDER_PRICE, averagePrice * SELL_PRICE_FLOOR_RATIO) : MIN_ORDER_PRICE;
+      let candidatePrice = averagePrice ?? floorPrice;
+      if (competitorOrders.length > 0) {
+        const cheapestOrder = _.min(competitorOrders, o => o.price);
+        if (cheapestOrder) {
+          candidatePrice = cheapestOrder.price - UNDERCUT_STEP;
+        }
+      }
+      return Math.max(floorPrice, candidatePrice);
     }
-    return 0.1;
+
+    // Buy: never bid more than 10% above the last 3 days' average price.
+    const ceilingPrice =
+      averagePrice !== null ? Math.max(MIN_ORDER_PRICE, averagePrice * BUY_PRICE_CEILING_RATIO) : Infinity;
+    let candidatePrice = averagePrice ?? MIN_ORDER_PRICE;
+    if (competitorOrders.length > 0) {
+      const highestOrder = _.max(competitorOrders, o => o.price);
+      if (highestOrder) {
+        candidatePrice = highestOrder.price + UNDERCUT_STEP;
+      }
+    }
+    return Math.max(MIN_ORDER_PRICE, Math.min(ceilingPrice, candidatePrice));
   }
 
   private getTrackedOrderId(flagName: string): string | undefined {
@@ -431,14 +470,15 @@ export default class MarketArea extends BaseArea {
       return null;
     }
 
-    const operation = parts[1];
+    const operationText = parts[1];
     const resourceText = parts[2];
     const amountText = parts[3];
     const priceText = parts[4];
 
-    if (operation !== "Sell") {
+    if (operationText !== "Sell" && operationText !== "Buy") {
       return null;
     }
+    const operation: MarketOperation = operationText;
 
     const resourceType = this.parseResourceType(resourceText);
     if (!resourceType) {
@@ -454,7 +494,7 @@ export default class MarketArea extends BaseArea {
     if (loweredPriceText === "marketvalue") {
       return {
         flag,
-        operation: "Sell",
+        operation,
         resourceType,
         amount,
         priceMode: "MarketValue"
@@ -464,7 +504,7 @@ export default class MarketArea extends BaseArea {
     if (loweredPriceText === "undercut") {
       return {
         flag,
-        operation: "Sell",
+        operation,
         resourceType,
         amount,
         priceMode: "Undercut"
@@ -478,7 +518,7 @@ export default class MarketArea extends BaseArea {
 
     return {
       flag,
-      operation: "Sell",
+      operation,
       resourceType,
       amount,
       priceMode: "Fixed",
@@ -487,9 +527,10 @@ export default class MarketArea extends BaseArea {
   }
 
   private parseResourceType(resourceText: string): ResourceConstant | null {
-    if (resourceText.toLowerCase() === "energy") {
-      return RESOURCE_ENERGY;
-    }
+    const resourceTypeUpper = resourceText.toUpperCase() as ResourceConstant;
+    if (resourceTypeUpper) return resourceTypeUpper;
+    const resourceTypeLower = resourceText.toLowerCase() as ResourceConstant;
+    if (resourceTypeLower) return resourceTypeLower;
     return null;
   }
 
