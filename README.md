@@ -66,7 +66,7 @@ All current flags are documented here so you only need this section.
 | `SourceKeeper-SpawnRoom[-AnyIgnoredText]` | `SourceKeeper-E29S25` | Source Keeper hunting squad | Required part 2 (`SpawnRoom`) or `X` |
 | `Looter-SpawnRoom[-AnyIgnoredText]` | `Looter-E29S25` | Looter carrier unit | Required part 2 (`SpawnRoom`) or `X` |
 | `Defense-RoomName` | `Defense-E29S25` | Emergency in-room defense team | Auto-placed by SafeMode logic |
-| `Market-Sell-Energy-Amount-PriceModeOrValue` | `Market-Sell-Energy-10000-MarketValue` | Creates and tracks sell orders from terminal stock | Uses room where the flag is placed |
+| `Market-Sell-Resource-Amount-PriceModeOrValue` | `Market-Sell-Energy-10000-MarketValue` | Creates and tracks sell orders from terminal stock, or deals existing orders (`MarketValueDeal`) | Uses room where the flag is placed |
 | `ReRoute-TargetRoom-From-CurrentRoom[-AnyText]` | `ReRoute-E29S25-From-E30S25` | Forces cross-room movement through the flag room | N/A (movement helper) |
 | `Season[-SquadSize]` | `Season-5` | Creates 5 collectors | Spawns from the room where the flag is placed in |
 
@@ -214,36 +214,61 @@ Example:
 
 ---
 
-### `Market-Sell-Energy-Amount-PriceModeOrValue`
+### `Market-Sell-Resource-Amount-PriceModeOrValue`
 
 - File source: `src/Areas/BaseRoom/MarketArea.ts`
 - Prefix: `Market`.
-- Current supported operation/resource pair: `Sell` + `Energy`.
+- Supported operations: `Sell`, `Buy`.
 - Parsed format:
 1. `Market`
-2. `Sell`
-3. `Energy`
+2. `Sell` or `Buy`
+3. Resource type, such as `Energy`, `H`, or `Utrium`
 4. `Amount` (positive integer)
-5. Price mode/value (`MarketValue`, `Undercut`, or fixed numeric price)
+5. Price mode/value (`MarketValue`, `MarketValueDeal`, `Undercut`, or fixed numeric price)
 
 Examples:
 - `Market-Sell-Energy-10000-MarketValue`
+- `Market-Sell-Energy-10000-MarketValueDeal`
 - `Market-Sell-Energy-10000-Undercut`
 - `Market-Sell-Energy-10000-0.25`
 
-Behavior:
+Manual flag behavior:
 1. Terminal energy baseline is maintained at `10000` whenever possible (clerk will refill from storage).
-2. If terminal energy is below `Amount`, a market clerk creep will move energy from storage to terminal.
+2. If the terminal has less than `Amount` of the target resource, a market clerk creep will move that resource from storage to terminal. The clerk is `2 CARRY / 2 MOVE` when `50000` or more needs to be moved, otherwise `1 CARRY / 1 MOVE`.
 3. If terminal already has enough energy, transfer step is skipped.
-4. Once terminal has enough, a `ORDER_SELL` market order is created and the flag turns `COLOR_YELLOW`.
-5. While the order is active, the flag stays `COLOR_YELLOW`.
-6. When the order is fully completed (or no longer exists), the flag turns `COLOR_GREEN`.
-7. Green market flags are automatically removed after `10000` ticks.
+4. When selling `Energy`, the clerk fills the terminal with `Amount + 10000` so the `10000` energy baseline stays available for transfer fees; deals never sell into that baseline.
+5. Once terminal has enough, a `ORDER_SELL` market order is created and the flag turns `COLOR_YELLOW`.
+6. While the order is active, the flag stays `COLOR_YELLOW`.
+7. When the order is fully completed (or no longer exists), the flag turns `COLOR_GREEN`.
+8. Green market flags are automatically removed after `10000` ticks.
+
+Automatic overflow behavior:
+1. If room storage is more than 90% full, MarketArea creates a sell flag for the most abundant stored resource above `150000` units.
+2. If a sell flag already exists for that resource in the room, the next most abundant eligible resource is used instead.
+3. Automatically created overflow flags sell `50000` units:
+   - Storage between 90% and 95% full: `MarketValue` (creates an order).
+   - Storage above 95% full: `MarketValueDeal` (deals existing orders immediately).
 
 Price behavior:
 1. `MarketValue`: uses latest market history average price.
-2. `Undercut`: uses lowest competing sell order minus `0.001` (with floor protection).
-3. Fixed numeric value: uses the provided number (minimum `0.001`).
+2. `MarketValueDeal`: does not create an order; deals existing orders of other players (see below).
+3. `Undercut`: uses lowest competing sell order minus `0.001` (with floor protection).
+4. Fixed numeric value: uses the provided number (minimum `0.001`).
+
+`MarketValueDeal` behavior:
+1. `Sell` flags deal `ORDER_BUY` orders, `Buy` flags deal `ORDER_SELL` orders. Own orders and orders in own rooms are ignored.
+2. Transfer energy cost per order is `ceil(amount * (1 - e^(-distance / 30)))`, where `distance` is the linear room distance from the terminal.
+3. The energy cost is converted to credits (3-day average energy price, or cheapest energy sell order as fallback), giving an effective price:
+   - Sell: `price - energyCostPerUnit * energyPrice` (highest first).
+   - Buy: `price + energyCostPerUnit * energyPrice` (lowest first).
+4. Orders with effective price below 90% (sell) or above 110% (buy) of the 3-day average price are skipped.
+5. Deal amount is limited by the amount left on the flag, the order amount, terminal stock (sell) or terminal free capacity and credits (buy), and terminal energy for the transfer cost.
+6. One deal per terminal per tick (terminal cooldown respected). The deal is confirmed next tick through the transaction log, and only the actually transferred amount is added to progress.
+7. Partial fills are tracked in `Memory.Keys.MarketAreaStates[flagName].dealtAmount`; dealing continues until the full `Amount` is reached. The clerk refills the terminal with the remaining amount for sell flags.
+8. Flag is `COLOR_YELLOW` while dealing, turns `COLOR_GREEN` once the full amount is dealt, and is removed after `10000` ticks.
+
+Event logging:
+- All market activity (order creation/completion, deals placed/confirmed/failed, terminal balancing sends, overflow flag creation) is pushed to `EventHandler` under the `Market` event type and printed to console.
 
 ---
 

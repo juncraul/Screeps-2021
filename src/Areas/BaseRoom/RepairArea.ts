@@ -4,8 +4,6 @@ import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
 import { CreepBase } from "CreepBase";
 
-const STORAGE_ENERGY_THRESHOLD = 5000;
-
 export default class RepairArea extends BaseArea {
   controller: StructureController;
   maxWorkerCount: number;
@@ -82,7 +80,11 @@ export default class RepairArea extends BaseArea {
       );
       creep.addTask(new CreepTask(Activity.Move, newPosition));
     }
-    if (creep.task?.activity === Activity.Repair && GetRoomObjects.isOnOrNearSourceContainer(creep.pos)) {
+    if (
+      creep.task?.activity === Activity.Repair &&
+      GetRoomObjects.isOnOrNearSourceContainer(creep.pos) &&
+      creep.pos.findPathTo(creep.task.targetPlace).length < 3
+    ) {
       const positionAwayFromSourceContainer = GetRoomObjects.getXStepTowardsSpawn(creep.pos, 2);
       if (!creep.pos.isEqualTo(positionAwayFromSourceContainer)) {
         creep.addTask(new CreepTask(Activity.Move, positionAwayFromSourceContainer));

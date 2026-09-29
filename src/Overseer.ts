@@ -23,6 +23,7 @@ import LabArea from "Areas/BaseRoom/LabArea";
 import BaseRoomStats from "Areas/BaseRoom/BaseRoomStats";
 import ScoutArea from "Areas/BaseRoom/ScoutArea";
 import { Helper } from "Helpers/Helper";
+import EventHandler from "Helpers/EventHandler";
 
 const SCOUT_FLAG = "Scout";
 
@@ -39,6 +40,7 @@ export default class Overseer implements IOverseer {
       });
       SafeMode.run(room, towers);
       BaseRoomStats.drawRoomVisual(room);
+      EventHandler.drawRoomVisual(room);
       BaseBuilder.automaticFlagPlacement(room);
       BaseBuilder.logicCreateConstructionSites();
     });

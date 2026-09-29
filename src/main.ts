@@ -28,6 +28,7 @@ import LooterArea from "Areas/Military/LooterArea";
 import SourceKeeperArea from "Areas/Military/SourceKeeperArea";
 import { Cannon } from "Areas/Military/Defense/Cannon";
 import { SafeMode } from "Areas/Military/Defense/SafeMode";
+import EventHandler from "Helpers/EventHandler";
 import profiler from "screeps-profiler";
 
 // Profiler githug: https://github.com/screepers/screeps-profiler
@@ -61,7 +62,8 @@ const profilerTargets: [{ prototype: unknown }, string][] = [
   [LooterArea, "LooterArea"],
   [SourceKeeperArea, "SourceKeeperArea"],
   [Cannon, "Cannon"],
-  [SafeMode, "SafeMode"]
+  [SafeMode, "SafeMode"],
+  [EventHandler, "EventHandler"]
 ];
 
 profilerTargets.forEach(([targetClass, label]) => profiler.registerClass(targetClass, label));

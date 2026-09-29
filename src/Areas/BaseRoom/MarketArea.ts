@@ -1,4 +1,5 @@
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
+import EventHandler from "Helpers/EventHandler";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import BaseArea from "./BaseArea";
 
@@ -11,8 +12,13 @@ const MIN_ORDER_PRICE = 0.001;
 const UNDERCUT_STEP = 0.001;
 const SELL_PRICE_FLOOR_RATIO = 0.9;
 const BUY_PRICE_CEILING_RATIO = 1.1;
+const STORAGE_AUTO_SELL_FILL_RATIO = 0.9;
+const STORAGE_AUTO_SELL_DEAL_FILL_RATIO = 0.95;
+const STORAGE_AUTO_SELL_MIN_AMOUNT = 150000;
+const STORAGE_AUTO_SELL_ORDER_AMOUNT = 50000;
+const LARGE_CLERK_TRANSFER_THRESHOLD = 40000;
 
-type PriceMode = "MarketValue" | "Undercut" | "Fixed";
+type PriceMode = "MarketValue" | "MarketValueDeal" | "Undercut" | "Fixed";
 type MarketOperation = "Sell" | "Buy";
 
 interface MarketFlagConfig {
@@ -24,15 +30,30 @@ interface MarketFlagConfig {
   fixedPrice?: number;
 }
 
+interface PendingDeal {
+  orderId: string;
+  amount: number;
+  tick: number;
+}
+
 interface MarketFlagState {
   orderId?: string;
   greenSinceTick?: number;
+  dealtAmount?: number;
+  pendingDeal?: PendingDeal;
+}
+
+interface DealCandidate {
+  order: Order;
+  energyCostPerUnit: number;
+  effectivePrice: number;
 }
 
 interface MarketContext {
   flagsNeedingTransfer: MarketFlagConfig[];
   needsTerminalBuffer: boolean;
   resourceToTransferToTerminal: ResourceConstant | null;
+  amountToTransfer: number;
 }
 
 export default class MarketArea extends BaseArea {
@@ -40,6 +61,7 @@ export default class MarketArea extends BaseArea {
   storage: StructureStorage;
   terminal: StructureTerminal | null;
   private cachedContext: { tick: number; context: MarketContext } | null;
+  private terminalActionTick = -1;
 
   constructor(storage: StructureStorage) {
     super("MarketArea", storage.room.name, storage.pos, storage.room);
@@ -50,6 +72,8 @@ export default class MarketArea extends BaseArea {
   }
 
   public handleThisArea() {
+    if (!this.terminal) return;
+
     this.trySendResourcesToOwnRooms();
     const context = this.getMarketContext();
 
@@ -65,6 +89,8 @@ export default class MarketArea extends BaseArea {
   }
 
   public handleSpawnTasks(): SpawnTask[] {
+    if (!this.terminal) return [];
+
     const context = this.getMarketContext();
     const tasksForThisArea: SpawnTask[] = [];
     const needsWork =
@@ -72,7 +98,7 @@ export default class MarketArea extends BaseArea {
       context.needsTerminalBuffer ||
       context.resourceToTransferToTerminal !== null;
     if (needsWork && this.creeps.length < this.maxWorkerCount) {
-      const task: SpawnTask | null = this.createCreepForThisArea();
+      const task: SpawnTask | null = this.createCreepForThisArea(context.amountToTransfer);
       if (task) {
         tasksForThisArea.push(task);
       }
@@ -81,7 +107,6 @@ export default class MarketArea extends BaseArea {
   }
 
   private handleCreeps(context: MarketContext) {
-    if (!this.terminal) return;
     const resourceToTransfer = context.resourceToTransferToTerminal;
 
     for (const creep of this.creeps) {
@@ -94,7 +119,7 @@ export default class MarketArea extends BaseArea {
       } else {
         const carriedResource = this.getCarriedResourceType(creep);
         if (carriedResource) {
-          creep.transfer(this.terminal, carriedResource);
+          creep.transfer(this.terminal!, carriedResource);
         }
       }
     }
@@ -116,7 +141,10 @@ export default class MarketArea extends BaseArea {
   private processMarketFlags(): MarketContext {
     const flagsNeedingTransfer: MarketFlagConfig[] = [];
     const states = this.getMarketStates();
-    const marketFlags = this.getMarketFlagsInRoom();
+    let marketFlags = this.getMarketFlagsInRoom();
+    if (this.tryCreateStorageOverflowSellFlag(marketFlags)) {
+      marketFlags = this.getMarketFlagsInRoom();
+    }
 
     for (const config of marketFlags) {
       const flagName = config.flag.name;
@@ -138,7 +166,8 @@ export default class MarketArea extends BaseArea {
         delete state.greenSinceTick;
       }
 
-      if (!this.terminal) {
+      if (config.priceMode === "MarketValueDeal") {
+        this.processDealFlag(config, state, flagsNeedingTransfer);
         continue;
       }
 
@@ -156,15 +185,17 @@ export default class MarketArea extends BaseArea {
         delete state.orderId;
         state.greenSinceTick = Game.time;
         config.flag.setColor(COLOR_GREEN, config.flag.secondaryColor);
+        this.logMarketEvent(`Order for ${config.flag.name} completed`);
         continue;
       }
 
       if (config.operation === "Sell") {
-        const terminalAmount = this.terminal.store.getUsedCapacity(config.resourceType);
-        if (terminalAmount >= config.amount) {
+        const terminalAmount = this.terminal!.store.getUsedCapacity(config.resourceType);
+        const requiredAmount = this.getTerminalSellTarget(config.resourceType, config.amount);
+        if (terminalAmount >= requiredAmount) {
           this.tryCreateOrder(config, state, ORDER_SELL);
         } else {
-          flagsNeedingTransfer.push(config);
+          flagsNeedingTransfer.push({ ...config, amount: requiredAmount });
         }
       } else {
         const totalOwned = this.getResourceTotalInRoom(this.room, config.resourceType);
@@ -175,25 +206,74 @@ export default class MarketArea extends BaseArea {
     }
 
     this.setMarketStates(states);
+    const resourceToTransferToTerminal = this.getResourceToTransferToTerminal(flagsNeedingTransfer);
     return {
       flagsNeedingTransfer,
       needsTerminalBuffer: this.needsTerminalBuffer(),
-      resourceToTransferToTerminal: this.getResourceToTransferToTerminal(flagsNeedingTransfer)
+      resourceToTransferToTerminal,
+      amountToTransfer: resourceToTransferToTerminal
+        ? this.getAmountToTransfer(resourceToTransferToTerminal, flagsNeedingTransfer)
+        : 0
     };
   }
 
-  private getResourceToTransferToTerminal(flagsNeedingTransfer: MarketFlagConfig[]): ResourceConstant | null {
-    if (!this.terminal) {
-      return null;
+  private getAmountToTransfer(resourceType: ResourceConstant, flagsNeedingTransfer: MarketFlagConfig[]): number {
+    const terminalAmount = this.terminal!.store.getUsedCapacity(resourceType);
+    let target = resourceType === RESOURCE_ENERGY ? MIN_TERMINAL_ENERGY : MIN_TERMINAL_RESOURCE;
+    for (const config of flagsNeedingTransfer) {
+      if (config.resourceType === resourceType) {
+        target = Math.max(target, config.amount);
+      }
+    }
+    const deficit = Math.max(0, target - terminalAmount);
+    return Math.min(deficit, this.storage.store.getUsedCapacity(resourceType));
+  }
+
+  private tryCreateStorageOverflowSellFlag(marketFlags: MarketFlagConfig[]): boolean {
+    const storageCapacity = this.storage.store.getCapacity();
+    const storageUsed = this.storage.store.getUsedCapacity();
+    if (!storageCapacity || storageUsed <= storageCapacity * STORAGE_AUTO_SELL_FILL_RATIO) {
+      return false;
+    }
+    const priceMode: PriceMode =
+      storageUsed > storageCapacity * STORAGE_AUTO_SELL_DEAL_FILL_RATIO ? "MarketValueDeal" : "MarketValue";
+
+    const resourcesWithSellFlags = marketFlags
+      .filter(config => config.operation === "Sell")
+      .map(config => config.resourceType);
+
+    const resourceToSell = (Object.keys(this.storage.store) as ResourceConstant[])
+      .filter(resourceType => this.storage.store.getUsedCapacity(resourceType) > STORAGE_AUTO_SELL_MIN_AMOUNT)
+      .filter(resourceType => !resourcesWithSellFlags.includes(resourceType))
+      .sort((a, b) => this.storage.store.getUsedCapacity(b) - this.storage.store.getUsedCapacity(a))[0];
+
+    if (!resourceToSell) {
+      return false;
     }
 
+    const flagName = `${MARKET_FLAG_PREFIX}-Sell-${resourceToSell}-${STORAGE_AUTO_SELL_ORDER_AMOUNT}-${priceMode}`;
+    if (Game.flags[flagName]) {
+      return false;
+    }
+
+    const createFlagResult = this.room.createFlag(this.storage.pos, flagName, COLOR_WHITE, COLOR_WHITE);
+    if (typeof createFlagResult === "string") {
+      EventHandler.pushEvent(this.room.name, "Market", `Created overflow sell flag ${flagName}`);
+      return true;
+    }
+
+    console.log(`MarketArea: createFlag failed for overflow sell flag ${flagName}, code ${createFlagResult}.`);
+    return false;
+  }
+
+  private getResourceToTransferToTerminal(flagsNeedingTransfer: MarketFlagConfig[]): ResourceConstant | null {
     if (this.needsTerminalBuffer() && this.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
       return RESOURCE_ENERGY;
     }
 
     for (const config of flagsNeedingTransfer) {
       if (
-        this.terminal.store.getUsedCapacity(config.resourceType) < config.amount &&
+        this.terminal!.store.getUsedCapacity(config.resourceType) < config.amount &&
         this.storage.store.getUsedCapacity(config.resourceType) > 0
       ) {
         return config.resourceType;
@@ -206,7 +286,7 @@ export default class MarketArea extends BaseArea {
       if (totalInRoom <= MIN_TERMINAL_RESOURCE) {
         continue;
       }
-      if (this.terminal.store.getUsedCapacity(resourceType) >= MIN_TERMINAL_RESOURCE) {
+      if (this.terminal!.store.getUsedCapacity(resourceType) >= MIN_TERMINAL_RESOURCE) {
         continue;
       }
       const recipientRoom = this.getRecipientRoomForResource(resourceType);
@@ -219,13 +299,10 @@ export default class MarketArea extends BaseArea {
   }
 
   private trySendResourcesToOwnRooms(): void {
-    if (!this.terminal) {
+    if (this.terminal!.cooldown > 0 || this.terminalActionTick === Game.time) {
       return;
     }
-    if (this.terminal.cooldown > 0) {
-      return;
-    }
-    if (this.terminal.store.getUsedCapacity(RESOURCE_ENERGY) < MIN_TERMINAL_ENERGY) {
+    if (this.terminal!.store.getUsedCapacity(RESOURCE_ENERGY) < MIN_TERMINAL_ENERGY) {
       return;
     }
 
@@ -236,7 +313,7 @@ export default class MarketArea extends BaseArea {
         continue;
       }
 
-      const terminalAmount = this.terminal.store.getUsedCapacity(resourceType);
+      const terminalAmount = this.terminal!.store.getUsedCapacity(resourceType);
       if (terminalAmount < MIN_TERMINAL_RESOURCE || terminalAmount < INTER_ROOM_SEND_AMOUNT) {
         continue;
       }
@@ -257,26 +334,19 @@ export default class MarketArea extends BaseArea {
         continue;
       }
 
-      const result = this.terminal.send(resourceType, amountToSend, recipientRoom.name, `Balance-${resourceType}`);
+      const result = this.terminal!.send(resourceType, amountToSend, recipientRoom.name, `Balance-${resourceType}`);
       if (result === OK) {
-        console.log(
-          `MarketArea: Sent ${amountToSend} ${resourceType} from ${this.room.name} to ${recipientRoom.name} for balancing.`
-        );
+        this.terminalActionTick = Game.time;
+        this.logMarketEvent(`Sent ${amountToSend} ${resourceType} to ${recipientRoom.name} for balancing`);
       } else {
-        console.log(
-          `MarketArea: terminal.send failed in ${this.room.name} for ${resourceType} to ${recipientRoom.name}, code ${result}.`
-        );
+        this.logMarketEvent(`Send ${resourceType} to ${recipientRoom.name} failed, code ${result}`);
       }
       return;
     }
   }
 
   private getSendableResourceTypes(): ResourceConstant[] {
-    if (!this.terminal) {
-      return [];
-    }
-
-    const keys = [...Object.keys(this.storage.store), ...Object.keys(this.terminal.store)] as ResourceConstant[];
+    const keys = [...Object.keys(this.storage.store), ...Object.keys(this.terminal!.store)] as ResourceConstant[];
     const uniqueKeys: ResourceConstant[] = [];
     for (const key of keys) {
       if (!uniqueKeys.includes(key)) {
@@ -327,10 +397,12 @@ export default class MarketArea extends BaseArea {
   }
 
   private needsTerminalBuffer(): boolean {
-    if (!this.terminal) {
-      return false;
-    }
-    return this.terminal.store.getUsedCapacity(RESOURCE_ENERGY) < MIN_TERMINAL_ENERGY;
+    return this.terminal!.store.getUsedCapacity(RESOURCE_ENERGY) < MIN_TERMINAL_ENERGY;
+  }
+
+  // Selling energy must not eat the terminal buffer used for transfer fees.
+  private getTerminalSellTarget(resourceType: ResourceConstant, amount: number): number {
+    return resourceType === RESOURCE_ENERGY ? amount + MIN_TERMINAL_ENERGY : amount;
   }
 
   private findActiveOrderForFlag(config: MarketFlagConfig, state: MarketFlagState): Order | null {
@@ -383,10 +455,9 @@ export default class MarketArea extends BaseArea {
         state.orderId = createdOrder.id;
       }
       config.flag.setColor(COLOR_YELLOW, config.flag.secondaryColor);
+      this.logMarketEvent(`Created ${orderType} order ${config.amount} ${config.resourceType} @ ${price.toFixed(3)}`);
     } else {
-      console.log(
-        `MarketArea: createOrder failed for flag ${config.flag.name} in ${this.room.name}, code ${createOrderResult}`
-      );
+      this.logMarketEvent(`createOrder failed for ${config.flag.name}, code ${createOrderResult}`);
     }
   }
 
@@ -441,6 +512,181 @@ export default class MarketArea extends BaseArea {
     return Math.max(MIN_ORDER_PRICE, Math.min(ceilingPrice, candidatePrice));
   }
 
+  private processDealFlag(
+    config: MarketFlagConfig,
+    state: MarketFlagState,
+    flagsNeedingTransfer: MarketFlagConfig[]
+  ): void {
+    this.resolvePendingDeal(config, state);
+
+    const remaining = config.amount - (state.dealtAmount ?? 0);
+    if (remaining <= 0) {
+      state.greenSinceTick = Game.time;
+      config.flag.setColor(COLOR_GREEN, config.flag.secondaryColor);
+      this.logMarketEvent(`Completed ${config.operation} deal of ${state.dealtAmount ?? 0} ${config.resourceType}`);
+      return;
+    }
+
+    // Wait for last tick's deal to be confirmed through the transaction log.
+    if (state.pendingDeal) {
+      return;
+    }
+
+    if (config.operation === "Sell") {
+      const requiredAmount = this.getTerminalSellTarget(config.resourceType, remaining);
+      if (this.terminal!.store.getUsedCapacity(config.resourceType) < requiredAmount) {
+        flagsNeedingTransfer.push({ ...config, amount: requiredAmount });
+      }
+    }
+
+    if (this.terminal!.cooldown > 0 || this.terminalActionTick === Game.time) {
+      return;
+    }
+
+    this.tryDeal(config, state, remaining);
+  }
+
+  private resolvePendingDeal(config: MarketFlagConfig, state: MarketFlagState): void {
+    const pending = state.pendingDeal;
+    if (!pending || Game.time <= pending.tick) {
+      return;
+    }
+
+    const transactions =
+      config.operation === "Sell" ? Game.market.outgoingTransactions : Game.market.incomingTransactions;
+    const transaction = transactions.find(
+      t =>
+        t.order?.id === pending.orderId &&
+        t.time >= pending.tick &&
+        (config.operation === "Sell" ? t.from === this.room.name : t.to === this.room.name)
+    );
+
+    if (transaction) {
+      state.dealtAmount = (state.dealtAmount ?? 0) + transaction.amount;
+      this.logMarketEvent(
+        `${config.operation} ${transaction.amount} ${config.resourceType} @ ${transaction.order?.price ?? "?"} ${
+          config.operation === "Sell" ? "to" : "from"
+        } ${config.operation === "Sell" ? transaction.to : transaction.from} (${state.dealtAmount}/${config.amount})`
+      );
+    } else {
+      this.logMarketEvent(`Deal on order ${pending.orderId} for ${config.flag.name} was not executed`);
+    }
+    delete state.pendingDeal;
+  }
+
+  private tryDeal(config: MarketFlagConfig, state: MarketFlagState, remaining: number): void {
+    const terminal = this.terminal!;
+    const isSell = config.operation === "Sell";
+    const candidates = this.getDealCandidates(config);
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const terminalEnergy = terminal.store.getUsedCapacity(RESOURCE_ENERGY);
+    for (const candidate of candidates) {
+      const order = candidate.order;
+      let amount = Math.min(remaining, order.amount);
+      if (isSell) {
+        const reserved = config.resourceType === RESOURCE_ENERGY ? MIN_TERMINAL_ENERGY : 0;
+        amount = Math.min(amount, terminal.store.getUsedCapacity(config.resourceType) - reserved);
+      } else {
+        amount = Math.min(amount, terminal.store.getFreeCapacity(), Math.floor(Game.market.credits / order.price));
+      }
+
+      // Selling energy spends the goods and the transfer fee from the same pool.
+      const energyPerUnit =
+        isSell && config.resourceType === RESOURCE_ENERGY
+          ? 1 + candidate.energyCostPerUnit
+          : candidate.energyCostPerUnit;
+      if (energyPerUnit > 0) {
+        amount = Math.min(amount, Math.floor(terminalEnergy / energyPerUnit));
+      }
+      if (amount <= 0) {
+        continue;
+      }
+
+      const cost = Game.market.calcTransactionCost(amount, this.room.name, order.roomName!);
+      const energyNeeded = isSell && config.resourceType === RESOURCE_ENERGY ? cost + amount : cost;
+      if (energyNeeded > terminalEnergy) {
+        continue;
+      }
+
+      const result = Game.market.deal(order.id, amount, this.room.name);
+      if (result === OK) {
+        this.terminalActionTick = Game.time;
+        state.pendingDeal = { orderId: order.id, amount, tick: Game.time };
+        if (config.flag.color !== COLOR_YELLOW) {
+          config.flag.setColor(COLOR_YELLOW, config.flag.secondaryColor);
+        }
+        this.logMarketEvent(
+          `Deal ${amount} ${config.resourceType} @ ${order.price} with ${order.roomName!} (energy ${cost})`
+        );
+      } else {
+        this.logMarketEvent(`Deal for ${config.flag.name} on order ${order.id} failed, code ${result}`);
+      }
+      return;
+    }
+  }
+
+  private getDealCandidates(config: MarketFlagConfig): DealCandidate[] {
+    const isSell = config.operation === "Sell";
+    const energyValue = this.getEnergyCreditValue();
+    const averagePrice = this.getAverageHistoryPrice(config.resourceType);
+    const orders = Game.market.getAllOrders({
+      type: isSell ? ORDER_BUY : ORDER_SELL,
+      resourceType: config.resourceType
+    });
+
+    const candidates: DealCandidate[] = [];
+    for (const order of orders) {
+      if (!order.roomName || order.amount <= 0 || Game.market.orders[order.id]) continue;
+      if (Game.rooms[order.roomName]?.controller?.my) continue;
+
+      // Terminal transfer fee: ceil(amount * (1 - e^(-distance / 30))).
+      const distance = Game.map.getRoomLinearDistance(this.room.name, order.roomName, true);
+      const energyCostPerUnit = 1 - Math.exp(-distance / 30);
+      const energyCredits = energyCostPerUnit * energyValue;
+      const effectivePrice = isSell ? order.price - energyCredits : order.price + energyCredits;
+
+      if (isSell) {
+        if (effectivePrice <= 0) continue;
+        if (averagePrice !== null && effectivePrice < averagePrice * SELL_PRICE_FLOOR_RATIO) continue;
+      } else if (averagePrice !== null && effectivePrice > averagePrice * BUY_PRICE_CEILING_RATIO) {
+        continue;
+      }
+
+      candidates.push({ order, energyCostPerUnit, effectivePrice });
+    }
+
+    candidates.sort((a, b) => (isSell ? b.effectivePrice - a.effectivePrice : a.effectivePrice - b.effectivePrice));
+    return candidates;
+  }
+
+  private getAverageHistoryPrice(resourceType: ResourceConstant): number | null {
+    const recentHistory = Game.market.getHistory(resourceType).slice(-3);
+    if (recentHistory.length === 0) {
+      return null;
+    }
+    return recentHistory.reduce((sum, entry) => sum + entry.avgPrice, 0) / recentHistory.length;
+  }
+
+  private getEnergyCreditValue(): number {
+    const averagePrice = this.getAverageHistoryPrice(RESOURCE_ENERGY);
+    if (averagePrice !== null) {
+      return averagePrice;
+    }
+    const cheapestEnergy = _.min(
+      Game.market.getAllOrders({ type: ORDER_SELL, resourceType: RESOURCE_ENERGY }),
+      o => o.price
+    );
+    return cheapestEnergy && _.isFinite(cheapestEnergy.price) ? cheapestEnergy.price : 0;
+  }
+
+  private logMarketEvent(message: string): void {
+    console.log(`MarketArea ${this.room.name}: ${message}`);
+    EventHandler.pushEvent(this.room.name, "Market", message);
+  }
+
   private getTrackedOrderId(flagName: string): string | undefined {
     const states = this.getMarketStates();
     return states[flagName]?.orderId;
@@ -491,6 +737,16 @@ export default class MarketArea extends BaseArea {
     }
 
     const loweredPriceText = priceText.toLowerCase();
+    if (loweredPriceText === "marketvaluedeal") {
+      return {
+        flag,
+        operation,
+        resourceType,
+        amount,
+        priceMode: "MarketValueDeal"
+      };
+    }
+
     if (loweredPriceText === "marketvalue") {
       return {
         flag,
@@ -527,11 +783,8 @@ export default class MarketArea extends BaseArea {
   }
 
   private parseResourceType(resourceText: string): ResourceConstant | null {
-    const resourceTypeUpper = resourceText.toUpperCase() as ResourceConstant;
-    if (resourceTypeUpper) return resourceTypeUpper;
-    const resourceTypeLower = resourceText.toLowerCase() as ResourceConstant;
-    if (resourceTypeLower) return resourceTypeLower;
-    return null;
+    const normalizedResourceText = resourceText.toLowerCase();
+    return RESOURCES_ALL.find(resourceType => resourceType.toLowerCase() === normalizedResourceText) ?? null;
   }
 
   private getMarketStates(): Record<string, MarketFlagState> {
@@ -545,20 +798,11 @@ export default class MarketArea extends BaseArea {
     Memory.Keys.MarketAreaStates = states;
   }
 
-  private createCreepForThisArea(): SpawnTask | null {
+  private createCreepForThisArea(amountToTransfer: number): SpawnTask | null {
+    const segments = amountToTransfer >= LARGE_CLERK_TRANSFER_THRESHOLD ? 2 : 1;
     const bodyPartConstants: BodyPartConstant[] = [];
-    const haveUtilityCreeps = this.creeps.length > 0;
-    const segments = haveUtilityCreeps ? Math.max(5, Math.floor(this.room.energyCapacityAvailable / 100)) : 1; // Carry-50; Move-50
-    if (segments < 1) {
-      console.log(
-        `Error MarketArea: Room ${this.room.name} Trying to spawn a clerk with segments ${segments} less than 1`
-      );
-      return null;
-    } else {
-      const moveParts = segments / 2;
-      for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
-      for (let i = 0; i < moveParts; i++) bodyPartConstants.push(MOVE);
-    }
+    for (let i = 0; i < segments; i++) bodyPartConstants.push(CARRY);
+    for (let i = 0; i < segments; i++) bodyPartConstants.push(MOVE);
     return new SpawnTask(CreepType.Clerk, this.areaId, bodyPartConstants, this);
   }
 }

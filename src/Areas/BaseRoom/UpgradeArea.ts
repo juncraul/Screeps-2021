@@ -106,9 +106,10 @@ export default class UpgradeArea extends BaseArea {
   }
 
   private calculateMaxWorkerCount(): number {
-    // For level 8 there is no point having more than one upgrader.
+    // For level 8 there is no point having more than one upgrader, and only spawn it once we are
+    // halfway to downgrading, so we don't waste energy upgrading a maxed out controller.
     if (this.controllerLevel === 8) {
-      return 1;
+      return this.controller.ticksToDowngrade <= CONTROLLER_DOWNGRADE[8] / 2 ? 1 : 0;
     }
     if (this.controllerLevel > 3) {
       const nearbyEnergy = this.getAvailableUpgradeEnergyNearby();
