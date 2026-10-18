@@ -86,7 +86,7 @@ export default class LooterArea extends SoldierArea {
           this.goToTargetRoom(creep, targetRoom);
         }
       } else if (creep.pos.roomName === targetRoom.name) {
-        const roomHasLoot = targetRoom ? this.hasLootRemaining(targetRoom) : true;
+        const roomHasLoot = targetRoom ? this.hasLootRemaining() : true;
         if (creep.isFull() || !roomHasLoot) {
           console.log(`LooterArea: ${creep.name} is full or no loot remaining, returning to base ${homeRoomName}`);
           this.returnToBaseAndDeposit(creep, homeRoomName);
@@ -113,6 +113,7 @@ export default class LooterArea extends SoldierArea {
     if (nonEnergyLoot) {
       console.log(`LooterArea: ${creep.name} found non-energy loot, collecting it`);
       this.addLootTask(creep, nonEnergyLoot);
+      return;
     }
 
     const energyLoot = this.findLootTask(creep, true);
@@ -165,7 +166,7 @@ export default class LooterArea extends SoldierArea {
     }
   }
 
-  private hasLootRemaining(room: Room): boolean {
+  private hasLootRemaining(): boolean {
     return (
       this.findLootTask(new CreepBase(Game.creeps[Object.keys(Game.creeps)[0]]), false) !== null ||
       this.findLootTask(new CreepBase(Game.creeps[Object.keys(Game.creeps)[0]]), true) !== null
@@ -219,8 +220,28 @@ export default class LooterArea extends SoldierArea {
         (s): s is StructureTerminal =>
           s.structureType === STRUCTURE_TERMINAL && this.getAvailableResources(s.store, includeEnergy).length > 0
       );
+    const structureLab = room
+      .find(FIND_STRUCTURES)
+      .filter(
+        (s): s is StructureLab =>
+          s.structureType === STRUCTURE_LAB && this.getAvailableResources(s.store, includeEnergy).length > 0
+      );
+    const structureLink = room
+      .find(FIND_STRUCTURES)
+      .filter(
+        (s): s is StructureLink =>
+          s.structureType === STRUCTURE_LINK && this.getAvailableResources(s.store, includeEnergy).length > 0
+      );
 
-    const candidates = [...tombstones, ...ruins, ...structureContainer, ...structureStorage, ...structureTerminal];
+    const candidates = [
+      ...tombstones,
+      ...ruins,
+      ...structureContainer,
+      ...structureStorage,
+      ...structureTerminal,
+      ...structureLab,
+      ...structureLink
+    ];
     const closestTarget = this.findClosestByRange(creep, candidates);
     if (!closestTarget) {
       return null;

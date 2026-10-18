@@ -62,7 +62,7 @@ All current flags are documented here so you only need this section.
 |---|---|---|---|
 | `Reserve-SpawnRoom[-AnyIgnoredText]` (purple/blue) | `Reserve-E29S25` | Reserve/claim remote controller | Required part 2 (`SpawnRoom`) or `X` |
 | `RemoteRebuild-SpawnRoom[-AnyIgnoredText]` | `RemoteRebuild-E29S25-First` | Rebuild remote room from spawn room | Required part 2 (`SpawnRoom`) or `X` |
-| `Attack-SpawnRoom[-SquadSize][-PowerRank][-AnyIgnoredText]` | `Attack-E29S25-4-5-Healers` | Soldier squad behavior | Required part 2 (`SpawnRoom`) or `X` |
+| `Attack-SpawnRoom-SquadSize[-PowerRank][-AnyIgnoredText]` | `Attack-E29S25-4-5-Healers` | Melee, ranged, mixed, healer-supported, or dismantler squad | Required part 2 (`SpawnRoom`) or `X` |
 | `SourceKeeper-SpawnRoom[-AnyIgnoredText]` | `SourceKeeper-E29S25` | Source Keeper hunting squad | Required part 2 (`SpawnRoom`) or `X` |
 | `Looter-SpawnRoom[-AnyIgnoredText]` | `Looter-E29S25` | Looter carrier unit | Required part 2 (`SpawnRoom`) or `X` |
 | `Defense-RoomName` | `Defense-E29S25` | Emergency in-room defense team | Auto-placed by SafeMode logic |
@@ -129,23 +129,30 @@ Example:
 
 ---
 
-### `Attack-SpawnRoom[-PowerRank][-AnyIgnoredText]`
+### `Attack-SpawnRoom-SquadSize[-PowerRank][-AnyIgnoredText]`
 
 - File source: `src/Areas/Military/SoldierArea.ts`
 - Prefix: `Attack`.
 - Parsed format:
 1. `SpawnRoom` (required part 2, or `X`)
-2. Optional `PowerRank` (default role body)
-3. Optional ignored suffix text
-- `SquadSize` currently defaults to `5`.
+2. `SquadSize` (required positive integer; total number of creeps, including healers)
+3. Optional `PowerRank` (defaults to `1`)
+4. Optional ignored suffix text
+- Flags without a valid positive `SquadSize` do not create a squad.
 
 Flag colors control behavior:
 
 Primary color (role composition):
-1. `RED` → Melee
-2. `GREEN` → Ranged
-3. `BLUE` → Healer
-4. `PURPLE` → Split Melee/Ranged
+
+| Color | Squad composition |
+|---|---|
+| `RED` | All `Melee` (`ATTACK`) |
+| `GREEN` | All `Ranged` (`RANGED_ATTACK`) |
+| `BLUE` | One `Melee`, remaining slots `Healer` (`HEAL`) |
+| `PURPLE` | Split `Melee` / `Ranged`; melee gets the extra slot for odd squad sizes |
+| `YELLOW` | One `Dismantler` (`WORK`), remaining slots `Healer` |
+
+For blue squads, the melee unit uses twice the flag's `PowerRank`; for yellow squads, the dismantler uses twice the flag's `PowerRank`. Healers use the flag's normal rank. Suffixes such as `Healers` or `Dismantle` are labels only; the primary flag color selects the squad type.
 
 Secondary color (combat targeting):
 1. `RED` → attack everything
@@ -154,8 +161,9 @@ Secondary color (combat targeting):
 4. `WHITE` → no attack, move/hold
 
 Examples:
-- `Attack-E29S25-2-Healers`
-- `Attack-X-1`
+- `Attack-E29S25-4-5-Healers` with a blue primary color: one melee unit and three healers, rank `5` (melee rank `10`).
+- `Attack-E29S25-4-5-Dismantle` with a yellow primary color: one dismantler and three healers, rank `5` (dismantler rank `10`).
+- `Attack-X-2` with a purple primary color: one melee and one ranged unit, default rank `1`, spawning from any base.
 
 ---
 

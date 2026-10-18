@@ -838,6 +838,52 @@ export class GetRoomObjects {
     return this.toRoomPosition(room.name, source?.linkPos);
   }
 
+  public static planSourceConstructionPositions(
+    room: Room,
+    source: Source,
+    containerPos: RoomPosition
+  ): { accessPosition: RoomPosition | null; linkPosition: RoomPosition | null } {
+    const linkPosition =
+      this.getWithinRangeLink(containerPos, 1)?.pos ??
+      this.getWithinRangeConstructionSite(containerPos, 1, STRUCTURE_LINK)?.pos ??
+      this.getSourceLinkPosition(room, source.id);
+    if (linkPosition) {
+      this.setSourceLinkPosition(room, source.id, linkPosition);
+    }
+    const spawn = this.getRoomSpawns(room, true)[0];
+    if (!spawn) {
+      return { accessPosition: null, linkPosition };
+    }
+
+    const accessCandidates = Helper.getWalkableAdjacentPositions(containerPos).filter(
+      pos =>
+        !pos.isEqualTo(source.pos) &&
+        (!linkPosition || !pos.isEqualTo(linkPosition)) &&
+        pos
+          .lookFor(LOOK_CONSTRUCTION_SITES)
+          .every(site => site.structureType === STRUCTURE_ROAD || site.structureType === STRUCTURE_RAMPART)
+    );
+    const preferredX = containerPos.x + Math.sign(spawn.pos.x - containerPos.x);
+    const preferredY = containerPos.y + Math.sign(spawn.pos.y - containerPos.y);
+    const pathPosition = this.getXStepTowardsSpawn(containerPos, 1);
+    const accessPosition =
+      accessCandidates.find(pos => pos.x === preferredX && pos.y === preferredY) ??
+      accessCandidates.find(pos => pos.isEqualTo(pathPosition)) ??
+      null;
+    if (linkPosition || !accessPosition) {
+      return { accessPosition, linkPosition };
+    }
+
+    const plannedLinkPosition =
+      Helper.getFreeAdjacentPositions(containerPos).find(
+        pos => !pos.isEqualTo(source.pos) && !pos.isEqualTo(accessPosition)
+      ) ?? null;
+    if (plannedLinkPosition) {
+      this.setSourceLinkPosition(room, source.id, plannedLinkPosition);
+    }
+    return { accessPosition, linkPosition: plannedLinkPosition };
+  }
+
   public static getMineralContainerPosition(room: Room, mineralId: string): RoomPosition | null {
     const mineral = this.getMineralInfo(room, mineralId);
     return this.toRoomPosition(room.name, mineral?.containerPos);

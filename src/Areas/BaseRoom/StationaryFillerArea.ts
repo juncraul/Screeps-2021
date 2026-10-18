@@ -5,6 +5,15 @@ import BaseArea from "./BaseArea";
 import { GetRoomObjects } from "Helpers/GetRoomObjects";
 import { CreepBase } from "CreepBase";
 
+// . R R R R R .
+// R E E C E E R
+// R E F E F E R
+// R E E E E E R
+// R E F E F E R
+// R E E S E E R
+// . R R R R R .
+// R = road, S = spawn, C = container, E = extension, F = stationary filler, . = empty
+
 export default class StationaryFillerArea extends BaseArea {
   containers: StructureContainer[];
   stationaryPositions: RoomPosition[];

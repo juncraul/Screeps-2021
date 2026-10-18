@@ -32,11 +32,24 @@ export default class SourceArea extends HarvestArea {
   }
 
   public handleSpawnTasks(): SpawnTask[] {
+    const walkableCellCount = Helper.getWalkableAdjacentPositions(this.source.pos).length;
+    if (this.creeps.length >= walkableCellCount + this.getNumberOfDyingCreeps()) {
+      return [];
+    }
+
     return super.handleSpawnTasks();
   }
 
   protected handleSetup() {
     super.handleSetup();
+
+    const containerPosition =
+      this.containerNextToHarvestArea?.pos ??
+      this.containerConstructionSiteNextToHarvestArea?.pos ??
+      this.getStoredContainerPosition();
+    const positionForLink = containerPosition
+      ? GetRoomObjects.planSourceConstructionPositions(this.room, this.source, containerPosition).linkPosition
+      : null;
 
     if (this.controllerLevel < 5) {
       return;
@@ -61,9 +74,6 @@ export default class SourceArea extends HarvestArea {
           this.isFurthestSourceInRoom());
 
       if (canCreateLink) {
-        const positionForLink =
-          GetRoomObjects.getSourceLinkPosition(this.room, this.source.id) ??
-          Helper.getFreeAdjacentPositions(this.containerNextToHarvestArea.pos)[0];
         if (positionForLink) {
           GetRoomObjects.setSourceLinkPosition(this.room, this.source.id, positionForLink);
           console.log("SourceArea: will create link", positionForLink.toString());
@@ -201,13 +211,12 @@ export default class SourceArea extends HarvestArea {
   }
 
   private calculateMaxWorkerCount(): number {
-    const sourcePos = Game.getObjectById<Source>(this.areaId)?.pos;
-    const maxEmptySpaceAroundHarvestArea = sourcePos ? Helper.getWalkableAdjacentPositions(sourcePos).length : 1;
+    const maxEmptySpaceAroundHarvestArea = Helper.getWalkableAdjacentPositions(this.source.pos).length;
     const creeps = this.creeps.filter(creep => (creep.ticksToLive ?? 0) > 200);
     const workBodyPartsFromCreeps = creeps.reduce((total, creep) => total + creep.creep.getActiveBodyparts(WORK), 0);
     const areWeAtMaxHarvestPower = workBodyPartsFromCreeps >= 5;
     if (areWeAtMaxHarvestPower) {
-      return creeps.length;
+      return Math.min(creeps.length, maxEmptySpaceAroundHarvestArea);
     }
     return Math.min(maxEmptySpaceAroundHarvestArea, 3);
   }

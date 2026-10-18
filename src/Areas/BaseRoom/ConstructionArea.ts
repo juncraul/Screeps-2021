@@ -5,6 +5,16 @@ import BaseArea from "./BaseArea";
 import { CreepBase } from "CreepBase";
 
 const STORAGE_ENERGY_THRESHOLD = 5000;
+const DROPPED_RESOURCE_PRIORITY = 5;
+const CONTAINER_PRIORITY = 2;
+const STORAGE_PRIORITY = 1;
+
+interface EnergySource {
+  amount: number;
+  activity: Activity;
+  pos: RoomPosition;
+  priority: number;
+}
 
 export default class ConstructionArea extends BaseArea {
   controller: StructureController;
@@ -45,22 +55,9 @@ export default class ConstructionArea extends BaseArea {
       this.interupCurrentTaskIfNeeded(creep);
       if (!creep.isFree()) continue;
       if (creep.isEmpty()) {
-        const closestContainer = creep.pos.findClosestByPath(
-          this.containersToCollectFrom.filter(c => c.store.energy > threasholdToCollectFrom)
-        );
-        if (closestContainer) {
-          creep.addTask(new CreepTask(Activity.CollectEnergy, closestContainer.pos));
-          continue;
-        }
-        const closestDroppedResource = creep.pos.findClosestByPath(
-          this.droppedResourcesToCollectFrom.filter(r => r.amount > threasholdToCollectFrom)
-        );
-        if (closestDroppedResource) {
-          creep.addTask(new CreepTask(Activity.Pickup, closestDroppedResource.pos));
-          continue;
-        }
-        if (this.storage && this.storage.store.energy > STORAGE_ENERGY_THRESHOLD) {
-          creep.addTask(new CreepTask(Activity.CollectEnergy, this.storage.pos)); // TODO:Add Energy type in here.
+        const energySource = this.getBestEnergySource(creep, threasholdToCollectFrom);
+        if (energySource) {
+          creep.addTask(new CreepTask(energySource.activity, energySource.pos));
           continue;
         }
         // If there is no energy to collect from anywhere, then we should send the creep to harvest from a source. Only if there is no spawn, otherwise spawn should create a harvester
@@ -95,6 +92,62 @@ export default class ConstructionArea extends BaseArea {
         }
       }
     }
+  }
+
+  private getBestEnergySource(creep: CreepBase, minimumAmount: number): EnergySource | null {
+    const energySources: EnergySource[] = [];
+
+    for (const container of this.containersToCollectFrom) {
+      const amount = container.store.getUsedCapacity(RESOURCE_ENERGY);
+      if (amount > minimumAmount) {
+        energySources.push({
+          amount,
+          activity: Activity.CollectEnergy,
+          pos: container.pos,
+          priority: CONTAINER_PRIORITY
+        });
+      }
+    }
+
+    for (const resource of this.droppedResourcesToCollectFrom) {
+      if (resource.amount > minimumAmount) {
+        energySources.push({
+          amount: resource.amount,
+          activity: Activity.Pickup,
+          pos: resource.pos,
+          priority: DROPPED_RESOURCE_PRIORITY
+        });
+      }
+    }
+
+    if (this.storage) {
+      const amount = this.storage.store.getUsedCapacity(RESOURCE_ENERGY);
+      if (amount > STORAGE_ENERGY_THRESHOLD && amount > minimumAmount) {
+        energySources.push({
+          amount,
+          activity: Activity.CollectEnergy,
+          pos: this.storage.pos,
+          priority: STORAGE_PRIORITY
+        });
+      }
+    }
+
+    let bestSource: EnergySource | null = null;
+    let bestScore = -Infinity;
+    for (const source of energySources) {
+      const path = creep.pos.findPathTo(source.pos);
+      if (path.length === 0 && !creep.pos.isEqualTo(source.pos)) continue;
+
+      const carryCapacity = Math.max(1, creep.carryCapacity);
+      const amountScore = Math.min(source.amount, carryCapacity) / carryCapacity;
+      const score = (source.priority * amountScore) / (path.length + 1);
+      if (score > bestScore) {
+        bestScore = score;
+        bestSource = source;
+      }
+    }
+
+    return bestSource;
   }
 
   private interupCurrentTaskIfNeeded(creep: CreepBase) {

@@ -46,8 +46,8 @@ interface BaseBuildData {
 
 // BROWN - WHITE Build Rampart instead of wall
 
-// Base automatically chooses a good anchor using distance transform + flood fill,
-// then repositions itself and uses its own colors for preview/build.
+// Except for Fixed Extensions, Base automatically chooses a good anchor using distance
+// transform + flood fill, then repositions itself and uses its own colors for preview/build.
 
 export class BaseBuilder {
   private static readonly BASE_BUILD_PLAN_KEY_PREFIX = "Base-Build-Plans-";
@@ -709,6 +709,10 @@ export class BaseBuilder {
    * if you want to recompute the anchor.
    */
   public static autoPlaceConstructionFlag(flag: Flag, layout: BaseLayout, controllerLevel: number): boolean {
+    if (layout === layoutFixedExtension) {
+      return true;
+    }
+
     flag.memory.baseBuilder = flag.memory.baseBuilder || {};
     if (!flag.room) {
       return true;
@@ -806,21 +810,16 @@ export class BaseBuilder {
     for (const source of sources) {
       const container = GetRoomObjects.getWithinRangeContainer(source.pos, 1);
       if (!container) continue;
-      const surroundingPositions = Helper.getWalkableAdjacentPositions(container.pos);
-      let roadFromContainerPos = GetRoomObjects.getWithinRangeStructures(container.pos, 1, STRUCTURE_ROAD)[0]?.pos;
-      if (!roadFromContainerPos) {
-        roadFromContainerPos = GetRoomObjects.getXStepTowardsSpawn(container.pos, 1);
-      }
-      let linkNextToSourcePos = GetRoomObjects.getWithinRangeLink(source.pos, 2)?.pos;
-      if (!linkNextToSourcePos) {
-        linkNextToSourcePos = surroundingPositions.filter(
-          pos => roadFromContainerPos && !Helper.isSamePosition(pos, roadFromContainerPos)
-        )[0];
-      }
+      const { accessPosition, linkPosition } = GetRoomObjects.planSourceConstructionPositions(
+        room,
+        source,
+        container.pos
+      );
+      if (!accessPosition || !linkPosition) continue;
+      const surroundingPositions = Helper.getFreeAdjacentPositions(container.pos);
 
       for (const pos of surroundingPositions) {
-        if (linkNextToSourcePos && pos.isEqualTo(linkNextToSourcePos)) continue;
-        if (roadFromContainerPos && pos.isEqualTo(roadFromContainerPos)) continue;
+        if (pos.isEqualTo(source.pos) || pos.isEqualTo(linkPosition) || pos.isEqualTo(accessPosition)) continue;
         room.createConstructionSite(pos.x, pos.y, STRUCTURE_EXTENSION);
         return; // Create just one per tick
       }

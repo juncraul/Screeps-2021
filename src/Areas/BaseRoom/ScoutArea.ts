@@ -39,8 +39,14 @@ interface ScoutRoomIntel {
 
 type ScoutIntelMemory = Record<string, ScoutRoomIntel>;
 
+interface ScoutRoomNode {
+  depth: number;
+  parent: string | null;
+}
+
 export default class ScoutArea extends BaseArea {
   private static readonly MANAGED_FLAG_PREFIX = "Reserve";
+  private static readonly MAX_SCOUT_DEPTH = 2;
 
   baseRoom: Room;
   roomIntel: ScoutIntelMemory;
@@ -59,7 +65,7 @@ export default class ScoutArea extends BaseArea {
 
   public handleSpawnTasks(): SpawnTask[] {
     const baseController = this.baseRoom.controller;
-    if (!baseController || baseController.level >= 3) {
+    if (!baseController) {
       return [];
     }
     const activeScouts = this.creeps.filter(creep => !(creep.ticksToLive !== undefined && creep.ticksToLive < 100));
@@ -84,17 +90,22 @@ export default class ScoutArea extends BaseArea {
         continue;
       }
 
-      const nextRoomName = this.pickNextRoomToScout(creep.pos.roomName);
-      if (!nextRoomName || nextRoomName === creep.pos.roomName) {
+      const roomNodes = this.getScoutRoomNodes();
+      const targetRoomName = this.pickNextRoomToScout(creep.pos.roomName, roomNodes);
+      if (!targetRoomName || targetRoomName === creep.pos.roomName) {
         continue;
       }
 
-      creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, nextRoomName)));
+      const nextHop = this.getNextHop(creep.pos.roomName, targetRoomName, roomNodes);
+      if (nextHop === creep.pos.roomName) {
+        continue;
+      }
+      creep.addTask(new CreepTask(Activity.MoveDifferentRoom, new RoomPosition(25, 25, nextHop)));
     }
   }
 
   private refreshIntelForVisibleRooms(): void {
-    for (const roomName of this.getScoutRoomNames()) {
+    for (const roomName of this.getScoutRoomNodes().keys()) {
       const room = Game.rooms[roomName];
       if (!room) {
         continue;
@@ -120,8 +131,6 @@ export default class ScoutArea extends BaseArea {
         }
       : null;
 
-    if (!controller) return null;
-
     const sources = GetRoomObjects.getRoomSources(room).map(source => ({
       id: source.id,
       x: source.pos.x,
@@ -138,9 +147,9 @@ export default class ScoutArea extends BaseArea {
 
     const hostileCount = room.find(FIND_HOSTILE_CREEPS).length;
     const hasController = !!controller;
-    const controllerNeutru = !controller.owner && !controller.reservation;
-    const controllerReservedByUs = controller.reservation === Helper.getUserName();
-    const controllerReservedByInvader = controller.reservation === "Invader";
+    const controllerNeutru = !controller?.owner && !controller?.reservation;
+    const controllerReservedByUs = controller?.reservation === Helper.getUserName();
+    const controllerReservedByInvader = controller?.reservation === "Invader";
     const controllerFree = hasController && (controllerNeutru || controllerReservedByUs || controllerReservedByInvader);
     const claimable = hostileCount === 0 && hasController && controllerFree && sources.length > 0;
 
@@ -157,6 +166,11 @@ export default class ScoutArea extends BaseArea {
 
   private syncManagedFlag(room: Room, intel: ScoutRoomIntel): void {
     const flagName = this.getManagedFlagName(room.name);
+    if (this.isBlockedByOtherPlayer(intel)) {
+      Game.flags[flagName]?.remove();
+      return;
+    }
+
     const existingFlags = this.getAllRemoteFlags(room.name);
 
     if (existingFlags.length > 0 || !intel.controller || intel.hostileCount > 0 || !intel.claimable) {
@@ -164,7 +178,43 @@ export default class ScoutArea extends BaseArea {
     }
 
     const flagPos = new RoomPosition(intel.controller.x, intel.controller.y, intel.roomName);
+    if (!this.canScoutReachTargets(room, intel, flagPos)) {
+      return;
+    }
     flagPos.createFlag(flagName, COLOR_PURPLE, COLOR_PURPLE);
+  }
+
+  // Leftover walls/ramparts from abandoned bases can seal off the controller or sources.
+  private canScoutReachTargets(room: Room, intel: ScoutRoomIntel, controllerPos: RoomPosition): boolean {
+    const scout = this.creeps.find(creep => creep.pos.roomName === room.name);
+    if (!scout) {
+      return false;
+    }
+
+    const costMatrix = new PathFinder.CostMatrix();
+    for (const structure of room.find(FIND_STRUCTURES)) {
+      const { x, y } = structure.pos;
+      if (structure.structureType === STRUCTURE_ROAD) {
+        costMatrix.set(x, y, 1);
+      } else if (structure.structureType === STRUCTURE_RAMPART) {
+        const rampart = structure;
+        if (!rampart.my && !rampart.isPublic) {
+          costMatrix.set(x, y, 255);
+        }
+      } else if ((OBSTACLE_OBJECT_TYPES as string[]).includes(structure.structureType)) {
+        costMatrix.set(x, y, 255);
+      }
+    }
+
+    const targets = [controllerPos, ...intel.sources.map(source => new RoomPosition(source.x, source.y, room.name))];
+    return targets.every(target => {
+      const result = PathFinder.search(
+        scout.pos,
+        { pos: target, range: 1 },
+        { maxRooms: 1, plainCost: 2, swampCost: 10, roomCallback: () => costMatrix }
+      );
+      return !result.incomplete;
+    });
   }
 
   private hasHostiles(room: Room): boolean {
@@ -175,33 +225,90 @@ export default class ScoutArea extends BaseArea {
     );
   }
 
-  private getScoutRoomNames(): string[] {
-    const exits = Game.map.describeExits(this.baseRoom.name);
-    if (!exits) {
-      return [];
+  private isBlockedByOtherPlayer(intel: ScoutRoomIntel | undefined): boolean {
+    const controller = intel?.controller;
+    if (!controller) {
+      return false;
     }
-
-    return Array.from(
-      new Set(
-        Object.values(exits).filter(
-          (roomName): roomName is string => !!roomName && GetRoomObjects.ROOM_NAME_PATTERN.test(roomName)
-        )
-      )
-    );
+    const myName = Helper.getUserName();
+    const ownedByOther = !!controller.owner && controller.owner !== myName;
+    const reservedByOther =
+      !!controller.reservation && controller.reservation !== myName && controller.reservation !== "Invader";
+    return ownedByOther || reservedByOther;
   }
 
-  private pickNextRoomToScout(currentRoomName: string): string | null {
-    const roomNames = this.getScoutRoomNames();
-    if (roomNames.length === 0) {
-      return null;
+  // BFS from the base room; rooms owned/reserved by other players are kept as leaves so search stops there.
+  private getScoutRoomNodes(): Map<string, ScoutRoomNode> {
+    const nodes = new Map<string, ScoutRoomNode>();
+    const visited = new Set<string>([this.baseRoom.name]);
+    const baseStatus = Game.map.getRoomStatus(this.baseRoom.name)?.status;
+    let frontier = [this.baseRoom.name];
+
+    for (let depth = 1; depth <= ScoutArea.MAX_SCOUT_DEPTH; depth++) {
+      const nextFrontier: string[] = [];
+      for (const fromRoom of frontier) {
+        const exits = Game.map.describeExits(fromRoom);
+        if (!exits) {
+          continue;
+        }
+        for (const roomName of Object.values(exits)) {
+          if (!roomName || visited.has(roomName) || !GetRoomObjects.ROOM_NAME_PATTERN.test(roomName)) {
+            continue;
+          }
+          visited.add(roomName);
+          if (!this.isRoomAccessible(roomName, baseStatus)) {
+            continue;
+          }
+          nodes.set(roomName, { depth, parent: fromRoom === this.baseRoom.name ? null : fromRoom });
+          if (!this.isBlockedByOtherPlayer(this.roomIntel[roomName])) {
+            nextFrontier.push(roomName);
+          }
+        }
+      }
+      frontier = nextFrontier;
     }
+
+    return nodes;
+  }
+
+  // Only rooms in the same zone as the base are reachable (e.g. respawn base -> respawn rooms only).
+  private isRoomAccessible(roomName: string, baseStatus: RoomStatus["status"] | undefined): boolean {
+    const status = Game.map.getRoomStatus(roomName)?.status;
+    return !!status && status !== "closed" && status === baseStatus;
+  }
+
+  private getNextHop(currentRoomName: string, targetRoomName: string, roomNodes: Map<string, ScoutRoomNode>): string {
+    const path: string[] = [];
+    let roomName: string | null = targetRoomName;
+    while (roomName) {
+      path.unshift(roomName);
+      roomName = roomNodes.get(roomName)?.parent ?? null;
+    }
+
+    const exits = Game.map.describeExits(currentRoomName) ?? {};
+    const adjacentRooms = new Set(Object.values(exits));
+    for (let i = path.length - 1; i >= 0; i--) {
+      if (adjacentRooms.has(path[i])) {
+        return path[i];
+      }
+    }
+    return currentRoomName === this.baseRoom.name ? path[0] : this.baseRoom.name;
+  }
+
+  private pickNextRoomToScout(currentRoomName: string, roomNodes: Map<string, ScoutRoomNode>): string | null {
+    const candidates = Array.from(roomNodes.entries()).filter(
+      ([roomName]) => !this.isBlockedByOtherPlayer(this.roomIntel[roomName])
+    );
+    // Finish scouting all adjacent rooms before going further out.
+    const nearbyUnscouted = candidates.some(([roomName, node]) => node.depth === 1 && !this.roomIntel[roomName]);
+    const maxDepth = nearbyUnscouted ? 1 : ScoutArea.MAX_SCOUT_DEPTH;
 
     const currentTick = Game.time;
     let bestRoomName: string | null = null;
     let bestScore = -1;
 
-    for (const roomName of roomNames) {
-      if (roomName === currentRoomName) {
+    for (const [roomName, node] of candidates) {
+      if (roomName === currentRoomName || node.depth > maxDepth) {
         continue;
       }
 
