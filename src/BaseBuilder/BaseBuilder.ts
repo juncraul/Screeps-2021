@@ -1,4 +1,4 @@
-import { BaseLayout, Coord } from "./BaseLayout";
+import { BaseLayout, BasePlanner, Coord } from "./BaseLayout";
 import {
   layoutBunker,
   layoutFourWays,
@@ -6,7 +6,8 @@ import {
   layoutRooftop,
   layoutSieve,
   layoutUtility,
-  layoutFixedExtension
+  layoutFixedExtension,
+  layout5E
 } from "./Layout";
 import { Helper } from "./../Helpers/Helper";
 import { GetRoomObjects } from "./../Helpers/GetRoomObjects";
@@ -36,6 +37,7 @@ interface BaseBuildData {
 // WHITE - GREEN Preview Layout Bunker
 // WHITE - CYAN  Preview Layout Utility
 // WHITE - YELLOW  Preview Layout Fixed Extensions
+// Base-5E-Autoplaced Additive Layout 5E (five extensions surrounded by roads)
 // GREY  - WHITE Build Layout Sieve
 // GREY  - GREY  Build Layout Rooftop
 // GREY  - BROWN Build Layout Reverse/Rooftop
@@ -105,15 +107,93 @@ export class BaseBuilder {
   public static automaticFlagPlacement(room: Room) {
     if (!room.controller || room.controller.level < 2) return;
     const buildData = this.getBaseBuildData(room.name);
-    if (buildData.plans.length > 0) return; // Don't auto-place if we already have plans
     const spawn = GetRoomObjects.getRoomSpawns(room, true)[0];
     if (!spawn) return; // Don't auto-place if we don't have a spawn yet
-    // Place flag
-    const flagName = "Base-Autoplaced";
-    const flagPos = new RoomPosition(spawn.pos.x, spawn.pos.y - 2, room.name);
-    if (!Game.flags[flagName]) {
-      spawn.room.createFlag(flagPos, flagName, COLOR_GREY, COLOR_YELLOW);
+
+    const basePlan = buildData.plans.find(plan => plan.flagName !== "Base-5E-Autoplaced");
+    if (!basePlan) {
+      const flagName = "Base-Autoplaced";
+      const flagPos = new RoomPosition(spawn.pos.x, spawn.pos.y - 2, room.name);
+      if (!Game.flags[flagName]) {
+        spawn.room.createFlag(flagPos, flagName, COLOR_WHITE, COLOR_YELLOW);
+      }
+      return;
     }
+
+    if (buildData.plans.some(plan => plan.flagName === "Base-5E-Autoplaced") || this.allExtensionsPlaced(room)) {
+      return;
+    }
+
+    const flagPos = new RoomPosition(spawn.pos.x, spawn.pos.y - 2, room.name);
+    const layout5EFlag = Game.flags["Base-5E-Autoplaced"];
+    if (layout5EFlag) {
+      if (layout5EFlag.color === COLOR_PURPLE || layout5EFlag.secondaryColor !== COLOR_PURPLE) {
+        layout5EFlag.setColor(COLOR_WHITE, COLOR_PURPLE);
+      }
+      return;
+    }
+    spawn.room.createFlag(flagPos, "Base-5E-Autoplaced", COLOR_WHITE, COLOR_PURPLE);
+  }
+
+  private static allExtensionsPlaced(room: Room): boolean {
+    const numberOfExtensions = room.find(FIND_MY_STRUCTURES, {
+      filter: structure => structure.structureType === STRUCTURE_EXTENSION
+    }).length;
+    const numberOfExtensionConstructionSites = room.find(FIND_MY_CONSTRUCTION_SITES, {
+      filter: site => site.structureType === STRUCTURE_EXTENSION
+    }).length;
+    const availableExtensions = CONTROLLER_STRUCTURES[STRUCTURE_EXTENSION][room.controller!.level];
+    return availableExtensions === numberOfExtensions + numberOfExtensionConstructionSites;
+  }
+
+  // private static areBaseExtensionsPlaced(room: Room, basePlan: BaseBuildPlan): boolean {
+  //   const baseLayout = this.getBaseLayout(basePlan.secondaryColor, basePlan.flagName);
+  //   if (!baseLayout || !room.controller) return false;
+
+  //   const planner = baseLayout[room.controller.level] || baseLayout[8] || baseLayout[7];
+  //   if (!planner) return false;
+
+  //   return planner.buildings.extension.pos.every(coord => {
+  //     const x = coord.x - baseLayout.data.anchor.x + basePlan.x;
+  //     const y = coord.y - baseLayout.data.anchor.y + basePlan.y;
+  //     return (
+  //       room.lookForAt(LOOK_STRUCTURES, x, y).some(structure => structure.structureType === STRUCTURE_EXTENSION) ||
+  //       room
+  //         .lookForAt(LOOK_CONSTRUCTION_SITES, x, y)
+  //         .some(constructionSite => constructionSite.structureType === STRUCTURE_EXTENSION)
+  //     );
+  //   });
+  // }
+
+  private static getLayoutControllerLevel(layout: BaseLayout, controllerLevel: number): number | null {
+    if (layout === layout5E) return 0;
+    if (layout[controllerLevel]) return controllerLevel;
+    const fallbackLevel = [8, 7, 6, 5, 4, 3, 2].find(level => layout[level]);
+    return fallbackLevel === undefined ? null : fallbackLevel;
+  }
+
+  private static isLayout5EFlag(flagName: string): boolean {
+    return flagName === "Base-5E-Autoplaced";
+  }
+
+  private static isLayout5E(layout: BaseLayout): boolean {
+    return layout === layout5E;
+  }
+
+  private static isOccupied(room: Room, x: number, y: number): boolean {
+    return room.lookForAt(LOOK_STRUCTURES, x, y).length > 0 || room.lookForAt(LOOK_CONSTRUCTION_SITES, x, y).length > 0;
+  }
+
+  private static canPlaceLayoutAt(room: Room, anchor: Coord, layout: BaseLayout, planner: BasePlanner): boolean {
+    if (!this.isLayout5E(layout)) return true;
+    for (const buildingType of Object.keys(planner.buildings)) {
+      for (const coord of planner.buildings[buildingType].pos) {
+        const x = coord.x - layout.data.anchor.x + anchor.x;
+        const y = coord.y - layout.data.anchor.y + anchor.y;
+        if (this.isOccupied(room, x, y)) return false;
+      }
+    }
+    return true;
   }
 
   public static logicCreateConstructionSites() {
@@ -122,6 +202,7 @@ export class BaseBuilder {
     });
 
     BaseBuilder.writeLegend(autoPlaceFlags);
+    this.showLayout5EPreview(autoPlaceFlags);
 
     if (Game.time % 20 !== 0) return; // Only run this logic every 20 ticks to reduce CPU usage
 
@@ -140,7 +221,7 @@ export class BaseBuilder {
       }
 
       const controller = GetRoomObjects.getRoomController(autoPlaceFlag.room);
-      const layoutToBeUsed = this.getBaseLayout(selectedSecondaryColor);
+      const layoutToBeUsed = this.getBaseLayout(selectedSecondaryColor, autoPlaceFlag.name);
 
       if (!controller) {
         console.log("BaseBuilder: No controller found in the room of the Base flag.");
@@ -150,13 +231,9 @@ export class BaseBuilder {
         continue;
       }
 
-      let autoPlaceLevel = controller.level;
-      if (!layoutToBeUsed[autoPlaceLevel]) {
-        const fallbackLevel = [8, 7, 6, 5, 4, 3, 2].find(level => layoutToBeUsed[level]);
-        if (!fallbackLevel) {
-          continue;
-        }
-        autoPlaceLevel = fallbackLevel;
+      const autoPlaceLevel = this.getLayoutControllerLevel(layoutToBeUsed, controller.level);
+      if (autoPlaceLevel === null) {
+        continue;
       }
 
       const canPlaceThisLayout = this.autoPlaceConstructionFlag(autoPlaceFlag, layoutToBeUsed, autoPlaceLevel);
@@ -166,12 +243,16 @@ export class BaseBuilder {
 
       let buildPlans = buildData.plans;
 
-      if (autoPlaceFlag.color === COLOR_WHITE) {
+      const isPreview = autoPlaceFlag.color === COLOR_WHITE;
+      if (isPreview) {
         buildPlans = this.removeBuildPlansForFlag(buildPlans, autoPlaceFlag.name);
         buildData.plans = buildPlans;
         this.setBaseBuildData(roomName, buildData);
 
-        const availablePreviewLevels = [8, 7, 6, 5, 4, 3, 2].filter(level => layoutToBeUsed[level] !== undefined);
+        const availablePreviewLevels =
+          layoutToBeUsed === layout5E
+            ? [0]
+            : [8, 7, 6, 5, 4, 3, 2].filter(level => layoutToBeUsed[level] !== undefined);
         if (availablePreviewLevels.length === 0) {
           continue;
         }
@@ -238,6 +319,9 @@ export class BaseBuilder {
     autoPlaceFlags.forEach(flag => {
       if (flag.room) {
         infoRooms.add(flag.room.name);
+        if (this.isAutoplacedFlag(flag)) {
+          this.drawAutoplacedFlagInfo(flag);
+        }
       }
     });
     infoRooms.forEach(roomName => {
@@ -245,6 +329,27 @@ export class BaseBuilder {
       if (room) {
         this.drawBaseFlagInfo(room);
       }
+    });
+  }
+
+  private static isAutoplacedFlag(flag: Flag): boolean {
+    return flag.name === "Base-Autoplaced" || flag.name === "Base-5E-Autoplaced";
+  }
+
+  private static drawAutoplacedFlagInfo(flag: Flag): void {
+    if (!flag.room) return;
+
+    const text =
+      flag.name === "Base-5E-Autoplaced"
+        ? "Layout5E (PURPLE): change primary to GREY to save"
+        : "Base: change primary to GREY to save";
+    const textX = Math.min(48, flag.pos.x + 1);
+    flag.room.visual.text(text, textX, flag.pos.y, {
+      align: "left",
+      color: "#ffffff",
+      backgroundColor: "#000000",
+      opacity: 0.8,
+      font: 0.5
     });
   }
 
@@ -299,8 +404,9 @@ export class BaseBuilder {
     }
 
     for (const plan of buildPlans) {
-      const layoutToBeUsed = this.getBaseLayout(plan.secondaryColor);
-      if (!layoutToBeUsed || !layoutToBeUsed[controller.level]) {
+      const layoutToBeUsed = this.getBaseLayout(plan.secondaryColor, plan.flagName);
+      const layoutLevel = layoutToBeUsed ? this.getLayoutControllerLevel(layoutToBeUsed, controller.level) : null;
+      if (!layoutToBeUsed || layoutLevel === null) {
         console.log(
           "No layout found for secondary color " + plan.secondaryColor + " and controller level " + controller.level
         );
@@ -311,8 +417,8 @@ export class BaseBuilder {
         const anchor = new RoomPosition(plan.x, plan.y, roomName);
 
         // Construct only once every 10th tick
-        this.buildBase(anchor, layoutToBeUsed, controller.level, false);
-        this.createContainerRoadConnections(room, anchor, layoutToBeUsed, controller.level, false);
+        this.buildBase(anchor, layoutToBeUsed, layoutLevel, false);
+        this.createContainerRoadConnections(room, anchor, layoutToBeUsed, layoutLevel, false);
         if (controller.level >= 3 && Game.time % 1000 === 0) {
           // Build walls only if the controller is at least level 3 because that's when we can build Cannons.
           this.createWall(room, false);
@@ -321,11 +427,28 @@ export class BaseBuilder {
     }
   }
 
+  private static showLayout5EPreview(autoPlaceFlags: Flag[]): void {
+    const previewFlag = autoPlaceFlags.find(flag => flag.name === "Base-5E-Autoplaced");
+    if (!previewFlag || !previewFlag.room) return;
+
+    const controller = GetRoomObjects.getRoomController(previewFlag.room);
+    const layout = layout5E;
+    if (!controller) return;
+
+    const layoutLevel = this.getLayoutControllerLevel(layout, controller.level);
+    if (layoutLevel === null || !this.autoPlaceConstructionFlag(previewFlag, layout, layoutLevel)) return;
+
+    this.buildBase(previewFlag.pos, layout, layoutLevel, true);
+  }
+
   private static getBaseBuildPlanMemoryKey(roomName: string): string {
     return this.BASE_BUILD_PLAN_KEY_PREFIX + roomName;
   }
 
-  private static getBaseLayout(secondaryColor: ColorConstant): BaseLayout | null {
+  private static getBaseLayout(secondaryColor: ColorConstant, flagName?: string): BaseLayout | null {
+    if (flagName && this.isLayout5EFlag(flagName)) {
+      return layout5E;
+    }
     switch (secondaryColor) {
       case COLOR_WHITE:
         return layoutSieve;
@@ -358,6 +481,8 @@ export class BaseBuilder {
       { text: "GREEN  -> Bunker", color: "#00ff00" },
       { text: "CYAN   -> Utility", color: "#00ffff" },
       { text: "YELLOW -> Fixed Extensions", color: "#ffff00" },
+      { text: "Secondary PURPLE -> Base-5E", color: "#a020f0" },
+      { text: "Base-5E -> Additive 5 Extensions", color: "#ffff00" },
       { text: "Rampart: BROWN/WHITE", color: "#d2b48c" }
     ];
 
@@ -782,6 +907,7 @@ export class BaseBuilder {
 
         const distScore = distanceCM.get(x, y);
         if (distScore < requiredDistance) continue; // footprint would overlap nearby terrain walls
+        if (!this.canPlaceLayoutAt(room, { x, y }, layout, planner)) continue;
 
         // Weight openness heavily; slightly prefer tiles closer to spawn
         const score = distScore * 100 - floodDepth;
@@ -790,6 +916,10 @@ export class BaseBuilder {
           bestPos = { x, y };
         }
       }
+    }
+
+    if (bestScore < 0) {
+      return false;
     }
 
     if (flag.pos.x !== bestPos.x || flag.pos.y !== bestPos.y || flag.pos.roomName !== room.name) {

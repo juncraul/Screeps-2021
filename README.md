@@ -60,7 +60,7 @@ All current flags are documented here so you only need this section.
 
 | Flag | Example | What it does | Spawn room selection |
 |---|---|---|---|
-| `Reserve-SpawnRoom[-AnyIgnoredText]` (purple/blue) | `Reserve-E29S25` | Reserve/claim remote controller | Required part 2 (`SpawnRoom`) or `X` |
+| `Reserve-SpawnRoom[-AnyIgnoredText]` (purple/blue/grey) | `Reserve-E29S25` | Reserve, claim, or collect from a remote room | Required part 2 (`SpawnRoom`) or `X` |
 | `RemoteRebuild-SpawnRoom[-AnyIgnoredText]` | `RemoteRebuild-E29S25-First` | Rebuild remote room from spawn room | Required part 2 (`SpawnRoom`) or `X` |
 | `Attack-SpawnRoom-SquadSize[-PowerRank][-AnyIgnoredText]` | `Attack-E29S25-4-5-Healers` | Melee, ranged, mixed, healer-supported, or dismantler squad | Required part 2 (`SpawnRoom`) or `X` |
 | `SourceKeeper-SpawnRoom[-AnyIgnoredText]` | `SourceKeeper-E29S25` | Source Keeper hunting squad | Required part 2 (`SpawnRoom`) or `X` |
@@ -100,6 +100,7 @@ Note:
 - `Reserve` flags are interpreted by color:
 1. **Primary color `COLOR_PURPLE`**: room is treated as **reserve target**.
 2. **Primary color `COLOR_BLUE`**: room is treated as **claim target**.
+3. **Primary color `COLOR_GREY`**: room is treated as a **resource-collection-only target**. The remote uses carrier creeps to collect available dropped resources, tombstone contents, and energy from containers. It does not spawn claimers, harvesters, or repairers.
 - Spawn room binding is parsed from part 2 (`Reserve-<SpawnRoom>`).
 - `Reserve-X` means any room may handle the remote.
 - For reserve flags, `secondaryColor === COLOR_BLUE` enables **mineral-only** remote mode.
@@ -107,6 +108,7 @@ Note:
 Examples:
 - `Reserve-E29S25` → only spawn room `E29S25` handles it.
 - `Reserve-X` → any spawn room may handle it.
+- To collect without reserving or harvesting, place `Reserve-<SpawnRoom>` in the remote room and set its **primary color to grey**.
 
 ---
 
@@ -318,5 +320,4 @@ Valid examples:
 - `W10N20`
 
 If a room-name segment does not match this pattern, it is treated as plain suffix text and ignored for base-room binding.
-
 

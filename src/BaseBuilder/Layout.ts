@@ -6,6 +6,7 @@ import layoutRooftopJson from "./Layouts/LayoutRooftop.json";
 import layoutSieveJson from "./Layouts/LayoutSieve.json";
 import layoutUtilityJson from "./Layouts/LayoutUtility.json";
 import layoutFixedExtensionJson from "./Layouts/LayoutFixedExtension.json";
+import layout5EJson from "./Layouts/Layout5E.json";
 
 interface LayoutConfig {
   anchor: Coord;
@@ -81,3 +82,4 @@ export const layoutFourWays: BaseLayout = toBaseLayout((layoutFourWaysJson as un
 export const layoutUtility: BaseLayout = toBaseLayout((layoutUtilityJson as unknown) as LayoutConfig);
 export const layoutBunker: BaseLayout = toBaseLayout((layoutBunkerJson as unknown) as LayoutConfig);
 export const layoutFixedExtension: BaseLayout = toBaseLayout((layoutFixedExtensionJson as unknown) as LayoutConfig);
+export const layout5E: BaseLayout = toBaseLayout((layout5EJson as unknown) as LayoutConfig);
