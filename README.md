@@ -50,6 +50,166 @@ Maintaining the docs will also become a more community-focused effort, which mea
 
 To visit the docs, [click here](https://screepers.gitbook.io/screeps-typescript-starter/).
 
+## Season configuration
+
+Season-specific behavior is disabled by default. Enable each season independently
+in the Screeps console:
+
+```js
+Memory.Keys = Memory.Keys || {};
+Memory.Keys.IsSeason10 = true; // Season 10 scout collectors and score collection
+Memory.Keys.IsSeason11 = true; // Season 11 thorium harvesting
+```
+
+Only the boolean value `true` enables a season. Missing keys, `false`, and other
+values disable it, including its area setup, creep management, and spawn tasks.
+The old `Memory.Keys.IsSeason` flag no longer enables any season. Ordinary source
+and mineral harvesting do not require a season flag.
+
+## Scouting
+
+Scouts only spawn when an eligible room exists within two exits of their base.
+Target selection skips rooms we own or reserve, but scouts may travel through
+them to reach other rooms. Rooms with hostile creeps or another player's
+ownership/reservation are retried after 5,000 ticks without a new enemy sighting.
+The last sighting is stored as `Memory.scoutIntel[roomName].lastEnemySeen`;
+older intel without this field uses `lastSeen` for the retry interval.
+
+## Base Layouts
+
+Each diagram shows the highest level defined in its JSON plan, not a merge of
+lower levels. North is up; each symbol occupies one room tile. Empty outer rows
+and columns are trimmed. Origins and anchors below use the JSON coordinates;
+the flag marks the anchor, which is not an extra structure.
+
+For selectable layouts, a `Base-*` flag uses primary white to preview and primary
+grey to save/build; its secondary color selects the pattern.
+
+| Layout | Highest defined level | Selection |
+|---|---|---|
+| [Bunker](src/BaseBuilder/Layouts/LayoutBunker.json) | 8 | Secondary green |
+| [FourWays](src/BaseBuilder/Layouts/LayoutFourWays.json) | 8 | Secondary orange |
+| [Utility](src/BaseBuilder/Layouts/LayoutUtility.json) | 8 | Secondary cyan |
+| [Fixed Extensions](src/BaseBuilder/Layouts/LayoutFixedExtension.json) | 8 | Secondary yellow |
+| [5E](src/BaseBuilder/Layouts/Layout5E.json) | 0 (controller-independent additive plan) | `Base-5E-Autoplaced[-N]`, secondary purple |
+| [Labs](src/BaseBuilder/Layouts/LayoutLabs.json) | 8 | Secondary white |
+
+Legend: `.` empty, `R` road, `S` spawn, `E` extension, `C` container,
+`F` stationary filler position, `G` storage, `K` link, `D` tower, `T` terminal,
+`L` lab, `O` observer, `P` power spawn, `N` nuker, `Y` factory.
+
+### Bunker
+
+Level 8. Origin `(0, 0)`; anchor `(6, 6)`.
+
+```text
+. . . R R R R R R R . . .
+. . R E E E R L L L R . .
+. R E E R E R L R L L R .
+R E E R E R S R L R L E R
+R E R E E R D R L L R O R
+R R E E D R T R D R E R R
+R E E N R K . Y R E E E R
+R R E E D R G R D E E R R
+R E R E S R D R S E R E R
+R E E R E R P R E R E E R
+. R E E R E R E R E E R .
+. . R E E E R E E E R . .
+. . . R R R R R R R . . .
+```
+
+The factory is present in the JSON pattern but is not currently included in the
+builder's supported structure types.
+
+### FourWays
+
+Level 8. Origin `(0, 0)`; anchor `(5, 5)`.
+
+```text
+E E E . . R . . E E E
+E R E E R D R E E R E
+E E R E E R E E R E E
+. E E R E R E R E E .
+. R E E R S R E E R .
+R D R R S G S R R D R
+. R E E R K R E E R .
+. E E R E R E R E E .
+E E R E E R E E R E E
+E R E E R D R E E R E
+E E E . . R . . E E E
+```
+
+### Utility
+
+Level 8. Origin `(23, 20)`; anchor `(25, 25)`.
+
+```text
+R R R R R R
+R D P K D R
+R O R R N R
+R R T G R R
+R R L L R R
+R L L L L R
+R L L L L R
+R R R R R R
+```
+
+### Fixed Extensions
+
+Level 8. Origin `(0, 0)`; anchor `(3, 3)`.
+
+```text
+. R R R R R .
+R E E C E E R
+R E F E F E R
+R E E E E E R
+R E F E F E R
+R E E S E E R
+. R R R R R .
+```
+
+The four `F` tiles are stationary filler positions, not structures. Fillers stand
+there to collect and distribute energy to adjacent extensions and the spawn.
+The level-8 JSON lists both an extension and a container at `(3, 1)`;
+the diagram shows the container as `C` rather than hiding that overlap.
+
+### 5E
+
+Level 0, reused at every eligible controller level. Origin `(0, 0)`; anchor `(2, 2)`.
+Five extensions with an outer road ring supplement an existing base plan.
+
+```text
+. . R . .
+. R E R .
+R E E E R
+. R E R .
+. . R . .
+```
+
+### Labs
+
+Level 8. Origin `(0, 0)`; anchor `(4, 2)`. Select with secondary white.
+The plan builds three labs at controller level 6, six at level 7, and ten at level 8.
+
+```text
+. . R . . . R . .
+. R L R L R L R .
+R . L L R L L . R
+. R L R L R L R .
+. . R . . . R . .
+```
+
+## Automatic extension plans
+
+After the main base plan is saved, automatic placement creates a
+`Base-5E-Autoplaced` preview when more extensions are needed. Change its primary
+color to grey to save the five-extension plan. If extension capacity remains,
+another preview is created with a unique name such as `Base-5E-Autoplaced-2`.
+Saved extension positions, built extensions, and construction sites count toward
+the current controller limit without double-counting shared positions. Additional
+plans avoid saved footprints, and placement resumes as controller upgrades allow
+more extensions.
+
 ## Flags
 
 This project uses flags as the primary runtime configuration system for remote expansion, military behavior, and emergency defense.
@@ -68,7 +228,7 @@ All current flags are documented here so you only need this section.
 | `Defense-RoomName` | `Defense-E29S25` | Emergency in-room defense team | Auto-placed by SafeMode logic |
 | `Market-Sell-Resource-Amount-PriceModeOrValue` | `Market-Sell-Energy-10000-MarketValue` | Creates and tracks sell orders from terminal stock, or deals existing orders (`MarketValueDeal`) | Uses room where the flag is placed |
 | `ReRoute-TargetRoom-From-CurrentRoom[-AnyText]` | `ReRoute-E29S25-From-E30S25` | Forces cross-room movement through the flag room | N/A (movement helper) |
-| `Season[-SquadSize]` | `Season-5` | Creates 5 collectors | Spawns from the room where the flag is placed in |
+| `Season[-SquadSize]` | `Season-5` | Creates 5 collectors when `Memory.Keys.IsSeason10 === true` | Spawns from the room where the flag is placed in |
 
 ---
 
@@ -110,6 +270,13 @@ Examples:
 - `Reserve-X` → any spawn room may handle it.
 - To collect without reserving or harvesting, place `Reserve-<SpawnRoom>` in the remote room and set its **primary color to grey**.
 
+Combat in collection-only rooms:
+- A grey `Reserve-*` flag does not create an attack squad; add an `Attack-*` flag separately if needed.
+- Attack squads in that room spare non-combat workers and claimers (creeps with active `WORK` or `CLAIM` parts).
+- Carriers without active `WORK`/`CLAIM` parts remain valid targets, so enemy haulers can be intercepted without killing the workers producing resources.
+- Active `ATTACK`, `RANGED_ATTACK`, or `HEAL` parts override that protection: combat-capable workers/claimers are still valid targets.
+- This filtering applies to both red-secondary (attack everything) and blue-secondary (creeps only) targeting, including passive melee/ranged attacks. Exempt players remain excluded.
+
 ---
 
 ### `RemoteRebuild-SpawnRoom[-AnyIgnoredText]`
@@ -142,19 +309,40 @@ Example:
 4. Optional ignored suffix text
 - Flags without a valid positive `SquadSize` do not create a squad.
 
+Squad assembly:
+- Squads larger than one wait until the full squad has finished spawning and gathered before moving toward the flag.
+- They assemble in the specified spawn room. For `Attack-X-*`, the first member's spawn room becomes the shared assembly room; members spawned elsewhere travel there.
+- Each creep gets a separate tile in a reachable assembly patch, preferably at least five tiles from every structure except roads, ramparts, and walls. Those exceptions do not make impassable walls or private enemy ramparts valid standing tiles.
+- If no suitable patch has five-tile clearance, the squad uses the best available smaller clearance and logs a warning. If no patch is reachable, it waits and retries.
+- If casualties make a deployed squad incomplete, survivors return to assemble with replacements before deploying again. Single-creep squads do not wait.
+
 Flag colors control behavior:
 
 Primary color (role composition):
 
 | Color | Squad composition |
 |---|---|
-| `RED` | All `Melee` (`ATTACK`) |
-| `GREEN` | All `Ranged` (`RANGED_ATTACK`) |
-| `BLUE` | One `Melee`, remaining slots `Healer` (`HEAL`) |
+| `RED` | One `Melee` (`ATTACK`), remaining slots `Healer` (`HEAL`) |
+| `BLUE` | One `Ranged` (`RANGED_ATTACK`), remaining slots `Healer` (`HEAL`) |
 | `PURPLE` | Split `Melee` / `Ranged`; melee gets the extra slot for odd squad sizes |
 | `YELLOW` | One `Dismantler` (`WORK`), remaining slots `Healer` |
 
-For blue squads, the melee unit uses twice the flag's `PowerRank`; for yellow squads, the dismantler uses twice the flag's `PowerRank`. Healers use the flag's normal rank. Suffixes such as `Healers` or `Dismantle` are labels only; the primary flag color selects the squad type.
+For blue squads, the ranged unit uses twice the flag's `PowerRank`; for red squads, the melee unit uses twice the flag's `PowerRank`; for yellow squads, the dismantler uses twice the flag's `PowerRank`. Healers use the flag's normal rank. Suffixes such as `Healers` or `Dismantle` are labels only; the primary flag color selects the squad type.
+
+Each ranged body segment contains two `RANGED_ATTACK` and two `MOVE` parts.
+Ranged bodies are capped at 25 pairs (50 body parts), allowing a final half-segment
+at the cap. A blue leader's doubled rank is applied before building its body.
+
+Use blue for ranged-led healer squads and red for melee-led healer squads.
+Green is no longer supported for soldier composition: recolor existing green
+Attack flags to red. Unsupported primary colors do not spawn soldiers and log a warning.
+Secondary targeting colors are unchanged. Blue squads now spawn healers after
+their ranged leader instead of additional ranged units; existing extra ranged
+units are not removed.
+
+Edge navigation supports entering and retreating through all four room borders.
+Incoming members move to separate slots inside the target room; recovering
+members step inward from the border in their retreat room to avoid crossing back.
 
 Secondary color (combat targeting):
 1. `RED` → attack everything
@@ -162,8 +350,26 @@ Secondary color (combat targeting):
 3. `BLUE` → creeps only
 4. `WHITE` → no attack, move/hold
 
+Two-creep squads automatically use `DuoNavigation`, with the attacker as the head
+and the other creep as the tail. Both must have zero fatigue before moving.
+The tail follows into the head's previous tile; if they separate, the head waits
+while the tail catches up. At room exits, the head clears the entry tile as the
+tail crosses. Duos share quad-style targeting and retreat/recovery behavior and
+honor the flag's secondary targeting color.
+
+Individual attackers, duo formations, and quad formations give up chasing a creep after five
+consecutive ticks without reducing their best observed distance to it. Closing
+the gap resets the timer; enemies already within attack range are not abandoned.
+An abandoned target is ignored by that squad for 25 ticks, allowing another
+target to be selected. Nearby passive attacks are still allowed during this period.
+
+In rooms with a grey `Reserve-*` collection-only flag, creep targeting also
+protects non-combat workers/claimers while allowing attacks on carriers and
+combat creeps, as described in the Reserve section above.
+
 Examples:
-- `Attack-E29S25-4-5-Healers` with a blue primary color: one melee unit and three healers, rank `5` (melee rank `10`).
+- `Attack-E29S25-4-5-Healers` with a red primary color: one melee unit and three healers, rank `5` (melee rank `10`).
+- `Attack-E29S25-4-5-RangedHealers` with a blue primary color: one ranged unit and three healers, rank `5` (ranged rank `10`).
 - `Attack-E29S25-4-5-Dismantle` with a yellow primary color: one dismantler and three healers, rank `5` (dismantler rank `10`).
 - `Attack-X-2` with a purple primary color: one melee and one ranged unit, default rank `1`, spawning from any base.
 
@@ -320,4 +526,3 @@ Valid examples:
 - `W10N20`
 
 If a room-name segment does not match this pattern, it is treated as plain suffix text and ignored for base-room binding.
-

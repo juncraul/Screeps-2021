@@ -54,30 +54,22 @@ export default class EdgeNavigation {
 
     // ── Kite logic ──────────────────────────────────────────────────────────
 
-    const totalHealPotential = this.getTotalHealPerTick(creeps);
-    const focusedHealPotential = this.getFocusedHealOnMostDamaged(creeps);
     const totalMissingHits = totalMaxHits - totalHits;
     const damagedCreeps = creeps.filter(c => c.hits < c.hitsMax);
     const mostDamaged = damagedCreeps.length > 0 ? _.max(damagedCreeps, (c: CreepBase) => c.hitsMax - c.hits) : null;
     const mostDamagedPercentage = mostDamaged ? mostDamaged.hits / mostDamaged.hitsMax : 1;
-    const focusedDamageMissing = mostDamaged ? mostDamaged.hitsMax - mostDamaged.hits : 0;
-    const healerCannotKeepUp = focusedDamageMissing > focusedHealPotential || totalMissingHits > totalHealPotential;
 
     if (EdgeNavigation.EnableDebugLogging) {
       console.log(
         `[${kiteStateKey}] damageTaken=${damageTaken} missingHits=${totalMissingHits} ` +
-          `healPotential=${totalHealPotential} focusedHeal=${focusedHealPotential} isEdgeNav=${String(
-            isEdgeNavigating
-          )}`
+          `mostDamagedPercentage=${mostDamagedPercentage} isEdgeNav=${String(isEdgeNavigating)}`
       );
     }
 
     const wasRetreating = previousState !== null && previousState.tick === Game.time - 1 && previousState.isRetreating;
 
     // Stay retreating until fully healed; start retreating on heavy damage under heal pressure.
-    const shouldRetreat = wasRetreating
-      ? !allFullyHealed
-      : mostDamagedPercentage < 0.4 && damageTaken > 0 && healerCannotKeepUp;
+    const shouldRetreat = wasRetreating ? !allFullyHealed : mostDamagedPercentage < 0.75 && damageTaken > 0;
 
     setSoldierEdgeKiteState(memoryName, { tick: Game.time, totalHits, isRetreating: shouldRetreat });
 
@@ -88,8 +80,12 @@ export default class EdgeNavigation {
     if (shouldRetreat && allCreepsInDestinationRoom) {
       // Mark edge-nav mode so the caller suppresses forward movement during recovery.
       setSoldierEdgeMode(memoryName, true);
-      this.retreatToAdjacentRoom(creeps, destination.roomName);
+      this.retreatToAdjacentRoom(creeps, destination);
       return true;
+    }
+
+    if (shouldRetreat) {
+      this.moveFurtherIntoSafeRoom(creeps, destination);
     }
 
     if (EdgeNavigation.EnableDebugLogging) {
@@ -98,106 +94,105 @@ export default class EdgeNavigation {
     }
     // Holding in retreat room — let passive healer actions restore HP.
     if (!allFullyHealed) {
-      for (const creep of creeps) {
-        if (creep.pos.roomName !== destination.roomName && creep.pos.x !== 48) {
-          creep.moveTo(new RoomPosition(creep.pos.x - 1, creep.pos.y, creep.pos.roomName));
-          if (EdgeNavigation.EnableDebugLogging) {
-            console.log(creep.name, "will move a bit to the left");
-          }
-        }
-      }
       return true;
     }
 
-    // Fully healed after an edge-nav retreat — clear flag and let standard movement
-    // (LineNavigation) walk the squad back to the target room entrance.
-    if (isEdgeNavigating && allFullyHealed) {
+    if (isEdgeNavigating && allFullyHealed && !this.isDestinationOnEdge(destination)) {
       setSoldierEdgeMode(memoryName, false);
       return false;
     }
 
-    // ── Edge attack ─────────────────────────────────────────────────────────
-
-    const anyInTargetRoom = creeps.some(c => c.pos.roomName === destination.roomName);
-    if (EdgeNavigation.EnableDebugLogging) {
-      console.log("anyInTargetRoom", anyInTargetRoom);
-    }
-    if (!anyInTargetRoom) return false;
-
-    const edge = this.detectEntryEdge(creeps, destination.roomName);
+    const edge = this.getEdgeFromDestination(destination);
     if (EdgeNavigation.EnableDebugLogging) {
       console.log("edge", edge);
     }
     if (!edge) return false;
 
+    const creepsInTargetRoom = creeps.filter(c => c.pos.roomName === destination.roomName);
+    if (creepsInTargetRoom.length < creeps.length) {
+      this.moveOneStepAlongEdge(creeps, destination, edge);
+    }
+    if (creepsInTargetRoom.length === 0) {
+      return true;
+    }
+
     if (creeps.some(c => c.creep.fatigue > 0)) return true;
 
-    const slots = this.getEdgeSlots(edge, creeps.length, destination);
+    const slots = this.getEdgeSlots(edge, creepsInTargetRoom.length, destination);
     if (EdgeNavigation.EnableDebugLogging) {
       console.log(
-        `Assigning ${creeps.length} creeps to ${slots.length} slots in room ${
+        `Assigning ${creepsInTargetRoom.length} creeps to ${slots.length} slots in room ${
           destination.roomName
         }, mapping: ${slots.map(s => `(${s.x},${s.y})`).join(", ")}`
       );
     }
-    this.assignCreepsToSlots(creeps, slots, destination.roomName);
-    // Already handled by the passive attack from soldier.
-    // this.attackFromEdge(creeps, destination.roomName);
-    this.bringAllCreepsToTheLeaderRoom(creeps, destination.roomName);
-
+    this.assignCreepsToSlots(creepsInTargetRoom, slots, destination.roomName);
     return true;
   }
 
   // ── Retreat ───────────────────────────────────────────────────────────────
 
   /** Moves all creeps that are still in the target room toward the nearest exit tile. */
-  private static retreatToAdjacentRoom(creeps: CreepBase[], targetRoomName: string): void {
+  private static retreatToAdjacentRoom(creeps: CreepBase[], destination: RoomPosition): void {
+    const entryEdge = this.getEdgeFromDestination(destination);
+    if (!entryEdge) return;
+    const direction = this.getRetreatDirection(entryEdge);
     for (const creep of creeps) {
       creep.say("😱");
-      if (creep.pos.roomName !== targetRoomName) continue; // already in previous room
-      const exitPos = this.getNearestExitPos(creep.pos);
-      if (exitPos) {
-        creep.creep.moveTo(exitPos, { range: 0, reusePath: 0 });
-      }
+      if (creep.pos.roomName !== destination.roomName) continue;
+      creep.creep.move(direction);
     }
   }
 
-  /** Returns the room-exit tile (x/y = 0 or 49) closest to the given position. */
-  private static getNearestExitPos(pos: RoomPosition): RoomPosition | null {
-    const dLeft = pos.x;
-    const dRight = 49 - pos.x;
-    const dTop = pos.y;
-    const dBottom = 49 - pos.y;
-    const min = Math.min(dLeft, dRight, dTop, dBottom);
-
-    if (min === dLeft) return new RoomPosition(0, pos.y, pos.roomName);
-    if (min === dRight) return new RoomPosition(49, pos.y, pos.roomName);
-    if (min === dTop) return new RoomPosition(pos.x, 0, pos.roomName);
-    return new RoomPosition(pos.x, 49, pos.roomName);
+  private static getRetreatDirection(edge: EntryEdge): DirectionConstant {
+    if (edge.axis === "x") return edge.value === 1 ? LEFT : RIGHT;
+    return edge.value === 1 ? TOP : BOTTOM;
   }
 
-  // ── Edge detection ────────────────────────────────────────────────────────
+  private static moveFurtherIntoSafeRoom(creeps: CreepBase[], destination: RoomPosition): void {
+    const entryEdge = this.getEdgeFromDestination(destination);
+    if (!entryEdge) return;
+    const direction = this.getRetreatDirection(entryEdge);
+    for (const creep of creeps) {
+      if (
+        creep.pos.roomName === destination.roomName ||
+        creep.creep.fatigue > 0 ||
+        !this.isAtSafeRoomBorder(creep.pos, direction)
+      ) {
+        continue;
+      }
+      creep.creep.move(direction);
+    }
+  }
 
-  /**
-   * Determines the entry edge from the positions of creeps currently inside the target
-   * room. Whichever edge (x=1, x=48, y=1, y=48) has the most creeps nearby wins.
-   */
-  private static detectEntryEdge(creeps: CreepBase[], roomName: string): EntryEdge | null {
-    const inRoom = creeps.filter(c => c.pos.roomName === roomName);
-    if (inRoom.length === 0) return null;
+  private static isAtSafeRoomBorder(position: RoomPosition, direction: DirectionConstant): boolean {
+    if (direction === LEFT) return position.x === 49;
+    if (direction === RIGHT) return position.x === 0;
+    if (direction === TOP) return position.y === 49;
+    return position.y === 0;
+  }
 
-    const atX1 = inRoom.filter(c => c.pos.x <= 2).length;
-    const atX48 = inRoom.filter(c => c.pos.x >= 47).length;
-    const atY1 = inRoom.filter(c => c.pos.y <= 2).length;
-    const atY48 = inRoom.filter(c => c.pos.y >= 47).length;
+  private static moveOneStepAlongEdge(creeps: CreepBase[], destination: RoomPosition, edge: EntryEdge): void {
+    for (const creep of creeps) {
+      if (creep.creep.fatigue > 0) continue;
+      const inTargetRoom = creep.pos.roomName === destination.roomName;
+      if (inTargetRoom) continue;
+      let direction: DirectionConstant | undefined;
+      if (edge.axis === "x") {
+        direction = edge.value === 1 ? RIGHT : LEFT;
+      } else {
+        direction = edge.value === 1 ? BOTTOM : TOP;
+      }
+      if (direction !== undefined) creep.creep.move(direction);
+    }
+  }
 
-    const max = Math.max(atX1, atX48, atY1, atY48);
-    if (max === 0) return null;
-
-    if (atX1 === max) return { axis: "x", value: 1 };
-    if (atX48 === max) return { axis: "x", value: 48 };
-    if (atY1 === max) return { axis: "y", value: 1 };
-    return { axis: "y", value: 48 };
+  private static getEdgeFromDestination(destination: RoomPosition): EntryEdge | null {
+    if (destination.x === 1) return { axis: "x", value: 1 };
+    if (destination.x === 48) return { axis: "x", value: 48 };
+    if (destination.y === 1) return { axis: "y", value: 1 };
+    if (destination.y === 48) return { axis: "y", value: 48 };
+    return null;
   }
 
   // ── Formation ─────────────────────────────────────────────────────────────
@@ -211,13 +206,13 @@ export default class EdgeNavigation {
 
     if (edge.axis === "x") {
       const center = Math.min(Math.max(destination.y, 1), 48);
-      const start = Math.max(1, center - Math.floor(count / 2));
+      const start = Math.max(1, Math.min(49 - count, center - Math.floor(count / 2)));
       for (let i = 0; i < count; i++) {
         slots.push(new RoomPosition(edge.value, Math.min(48, start + i), destination.roomName));
       }
     } else {
       const center = Math.min(Math.max(destination.x, 1), 48);
-      const start = Math.max(1, center - Math.floor(count / 2));
+      const start = Math.max(1, Math.min(49 - count, center - Math.floor(count / 2)));
       for (let i = 0; i < count; i++) {
         slots.push(new RoomPosition(Math.min(48, start + i), edge.value, destination.roomName));
       }
@@ -240,11 +235,11 @@ export default class EdgeNavigation {
       console.log(`[EdgeNavigation] Warning: no slots available`);
       return;
     }
-    const horizontalSlots = slots.filter(s => s.x === 1 || s.x === 48).length > 0;
+    const horizontalSlots = slots.length > 1 ? slots[0].x === slots[1].x : slots[0].x === 1 || slots[0].x === 48;
 
     const edgePriority = (v: number) => (v === 0 || v === 49 ? -1 : 0);
     // if y or x is the same then prioritize the one that the other axis is 0 or 49
-    creeps = creeps.sort((a, b) => {
+    creeps = creeps.slice().sort((a, b) => {
       if (horizontalSlots) {
         // Primary: y
         if (a.pos.y !== b.pos.y) {
@@ -272,12 +267,18 @@ export default class EdgeNavigation {
       }
     });
 
-    const allCreepsAreInTheirSlots = creeps.every((creep, i) => Helper.isSamePosition(creep.pos, slots[i]));
-
     // let creepCantReach: CreepBase | null = null;
     for (let i = 0; i < slots.length; i++) {
       const creep = creeps[i];
       const slot = slots[i];
+      if (creep.pos.roomName !== roomName) {
+        creep.creep.moveTo(slot, {
+          range: 0,
+          reusePath: 0,
+          visualizePathStyle: { stroke: "#ff9900", opacity: 0.5 }
+        });
+        continue;
+      }
       if (room) {
         room.visual.text(String(i), slot.x, slot.y, {
           align: "center",
@@ -397,80 +398,44 @@ export default class EdgeNavigation {
 
   // ── Heal potential ────────────────────────────────────────────────────────
 
-  private static getTotalHealPerTick(creeps: CreepBase[]): number {
-    return _.sum(creeps, (c: CreepBase) => c.creep.getActiveBodyparts(HEAL) * HEAL_POWER);
-  }
-
-  private static getFocusedHealOnMostDamaged(creeps: CreepBase[]): number {
-    const damagedCreeps = creeps.filter(c => c.hits < c.hitsMax);
-    if (damagedCreeps.length === 0) return 0;
-    const target = _.max(damagedCreeps, (c: CreepBase) => c.hitsMax - c.hits);
-    return _.sum(creeps, (c: CreepBase) => {
-      const parts = c.creep.getActiveBodyparts(HEAL);
-      if (parts <= 0) return 0;
-      const range = c.pos.getRangeTo(target.pos);
-      if (range <= 1) return parts * HEAL_POWER;
-      if (range <= 3) return parts * RANGED_HEAL_POWER;
-      return 0;
-    });
-  }
-
-  private static bringAllCreepsToTheLeaderRoom(creeps: CreepBase[], roomName: string): void {
-    const leader = creeps[0];
-    for (const creep of creeps) {
-      if (creep.pos.roomName !== roomName) {
-        creep.creep.moveTo(leader.pos, {
-          range: 0,
-          reusePath: 0,
-          visualizePathStyle: { stroke: "#ff9900", opacity: 0.5 }
-        });
-      }
-    }
-  }
-
   public static shouldApplyEdgeNavigation(creepLeader: CreepBase, destination: RoomPosition): boolean {
     if (EdgeNavigation.EnableDebugLogging) {
       console.log("shouldApplyEdgeNavigation", creepLeader.pos.roomName, destination.roomName);
       console.log("destination", destination.x, destination.y);
     }
-    if (destination.x === 1 || destination.x === 48 || destination.y === 1 || destination.y === 48) {
+    if (this.isDestinationOnEdge(destination)) {
       if (EdgeNavigation.EnableDebugLogging) {
         console.log("destination is on edge, applying edge navigation");
       }
-      return true;
+      return (
+        creepLeader.pos.roomName !== destination.roomName ||
+        creepLeader.pos.x <= 1 ||
+        creepLeader.pos.x >= 48 ||
+        creepLeader.pos.y <= 1 ||
+        creepLeader.pos.y >= 48
+      );
     }
-    if (!Game.rooms[destination.roomName]) {
-      if (EdgeNavigation.EnableDebugLogging) {
-        console.log("destination room is not visible, not applying edge navigation");
-      }
+    if (creepLeader.pos.roomName !== destination.roomName) return false;
+    if (!(creepLeader.pos.x <= 1 || creepLeader.pos.x >= 48 || creepLeader.pos.y <= 1 || creepLeader.pos.y >= 48)) {
       return false;
     }
-    if (Game.rooms[destination.roomName] && Game.rooms[destination.roomName].controller?.my) {
-      if (EdgeNavigation.EnableDebugLogging) {
-        console.log("destination room is owned by me, not applying edge navigation");
-      }
-      return false;
-    }
-    const creeps = [creepLeader];
-    for (const creep of creeps) {
-      if (!(creep.pos.x <= 1 || creep.pos.x >= 48 || creep.pos.y <= 1 || creep.pos.y >= 48)) continue;
-      for (let i = -1; i <= 1; i++) {
-        for (let j = -1; j <= 1; j++) {
-          const x = creep.pos.x + i;
-          const y = creep.pos.y + j;
-          if (x < 2 || x > 47 || y < 2 || y > 47) continue;
-          const pos = new RoomPosition(x, y, destination.roomName);
-          const isRampartOrWallStructure =
-            pos
-              .lookFor(LOOK_STRUCTURES)
-              .filter(s => s.structureType === STRUCTURE_RAMPART || s.structureType === STRUCTURE_WALL).length > 0;
-          if (isRampartOrWallStructure) {
-            console.log("found rampart or wall structure at", pos.x, pos.y, "in room", pos.roomName);
-            return true;
-          }
-        }
+    for (let i = -1; i <= 1; i++) {
+      for (let j = -1; j <= 1; j++) {
+        const x = Math.max(1, Math.min(48, creepLeader.pos.x)) + i;
+        const y = Math.max(1, Math.min(48, creepLeader.pos.y)) + j;
+        if (x < 2 || x > 47 || y < 2 || y > 47) continue;
+        const pos = new RoomPosition(x, y, destination.roomName);
+        const isRampartOrWallStructure =
+          pos
+            .lookFor(LOOK_STRUCTURES)
+            .filter(s => s.structureType === STRUCTURE_RAMPART || s.structureType === STRUCTURE_WALL).length > 0;
+        if (isRampartOrWallStructure) return true;
       }
     }
     return false;
+  }
+
+  public static isDestinationOnEdge(destination: RoomPosition): boolean {
+    return destination.x === 1 || destination.x === 48 || destination.y === 1 || destination.y === 48;
   }
 }

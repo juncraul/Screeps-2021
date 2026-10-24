@@ -79,6 +79,8 @@ export default class SpawnTask {
         return "Scout";
       case CreepType.Laboratorian:
         return "Laboratorian";
+      case CreepType.Season11ThoriumHarvester:
+        return "Season11ThoriumHarvester";
     }
   }
 

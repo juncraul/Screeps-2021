@@ -1,9 +1,7 @@
 import { BaseLayout, Coord } from "./BaseLayout";
 import layoutBunkerJson from "./Layouts/LayoutBunker.json";
 import layoutFourWaysJson from "./Layouts/LayoutFourWays.json";
-import layoutReverseRooftopJson from "./Layouts/LayoutReverseRooftop.json";
-import layoutRooftopJson from "./Layouts/LayoutRooftop.json";
-import layoutSieveJson from "./Layouts/LayoutSieve.json";
+import * as layoutLabsJson from "./Layouts/LayoutLabs.json";
 import layoutUtilityJson from "./Layouts/LayoutUtility.json";
 import layoutFixedExtensionJson from "./Layouts/LayoutFixedExtension.json";
 import layout5EJson from "./Layouts/Layout5E.json";
@@ -75,9 +73,7 @@ function toBaseLayout(config: LayoutConfig | undefined): BaseLayout {
   return layout;
 }
 
-export const layoutSieve: BaseLayout = toBaseLayout((layoutSieveJson as unknown) as LayoutConfig);
-export const layoutRooftop: BaseLayout = toBaseLayout((layoutRooftopJson as unknown) as LayoutConfig);
-export const layoutReverseRooftop: BaseLayout = toBaseLayout((layoutReverseRooftopJson as unknown) as LayoutConfig);
+export const layoutLabs: BaseLayout = toBaseLayout((layoutLabsJson as unknown) as LayoutConfig);
 export const layoutFourWays: BaseLayout = toBaseLayout((layoutFourWaysJson as unknown) as LayoutConfig);
 export const layoutUtility: BaseLayout = toBaseLayout((layoutUtilityJson as unknown) as LayoutConfig);
 export const layoutBunker: BaseLayout = toBaseLayout((layoutBunkerJson as unknown) as LayoutConfig);

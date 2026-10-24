@@ -33,6 +33,7 @@ interface ScoutControllerIntel {
 interface ScoutRoomIntel {
   roomName: string;
   lastSeen: number;
+  lastEnemySeen?: number;
   controller: ScoutControllerIntel | null;
   sources: {
     id: string;
@@ -161,10 +162,11 @@ interface SoldierCompositionMemory {
 }
 
 interface SoldierNavigationMemory {
-  lastStyle?: "edge" | "quad" | "line";
+  lastStyle?: "edge" | "quad" | "duo" | "line";
   edgeMode?: boolean;
   edgeKiteState?: SoldierKiteState;
   quadKiteState?: SoldierKiteState;
+  duoKiteState?: SoldierKiteState;
   quadSlots?: string[];
 }
 
@@ -172,7 +174,25 @@ interface SoldierAreaMemory {
   flagState?: SoldierFlagState;
   composition?: SoldierCompositionMemory;
   navigation?: SoldierNavigationMemory;
+  chases?: Record<string, SoldierChaseMemory>;
+  ignoredChaseTargets?: Record<string, number>;
+  assembly?: SoldierAssemblyMemory;
   lastUpdatedTick?: number;
+}
+
+interface SoldierAssemblyMemory {
+  roomName: string;
+  squadSize: number;
+  deployed: boolean;
+  slots: RoomObjectPositionMemory[];
+  nextSearchTick?: number;
+}
+
+interface SoldierChaseMemory {
+  targetId: string;
+  bestRange: number;
+  lastProgressTick: number;
+  lastTick: number;
 }
 
 interface AreasMemory {

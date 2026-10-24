@@ -1,8 +1,8 @@
 import { Helper } from "Helpers/Helper";
 import CreepTask, { Activity } from "Tasks/CreepTask";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
-import BaseArea from "./BaseArea";
-import { CreepBase } from "../../CreepBase";
+import BaseArea from "../../BaseRoom/BaseArea";
+import { CreepBase } from "../../../CreepBase";
 
 const SEASON_AREA_ID = "SeasonArea-Global";
 const EXPLORATION_EXPIRATION_TICKS = 2500;
@@ -18,7 +18,7 @@ const SEASON_FLAG_PATTERN = /^Season-(\d+)(?:-.+)?$/;
  * Collection: Automatic — move a creep onto the same tile
  */
 
-export default class SeasonArea extends BaseArea {
+export default class Season10ScoutCollectorArea extends BaseArea {
   private static handledTick: number | null = null;
 
   scores: Score[];
@@ -83,10 +83,10 @@ export default class SeasonArea extends BaseArea {
 
   public handleThisArea(): void {
     // Making sure we only handle one tick per area to avoid duplicate handling from multiple rooms with season.
-    if (SeasonArea.handledTick === Game.time) {
+    if (Season10ScoutCollectorArea.handledTick === Game.time) {
       return;
     }
-    SeasonArea.handledTick = Game.time;
+    Season10ScoutCollectorArea.handledTick = Game.time;
 
     this.scores = this.findAllScores(); // Refresh scores each tick
     this.flagTargetRoom = this.detectFlag(); // Check for flags each tick

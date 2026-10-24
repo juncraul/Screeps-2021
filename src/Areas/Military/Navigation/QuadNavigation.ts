@@ -2,9 +2,12 @@ import { CreepBase } from "../../../CreepBase";
 import { Helper } from "Helpers/Helper";
 import {
   getSoldierQuadKiteState,
+  getSoldierDuoKiteState,
   getSoldierQuadSlots,
   setSoldierQuadKiteState,
-  setSoldierQuadSlots
+  setSoldierDuoKiteState,
+  setSoldierQuadSlots,
+  selectSoldierChaseTarget
 } from "../SoldierAreaMemory";
 
 export default class QuadNavigation {
@@ -22,19 +25,33 @@ export default class QuadNavigation {
       return false;
     }
 
+    const movement = this.getCombatMovement(quad, destination, memoryName, flagColor);
+    return movement
+      ? this.tryMoveAsFormation(quad, movement.destination, memoryName, movement.rotateTowardsTarget)
+      : true;
+  }
+
+  public static getCombatMovement(
+    quad: CreepBase[],
+    destination: RoomPosition,
+    memoryName: string,
+    flagColor: ColorConstant,
+    pursuitKey: "quad" | "duo" = "quad"
+  ): { destination: RoomPosition; rotateTowardsTarget: boolean } | null {
     const leader = quad[0];
-    const anchor = this.getQuadAnchor(quad);
+    const anchor = pursuitKey === "quad" ? this.getQuadAnchor(quad) : null;
     const pathOrigin = anchor ?? leader.pos;
-    const threat = this.getPrimaryThreat(pathOrigin.roomName, pathOrigin);
+    let threat = this.getPrimaryThreat(pathOrigin.roomName, pathOrigin, quad, memoryName, false);
     const totalHits = _.sum(quad, creep => creep.hits);
 
-    const kiteStateKey = `QuadNavigation-KiteState-${memoryName}`;
-    const previousState = getSoldierQuadKiteState(memoryName) ?? null;
+    const kiteStateKey = `${pursuitKey === "duo" ? "DuoNavigation" : "QuadNavigation"}-KiteState-${memoryName}`;
+    const previousState =
+      (pursuitKey === "duo" ? getSoldierDuoKiteState(memoryName) : getSoldierQuadKiteState(memoryName)) ?? null;
     const damageTaken =
       previousState && previousState.tick === Game.time - 1 ? Math.max(0, previousState.totalHits - totalHits) : 0;
 
     const damagedCreeps = quad.filter(creep => creep.hits < creep.hitsMax);
-    const mostDamaged = _.max(damagedCreeps, creep => creep.hitsMax - creep.hits);
+    const mostDamaged = damagedCreeps.length > 0 ? _.max(damagedCreeps, creep => creep.hitsMax - creep.hits) : null;
     const mostDamagedPercentage = mostDamaged ? mostDamaged.hits / mostDamaged.hitsMax : 1;
     const totalMissingHits = _.sum(damagedCreeps, creep => creep.hitsMax - creep.hits);
     const totalHealPotential = this.getTotalPotentialHealPerTick(quad);
@@ -55,10 +72,24 @@ export default class QuadNavigation {
       ? totalMissingHits !== 0
       : mostDamagedPercentage < 0.7 && damageTaken > 0 && healerCannotKeepUp && !!threat;
 
-    setSoldierQuadKiteState(memoryName, { tick: Game.time, totalHits, isRetreating: shouldRetreat });
+    const setKiteState = pursuitKey === "duo" ? setSoldierDuoKiteState : setSoldierQuadKiteState;
+    setKiteState(memoryName, { tick: Game.time, totalHits, isRetreating: shouldRetreat });
 
     if (quad.some(creep => creep.creep.fatigue > 0)) {
-      return true;
+      return null;
+    }
+
+    if (!shouldRetreat && flagColor !== COLOR_WHITE) {
+      threat = this.getPrimaryThreat(
+        pathOrigin.roomName,
+        pathOrigin,
+        quad,
+        memoryName,
+        true,
+        flagColor === COLOR_GREY,
+        pursuitKey,
+        pursuitKey === "duo" && flagColor === COLOR_BLUE
+      );
     }
 
     if (threat) {
@@ -69,21 +100,21 @@ export default class QuadNavigation {
           )} due to damage taken and healer cannot keep up.`
         );
         leader.say("😱"); // Retreat to destination
-        return this.tryMoveAsFormation(quad, destination, memoryName, false);
+        return { destination, rotateTowardsTarget: false };
       } else {
         if (flagColor !== COLOR_WHITE) {
           if (leader.pos.inRangeTo(threat?.pos ?? leader.pos, 1)) {
-            return true; // We arrived at the enemy. We are done with navigation.
+            return null;
           } else {
             leader.say("⚔️👣"); // Move towards threat
-            return this.tryMoveAsFormation(quad, threat.pos, memoryName, true);
+            return { destination: threat.pos, rotateTowardsTarget: true };
           }
         }
       }
     }
 
     leader.say("👣🚩"); // Move towards destination
-    return this.tryMoveAsFormation(quad, destination, memoryName, true);
+    return { destination, rotateTowardsTarget: true };
   }
 
   private static tryMoveAsFormation(
@@ -488,22 +519,33 @@ export default class QuadNavigation {
 
   private static getPrimaryThreat(
     roomName: string,
-    nearPos: RoomPosition
+    nearPos: RoomPosition,
+    quad: CreepBase[],
+    memoryName: string,
+    trackChase: boolean,
+    structuresOnly = false,
+    pursuitKey = "quad",
+    creepsOnly = false
   ): { pos: RoomPosition; type: "creep" | "tower" | "structure" } | null {
     const room = Game.rooms[roomName];
     if (!room) {
       return null;
     }
 
-    const hostileCreeps = room
-      .find(FIND_HOSTILE_CREEPS)
-      .filter(hostile => hostile.getActiveBodyparts(ATTACK) > 0 || hostile.getActiveBodyparts(RANGED_ATTACK) > 0);
+    const hostileCreeps = structuresOnly
+      ? []
+      : room
+          .find(FIND_HOSTILE_CREEPS)
+          .filter(hostile => hostile.body.some(part => part.type === ATTACK || part.type === RANGED_ATTACK));
 
-    const hostileTowers = room
-      .find(FIND_HOSTILE_STRUCTURES)
-      .filter(
-        structure => structure.structureType === STRUCTURE_TOWER && structure.store.getUsedCapacity(RESOURCE_ENERGY) > 0
-      ) as StructureTower[];
+    const hostileTowers = (creepsOnly
+      ? []
+      : room
+          .find(FIND_HOSTILE_STRUCTURES)
+          .filter(
+            structure =>
+              structure.structureType === STRUCTURE_TOWER && structure.store.getUsedCapacity(RESOURCE_ENERGY) > 0
+          )) as StructureTower[];
 
     if (hostileTowers.length > 0) {
       const closestTower = nearPos.findClosestByPath(hostileTowers);
@@ -513,11 +555,15 @@ export default class QuadNavigation {
     }
 
     if (hostileCreeps.length > 0) {
-      const closestHostile = nearPos.findClosestByPath(hostileCreeps);
+      const closestHostile = trackChase
+        ? selectSoldierChaseTarget(memoryName, pursuitKey, quad, hostileCreeps, nearPos)
+        : nearPos.findClosestByPath(hostileCreeps);
       if (closestHostile) {
         return { pos: closestHostile.pos, type: "creep" };
       }
     }
+
+    if (creepsOnly) return null;
 
     const anyHostileStructures = room
       .find(FIND_HOSTILE_STRUCTURES)
@@ -690,11 +736,6 @@ export default class QuadNavigation {
         }
       }
     }
-    return true;
-  }
-
-  public static isQuadAbleToReachDestinationInTime(creeps: CreepBase[], destination: RoomPosition): boolean {
-    const allowedExtraCostForAQuad = 5;
     return true;
   }
 }

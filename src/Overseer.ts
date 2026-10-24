@@ -1,5 +1,6 @@
 import SourceArea from "Areas/BaseRoom/SourceArea";
 import MineralArea from "Areas/BaseRoom/MineralArea";
+import Season11ThoriumArea from "Areas/Seasons/Season11/Season11ThoriumArea";
 import UpgradeArea from "Areas/BaseRoom/UpgradeArea";
 import SpawnTask, { CreepType } from "Tasks/SpawnTask";
 import CarryArea from "Areas/BaseRoom/CarryArea";
@@ -11,7 +12,7 @@ import { BaseBuilder } from "BaseBuilder/BaseBuilder";
 import RemoteArea from "Areas//RemoteArea/RemoteArea";
 import RemoteRebuildArea from "Areas/RemoteRebuildArea";
 import UtilityArea from "Areas/BaseRoom/UtilityArea";
-import SeasonArea from "Areas/BaseRoom/SeasonArea";
+import Season10ScoutCollectorArea from "Areas/Seasons/Season10/Season10ScoutCollectorArea";
 import RepairArea from "Areas/BaseRoom/RepairArea";
 import SoldierArea from "./Areas/Military/SoldierArea";
 import DefenseArea from "./Areas/Military/Defense/DefenseArea";
@@ -66,10 +67,7 @@ export default class Overseer implements IOverseer {
     const soldierTasks = this.handleSoldierArea(room, roomHasSpawn);
     const looterTasks = this.handleLooterArea(room, roomHasSpawn);
     const sourceKeeperTasks = this.handleSourceKeeperArea(room, roomHasSpawn);
-    let seasonTasks: SpawnTask[] = [];
-    if (Helper.getCashedMemory("IsSeason", false)) {
-      seasonTasks = this.handleSeasonArea(room, roomHasSpawn);
-    }
+    const seasonTasks = this.handleSeasonArea(room, roomHasSpawn);
     let remoteTasks: SpawnTask[] = [];
     for (const remoteRoom of remoteRooms) {
       remoteTasks = remoteTasks.concat(
@@ -138,6 +136,7 @@ export default class Overseer implements IOverseer {
     }
     // Append any remaining tasks not consumed by the pattern
     const remaining = [
+      ...harvest.thoriumTasks,
       ...(taskBuckets[CreepType.Harvester] ?? []),
       ...(taskBuckets[CreepType.Carrier] ?? []),
       ...(taskBuckets[CreepType.Upgrader] ?? []),
@@ -160,6 +159,7 @@ export default class Overseer implements IOverseer {
     this.drawBaseRoomAreaStats(room, {
       SourceArea: { existing: harvest.sourceExisting, queued: harvest.sourceTasks.length },
       MineralArea: { existing: harvest.mineralExisting, queued: harvest.mineralTasks.length },
+      ThoriumArea: { existing: harvest.thoriumExisting, queued: harvest.thoriumTasks.length },
       CarryArea: { existing: carry.existing, queued: carry.tasks.length },
       ConstructionArea: { existing: construction.existing, queued: construction.tasks.length },
       RepairArea: { existing: repair.existing, queued: repair.tasks.length },
@@ -195,6 +195,8 @@ export default class Overseer implements IOverseer {
     sourceExisting: number;
     mineralTasks: SpawnTask[];
     mineralExisting: number;
+    thoriumTasks: SpawnTask[];
+    thoriumExisting: number;
   } {
     if (!room.controller) {
       return {
@@ -203,13 +205,17 @@ export default class Overseer implements IOverseer {
         sourceTasks: [],
         sourceExisting: 0,
         mineralTasks: [],
-        mineralExisting: 0
+        mineralExisting: 0,
+        thoriumTasks: [],
+        thoriumExisting: 0
       };
     }
     const sourceTasks: SpawnTask[] = [];
     let sourceExisting = 0;
     const mineralTasks: SpawnTask[] = [];
     let mineralExisting = 0;
+    const thoriumTasks: SpawnTask[] = [];
+    let thoriumExisting = 0;
 
     const spawn: StructureSpawn | null = GetRoomObjects.getRoomSpawns(room, true)[0] ?? null;
     let sources: Source[] = GetRoomObjects.getRoomSources(room);
@@ -235,7 +241,20 @@ export default class Overseer implements IOverseer {
       sourceArea.handleThisArea();
     });
 
-    const mineral = GetRoomObjects.getRoomMineral(room, false);
+    const minerals = room.find(FIND_MINERALS);
+    if (Helper.getCashedMemory<boolean>("IsSeason11", false) === true) {
+      const thoriumMinerals = minerals.filter(mineral => (mineral.mineralType as string) === "Th");
+      for (const thorium of thoriumMinerals) {
+        const thoriumArea = new Season11ThoriumArea(thorium, room.controller);
+        if (doSpawnTasks) {
+          thoriumTasks.push(...thoriumArea.handleSpawnTasks());
+        }
+        thoriumExisting += thoriumArea.creeps.length;
+        thoriumArea.handleThisArea();
+      }
+    }
+
+    const mineral = minerals.find(mineral => (mineral.mineralType as string) !== "Th") ?? null;
     if (mineral) {
       const mineralArea = new MineralArea(mineral, room.controller);
       if (doSpawnTasks) {
@@ -246,12 +265,14 @@ export default class Overseer implements IOverseer {
     }
 
     return {
-      tasks: sourceTasks.concat(mineralTasks),
-      existing: sourceExisting + mineralExisting,
+      tasks: sourceTasks.concat(thoriumTasks, mineralTasks),
+      existing: sourceExisting + thoriumExisting + mineralExisting,
       sourceTasks,
       sourceExisting,
       mineralTasks,
-      mineralExisting
+      mineralExisting,
+      thoriumTasks,
+      thoriumExisting
     };
   }
 
@@ -521,7 +542,9 @@ export default class Overseer implements IOverseer {
   }
 
   private handleSeasonArea(room: Room, doSpawnTasks: boolean): SpawnTask[] {
-    const seasonArea = new SeasonArea(room.name);
+    if (Helper.getCashedMemory<boolean>("IsSeason10", false) !== true) return [];
+
+    const seasonArea = new Season10ScoutCollectorArea(room.name);
     seasonArea.handleThisArea();
     if (!doSpawnTasks) return [];
     const tasks: SpawnTask[] = seasonArea.handleSpawnTasks();

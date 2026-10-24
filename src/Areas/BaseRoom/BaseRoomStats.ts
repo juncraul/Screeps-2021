@@ -71,11 +71,20 @@ export default class BaseRoomStats {
       y += 0.8;
     }
 
+    const claimedTick = roomStats.controllerLevelTicks[1];
+    if (claimedTick !== undefined) {
+      room.visual.text(`Claimed at: ${claimedTick}`, x, y, lineStyle);
+      y += 0.65;
+    }
+
     if (roomStats.spawnPlacedTick !== undefined) {
       room.visual.text(`Spawn placed at: ${roomStats.spawnPlacedTick}`, x, y, lineStyle);
       y += 0.65;
+    }
 
-      room.visual.text(`Tick: ${Game.time - roomStats.spawnPlacedTick} ticks (${Game.time})`, x, y, lineStyle);
+    const progressStartTick = claimedTick ?? roomStats.spawnPlacedTick;
+    if (progressStartTick !== undefined) {
+      room.visual.text(`Tick: ${Game.time - progressStartTick} ticks (${Game.time})`, x, y, lineStyle);
       y += 0.65;
       const levelDeltas = this.getControllerLevelDeltas(roomStats);
       if (levelDeltas.length > 0) {
@@ -193,17 +202,18 @@ export default class BaseRoomStats {
     }
 
     const controller = room.controller;
-    if (!controller || !controller.my || roomStats.spawnPlacedTick === undefined) {
+    if (!controller || !controller.my) {
       return;
     }
 
-    if (!roomStats.controllerLevelTicks[controller.level]) {
+    if (roomStats.controllerLevelTicks[controller.level] === undefined) {
       roomStats.controllerLevelTicks[controller.level] = Game.time;
     }
   }
 
   private static getControllerLevelDeltas(roomStats: BaseRoomEnergyStats): string[] {
-    if (roomStats.spawnPlacedTick === undefined) {
+    const progressStartTick = roomStats.controllerLevelTicks[1] ?? roomStats.spawnPlacedTick;
+    if (progressStartTick === undefined) {
       return [];
     }
 
@@ -214,7 +224,7 @@ export default class BaseRoomStats {
 
     return levels.map(level => {
       const reachedAtTick = roomStats.controllerLevelTicks[level];
-      const delta = reachedAtTick - roomStats.spawnPlacedTick!;
+      const delta = reachedAtTick - progressStartTick;
       return `RCL ${level}: +${delta} ticks (${reachedAtTick})`;
     });
   }

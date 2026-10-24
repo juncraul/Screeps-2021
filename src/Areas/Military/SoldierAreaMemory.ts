@@ -1,4 +1,5 @@
 import { CreepBase } from "CreepBase";
+import { CreepType } from "CreepType";
 import type { AttackFlagConfig } from "./SoldierArea";
 
 function ensureAreasMemory(): AreasMemory {
@@ -22,6 +23,64 @@ export function getSoldierAreaMemory(flagName: string): SoldierAreaMemory {
     soldiers[flagName] = {};
   }
   return soldiers[flagName];
+}
+
+export function selectSoldierChaseTarget(
+  flagName: string,
+  pursuitKey: string,
+  pursuers: CreepBase[],
+  candidates: Creep[],
+  origin: RoomPosition
+): Creep | null {
+  const attackers = pursuers.filter(
+    creep => creep.creepType !== CreepType.Healer && creep.pos.roomName === origin.roomName
+  );
+  if (attackers.length === 0) return origin.findClosestByPath(candidates);
+
+  const memory = getSoldierAreaMemory(flagName);
+  const chases = memory.chases ?? (memory.chases = {});
+  const ignored = memory.ignoredChaseTargets ?? (memory.ignoredChaseTargets = {});
+  for (const id of Object.keys(ignored)) {
+    if (ignored[id] <= Game.time) delete ignored[id];
+  }
+  let available = candidates.filter(target => ignored[target.id] === undefined);
+  while (available.length > 0) {
+    const target = origin.findClosestByPath(available);
+    if (!target) break;
+    const range = Math.min(...attackers.map(creep => creep.pos.getRangeTo(target.pos)));
+    const inAttackRange = attackers.some(
+      creep => creep.pos.getRangeTo(target.pos) <= (creep.creepType === CreepType.Ranged ? 3 : 1)
+    );
+    const previous = chases[pursuitKey];
+    if (
+      !previous ||
+      previous.targetId !== target.id ||
+      previous.lastTick < Game.time - 1 ||
+      range < previous.bestRange ||
+      inAttackRange
+    ) {
+      chases[pursuitKey] = {
+        targetId: target.id,
+        bestRange: range,
+        lastProgressTick: Game.time,
+        lastTick: Game.time
+      };
+      return target;
+    }
+    previous.lastTick = Game.time;
+    if (
+      Game.time - previous.lastProgressTick < 5 ||
+      pursuers.some(pursuer => pursuer.creep && pursuer.creep.getActiveBodyparts(RANGED_ATTACK) > 0)
+    ) {
+      return target;
+    }
+
+    ignored[target.id] = Game.time + 25;
+    delete chases[pursuitKey];
+    available = available.filter(candidate => candidate.id !== target.id);
+  }
+  delete chases[pursuitKey];
+  return null;
 }
 
 export function setSoldierFlagState(flagName: string, state: SoldierFlagState): void {
@@ -78,7 +137,7 @@ export function clearSoldierAreaMemory(flagName: string): void {
   delete soldiers[flagName];
 }
 
-export function setSoldierNavigationStyle(flagName: string, style: "edge" | "quad" | "line" | undefined): void {
+export function setSoldierNavigationStyle(flagName: string, style: "edge" | "quad" | "duo" | "line" | undefined): void {
   const record = getSoldierAreaMemory(flagName);
   if (!record.navigation) {
     record.navigation = {};
@@ -87,7 +146,7 @@ export function setSoldierNavigationStyle(flagName: string, style: "edge" | "qua
   record.lastUpdatedTick = Game.time;
 }
 
-export function getSoldierNavigationStyle(flagName: string): "edge" | "quad" | "line" | undefined {
+export function getSoldierNavigationStyle(flagName: string): "edge" | "quad" | "duo" | "line" | undefined {
   return getSoldierAreaMemory(flagName).navigation?.lastStyle;
 }
 
@@ -130,6 +189,19 @@ export function setSoldierQuadKiteState(flagName: string, state: SoldierKiteStat
   record.lastUpdatedTick = Game.time;
 }
 
+export function getSoldierDuoKiteState(flagName: string): SoldierKiteState | undefined {
+  return getSoldierAreaMemory(flagName).navigation?.duoKiteState;
+}
+
+export function setSoldierDuoKiteState(flagName: string, state: SoldierKiteState): void {
+  const record = getSoldierAreaMemory(flagName);
+  if (!record.navigation) {
+    record.navigation = {};
+  }
+  record.navigation.duoKiteState = state;
+  record.lastUpdatedTick = Game.time;
+}
+
 export function getSoldierQuadSlots(flagName: string): string[] {
   return getSoldierAreaMemory(flagName).navigation?.quadSlots ?? [];
 }
@@ -152,6 +224,11 @@ export function updateSoldierComposition(flag: AttackFlagConfig, creeps: CreepBa
 
   const dyingCount = creeps.filter(c => c.ticksToLive && c.ticksToLive < 250).length;
   const record = getSoldierAreaMemory(flag.name);
+  if (record.chases) {
+    for (const key of Object.keys(record.chases)) {
+      if (key !== "quad" && key !== "duo" && !creeps.some(creep => creep.name === key)) delete record.chases[key];
+    }
+  }
   record.composition = {
     squadSize: flag.squadSize,
     baseRoomName: flag.baseRoomName,

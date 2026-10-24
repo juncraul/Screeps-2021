@@ -9,11 +9,12 @@ import SpawnTask from "Tasks/SpawnTask";
 import BaseRoomStats from "Areas/BaseRoom/BaseRoomStats";
 import SourceArea from "Areas/BaseRoom/SourceArea";
 import MineralArea from "Areas/BaseRoom/MineralArea";
+import Season11ThoriumArea from "Areas/Seasons/Season11/Season11ThoriumArea";
 import UpgradeArea from "Areas/BaseRoom/UpgradeArea";
 import CarryArea from "Areas/BaseRoom/CarryArea";
 import ConstructionArea from "Areas/BaseRoom/ConstructionArea";
 import UtilityArea from "Areas/BaseRoom/UtilityArea";
-import SeasonArea from "Areas/BaseRoom/SeasonArea";
+import Season10ScoutCollectorArea from "Areas/Seasons/Season10/Season10ScoutCollectorArea";
 import RepairArea from "Areas/BaseRoom/RepairArea";
 import StationaryFillerArea from "Areas/BaseRoom/StationaryFillerArea";
 import MarketArea from "Areas/BaseRoom/MarketArea";
@@ -44,11 +45,12 @@ const profilerTargets: [{ prototype: unknown }, string][] = [
   [BaseRoomStats, "BaseRoomStats"],
   [SourceArea, "SourceArea"],
   [MineralArea, "MineralArea"],
+  [Season11ThoriumArea, "Season11ThoriumArea"],
   [UpgradeArea, "UpgradeArea"],
   [CarryArea, "CarryArea"],
   [ConstructionArea, "ConstructionArea"],
   [UtilityArea, "UtilityArea"],
-  [SeasonArea, "SeasonArea"],
+  [Season10ScoutCollectorArea, "Season10ScoutCollectorArea"],
   [RepairArea, "RepairArea"],
   [StationaryFillerArea, "StationaryFillerArea"],
   [MarketArea, "MarketArea"],

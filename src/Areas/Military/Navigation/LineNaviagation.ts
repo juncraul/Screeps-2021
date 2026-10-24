@@ -22,6 +22,19 @@ export default class LineNaviagation {
       return false;
     }
 
+    const firstStep = search.path[0];
+    const isRoomExit = firstStep.x === 0 || firstStep.x === 49 || firstStep.y === 0 || firstStep.y === 49;
+    if (isRoomExit) {
+      for (const creep of line) {
+        const exit =
+          firstStep.x === 0 || firstStep.x === 49
+            ? new RoomPosition(firstStep.x, creep.pos.y, firstStep.roomName)
+            : new RoomPosition(creep.pos.x, firstStep.y, firstStep.roomName);
+        creep.creep.moveTo(exit, { range: 0, reusePath: 0 });
+      }
+      return true;
+    }
+
     const path: RoomPosition[] = [];
     for (const creep of line
       .sort((a, b) => a.pos.getRangeTo(search.path[0]) - b.pos.getRangeTo(search.path[0]))
@@ -64,20 +77,6 @@ export default class LineNaviagation {
 
     return true;
   }
-
-  // private static creepsAreInRangeOfEachOther(creeps: CreepBase[], range: number): boolean {
-  //   for (let i = 0; i < creeps.length; i++) {
-  //     for (let j = i + 1; j < creeps.length; j++) {
-  //       if (creeps[i].pos.roomName !== creeps[j].pos.roomName) {
-  //         return false;
-  //       }
-  //       if (creeps[i].pos.getRangeTo(creeps[j].pos) > range) {
-  //         return false;
-  //       }
-  //     }
-  //   }
-  //   return true;
-  // }
 
   private static creepsAreInRangeOfEachOther(creeps: CreepBase[], range: number): boolean {
     const positions = creeps.map(c => this.getWorldPosition(c.pos));

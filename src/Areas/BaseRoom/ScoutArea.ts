@@ -30,6 +30,7 @@ interface ScoutControllerIntel {
 interface ScoutRoomIntel {
   roomName: string;
   lastSeen: number;
+  lastEnemySeen?: number;
   controller: ScoutControllerIntel | null;
   sources: ScoutSourceIntel[];
   minerals: ScoutMineralIntel[];
@@ -47,6 +48,7 @@ interface ScoutRoomNode {
 export default class ScoutArea extends BaseArea {
   private static readonly MANAGED_FLAG_PREFIX = "Reserve";
   private static readonly MAX_SCOUT_DEPTH = 2;
+  private static readonly ENEMY_RECHECK_TICKS = 5000;
 
   baseRoom: Room;
   roomIntel: ScoutIntelMemory;
@@ -70,6 +72,9 @@ export default class ScoutArea extends BaseArea {
     }
     const activeScouts = this.creeps.filter(creep => !(creep.ticksToLive !== undefined && creep.ticksToLive < 100));
     if (activeScouts.length >= 1) {
+      return [];
+    }
+    if (!this.pickNextRoomToScout(this.baseRoom.name, this.getScoutRoomNodes())) {
       return [];
     }
 
@@ -153,7 +158,7 @@ export default class ScoutArea extends BaseArea {
     const controllerFree = hasController && (controllerNeutru || controllerReservedByUs || controllerReservedByInvader);
     const claimable = hostileCount === 0 && hasController && controllerFree && sources.length > 0;
 
-    return {
+    const intel: ScoutRoomIntel = {
       roomName: room.name,
       lastSeen: Game.time,
       controller,
@@ -162,6 +167,9 @@ export default class ScoutArea extends BaseArea {
       hostileCount,
       claimable
     };
+    intel.lastEnemySeen =
+      hostileCount > 0 || this.isBlockedByOtherPlayer(intel) ? Game.time : this.roomIntel[room.name]?.lastEnemySeen;
+    return intel;
   }
 
   private syncManagedFlag(room: Room, intel: ScoutRoomIntel): void {
@@ -173,7 +181,13 @@ export default class ScoutArea extends BaseArea {
 
     const existingFlags = this.getAllRemoteFlags(room.name);
 
-    if (existingFlags.length > 0 || !intel.controller || intel.hostileCount > 0 || !intel.claimable) {
+    if (
+      existingFlags.length > 0 ||
+      !intel.controller ||
+      intel.hostileCount > 0 ||
+      !intel.claimable ||
+      this.isOwnedOrReservedByUs(room.name)
+    ) {
       return;
     }
 
@@ -237,7 +251,28 @@ export default class ScoutArea extends BaseArea {
     return ownedByOther || reservedByOther;
   }
 
-  // BFS from the base room; rooms owned/reserved by other players are kept as leaves so search stops there.
+  private hasRecentEnemyIntel(intel: ScoutRoomIntel | undefined): boolean {
+    if (!intel || (!this.isBlockedByOtherPlayer(intel) && intel.hostileCount === 0)) {
+      return false;
+    }
+    return Game.time - (intel.lastEnemySeen ?? intel.lastSeen) < ScoutArea.ENEMY_RECHECK_TICKS;
+  }
+
+  private isOwnedOrReservedByUs(roomName: string): boolean {
+    const myName = Helper.getUserName();
+    const room = Game.rooms[roomName];
+    if (room) {
+      return (
+        room.controller?.my === true ||
+        room.controller?.owner?.username === myName ||
+        room.controller?.reservation?.username === myName
+      );
+    }
+    const controller = this.roomIntel[roomName]?.controller;
+    return controller?.owner === myName || controller?.reservation === myName;
+  }
+
+  // Enemy rooms are leaves until scouting confirms that they are safe to traverse.
   private getScoutRoomNodes(): Map<string, ScoutRoomNode> {
     const nodes = new Map<string, ScoutRoomNode>();
     const visited = new Set<string>([this.baseRoom.name]);
@@ -260,7 +295,7 @@ export default class ScoutArea extends BaseArea {
             continue;
           }
           nodes.set(roomName, { depth, parent: fromRoom === this.baseRoom.name ? null : fromRoom });
-          if (!this.isBlockedByOtherPlayer(this.roomIntel[roomName])) {
+          if (!this.hasRecentEnemyIntel(this.roomIntel[roomName])) {
             nextFrontier.push(roomName);
           }
         }
@@ -297,7 +332,7 @@ export default class ScoutArea extends BaseArea {
 
   private pickNextRoomToScout(currentRoomName: string, roomNodes: Map<string, ScoutRoomNode>): string | null {
     const candidates = Array.from(roomNodes.entries()).filter(
-      ([roomName]) => !this.isBlockedByOtherPlayer(this.roomIntel[roomName])
+      ([roomName]) => !this.isOwnedOrReservedByUs(roomName) && !this.hasRecentEnemyIntel(this.roomIntel[roomName])
     );
     // Finish scouting all adjacent rooms before going further out.
     const nearbyUnscouted = candidates.some(([roomName, node]) => node.depth === 1 && !this.roomIntel[roomName]);

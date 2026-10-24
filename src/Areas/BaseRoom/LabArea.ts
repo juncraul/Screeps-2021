@@ -287,6 +287,7 @@ export default class LabArea extends BaseArea {
     switch (creep.creepType) {
       case CreepType.Harvester:
       case CreepType.MineralHarvester:
+      case CreepType.Season11ThoriumHarvester:
         return { bodyPart: WORK, effect: "harvest" };
       case CreepType.Upgrader:
         return { bodyPart: WORK, effect: "upgradeController" };

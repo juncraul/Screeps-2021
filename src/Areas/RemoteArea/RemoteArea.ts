@@ -212,6 +212,7 @@ export default class RemoteArea extends BaseArea {
 
     for (let i = 0; i < this.creeps.length; i++) {
       this.suicideCreepDueToBrokenParts(this.creeps[i]);
+      this.interupCurrentTaskIfNeeded(this.creeps[i]);
       if (!this.creeps[i].isFree()) continue;
 
       const creepType = this.creeps[i].creepType;
@@ -253,6 +254,20 @@ export default class RemoteArea extends BaseArea {
           }
           break;
       }
+    }
+  }
+
+  private interupCurrentTaskIfNeeded(creep: CreepBase): void {
+    if (
+      creep.creepType === CreepType.Claimer &&
+      this.remoteMode === RemoteRoomMode.Claim &&
+      this.controller &&
+      !this.controller.my &&
+      creep.pos.roomName === this.roomName &&
+      creep.task &&
+      (creep.task.activity === Activity.Reserve || creep.task.activity === Activity.AttackController)
+    ) {
+      creep.addTask(new CreepTask(Activity.Claim, this.controller.pos));
     }
   }
 

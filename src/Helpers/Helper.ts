@@ -275,7 +275,7 @@ export class Helper {
     return null;
   }
 
-  public static positionIsWalkable(pos: RoomPosition): boolean {
+  public static positionIsWalkable(pos: RoomPosition, ignoreCreeps = false): boolean {
     const room = Game.rooms[pos.roomName];
     if (!room) {
       return false;
@@ -306,17 +306,20 @@ export class Helper {
     ) {
       return false;
     }
-    const creeps = pos.lookFor(LOOK_CREEPS);
-    if (creeps.length > 0) {
+    if (!ignoreCreeps && pos.lookFor(LOOK_CREEPS).length > 0) {
       return false;
     }
     return true;
   }
 
-  public static simplePathFinderWithObstacles(start: RoomPosition, end: RoomPosition): PathFinderPath {
+  public static simplePathFinderWithObstacles(
+    start: RoomPosition,
+    end: RoomPosition,
+    options: { range?: number; ignoreCreeps?: string[]; allowUnseenRooms?: boolean } = {}
+  ): PathFinderPath {
     const result = PathFinder.search(
       start,
-      { pos: end, range: 0 },
+      { pos: end, range: options.range ?? 0 },
       {
         plainCost: 2,
         swampCost: 10,
@@ -324,7 +327,7 @@ export class Helper {
         roomCallback: roomName => {
           const room = Game.rooms[roomName];
           if (!room) {
-            return false;
+            return options.allowUnseenRooms ?? false;
           }
 
           const costs = new PathFinder.CostMatrix();
@@ -345,7 +348,9 @@ export class Helper {
 
           const creeps = room.find(FIND_CREEPS);
           for (const creep of creeps) {
-            blocked.add(`${creep.pos.x}:${creep.pos.y}`);
+            if (!options.ignoreCreeps?.includes(creep.name)) {
+              blocked.add(`${creep.pos.x}:${creep.pos.y}`);
+            }
           }
 
           for (let x = 0; x < 50; x++) {

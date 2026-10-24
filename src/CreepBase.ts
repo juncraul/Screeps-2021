@@ -5,6 +5,7 @@ import { CreepType } from "CreepType";
 import BaseRoomStats from "Areas/BaseRoom/BaseRoomStats";
 
 const MOVE_TO_REUSE = 5;
+const STORAGE_RESERVED_CAPACITY = 5000;
 
 export class CreepBase {
   private static readonly HARVEST_DIRECT_COLLECT_INTENT = "__harvest_direct__";
@@ -338,7 +339,9 @@ export class CreepBase {
       return;
     }
 
-    this.withdraw(targetCollect, availableResources[0]);
+    const resourceToCollect =
+      availableResources.find(resource => resource !== RESOURCE_ENERGY) ?? availableResources[0];
+    this.withdraw(targetCollect, resourceToCollect);
 
     if (this.store.getFreeCapacity() === 0 || this.getCollectTargetResources(targetCollect).length === 0) {
       this.completeTask("📦✔️");
@@ -789,6 +792,15 @@ export class CreepBase {
     resourceType: ResourceConstant,
     amount?: number
   ): ScreepsReturnCode {
+    if (
+      resourceType === RESOURCE_ENERGY &&
+      "structureType" in target &&
+      target.structureType === STRUCTURE_STORAGE &&
+      (target as StructureStorage).store.getFreeCapacity() < STORAGE_RESERVED_CAPACITY
+    ) {
+      return ERR_FULL;
+    }
+
     let result: ScreepsReturnCode;
     if (target instanceof CreepBase) {
       if (amount) {
